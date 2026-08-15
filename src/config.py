@@ -14,6 +14,9 @@ CONFIG_PATH = ROOT / "config.yaml"
 DOCS_DIR = ROOT / "docs"
 DATA_DIR = DOCS_DIR / "data"
 ARCHIVE_DIR = DATA_DIR / "archive"
+# Di luar docs/ supaya tidak ikut terbit ke GitHub Pages.
+STATE_DIR = ROOT / "state"
+SUBSCRIBERS_PATH = STATE_DIR / "subscribers.enc"
 
 
 class ConfigError(Exception):
@@ -26,6 +29,7 @@ class Secrets:
     telegram_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
     fred_api_key: Optional[str] = None
+    telegram_subscriber_key: Optional[str] = None
 
     @property
     def llm_enabled(self) -> bool:
@@ -44,6 +48,7 @@ class Config:
     llm: Dict[str, Any] = field(default_factory=dict)
     news: Dict[str, Any] = field(default_factory=dict)
     statements: Dict[str, Any] = field(default_factory=dict)
+    telegram: Dict[str, Any] = field(default_factory=dict)
     source_tiers: Dict[str, int] = field(default_factory=dict)
     fomc_dates: List[str] = field(default_factory=list)
     archive_retention_days: int = 90
@@ -88,6 +93,7 @@ def load_config(path: Path = CONFIG_PATH) -> Config:
         telegram_token=os.environ.get("TELEGRAM_TOKEN") or None,
         telegram_chat_id=os.environ.get("TELEGRAM_CHAT_ID") or None,
         fred_api_key=os.environ.get("FRED_API_KEY") or None,
+        telegram_subscriber_key=os.environ.get("TELEGRAM_SUBSCRIBER_KEY") or None,
     )
 
     cfg = Config(
@@ -97,6 +103,7 @@ def load_config(path: Path = CONFIG_PATH) -> Config:
         llm=raw.get("llm", {}) or {},
         news=raw.get("news", {}) or {},
         statements=raw.get("statements", {}) or {},
+        telegram=raw.get("telegram", {}) or {},
         source_tiers=raw.get("source_tiers", {}) or {},
         fomc_dates=[str(d) for d in (raw.get("fomc_dates") or [])],
         archive_retention_days=int(raw.get("archive_retention_days", 90)),

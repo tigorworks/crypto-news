@@ -163,7 +163,7 @@ Untuk mengirim ke grup: tambahkan bot ke grup, kirim satu pesan di grup, lalu ul
 ### 3. Ambil API key OpenRouter
 
 1. Daftar di [openrouter.ai](https://openrouter.ai), buka **Keys**, buat key baru.
-2. Isi saldo secukupnya. Rantai analisa terdiri dari 9 langkah dengan keluaran naratif panjang, dan `max_cost_usd_per_run: 0.60` adalah **plafon**, bukan tarif tetap — dengan model bawaan, satu run biasanya ~$0,25–0,35 (lihat tabel di langkah 4). Turunkan plafonnya kalau mau lebih hemat; langkah yang kena batas dilewati dan brief tetap terbit.
+2. Isi saldo secukupnya. `max_cost_usd_per_run: 0.25` adalah **plafon**, bukan tarif tetap — dengan model bawaan, satu run diperkirakan ~$0,08–0,12 (lihat tabel di langkah 4). Langkah yang kena batas dilewati dan brief tetap terbit.
 
 ### 4. Model LLM di `config.yaml`
 
@@ -175,13 +175,15 @@ Kesembilan step sudah terisi model yang wajar sebagai titik awal, jadi bisa lang
 | `classify` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | patuh JSON, keluaran pendek |
 | `mechanism` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | butuh penalaran sebab-akibat |
 | `statements` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | menyaring pernyataan dari derau |
-| `technical` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menafsirkan indikator lintas timeframe |
-| `whale` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | membaca divergensi posisi |
-| `synthesis` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menulis analisa panjang |
-| `outlook` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menggabungkan banyak sumber |
+| `technical` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | menafsirkan indikator lintas timeframe |
+| `whale` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | membaca divergensi posisi |
+| `synthesis` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | menulis analisa panjang |
+| `outlook` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | menggabungkan banyak sumber |
 | `critic` | `openai/gpt-5.1` | `google/gemini-3.1-flash-lite-preview` | **beda keluarga** dari `synthesis` |
 
-Dengan kombinasi ini satu run biasanya menghabiskan sekitar **$0,25–0,35**, di bawah plafon `max_cost_usd_per_run: 0.60`. Dua run per hari berarti kira-kira **$15–21 per bulan**.
+Dengan kombinasi ini satu run diperkirakan **$0,08–0,12**, di bawah plafon `max_cost_usd_per_run: 0.25`. Satu run per hari berarti sekitar **$2,5–3,6 per bulan**.
+
+Step naratif memakai DeepSeek karena jauh lebih murah dari model kelas atas. Konsekuensinya jujur: prosa Indonesia panjang dari DeepSeek umumnya sedikit di bawah model premium. Kalau hasilnya terasa kurang, naikkan `synthesis` saja ke model yang lebih kuat — itu satu step yang paling terasa bedanya, dan biayanya tetap terkendali.
 
 Entri kedua tiap baris adalah cadangan: OpenRouter otomatis memakainya kalau model pertama error, kena rate limit, atau kehabisan kapasitas.
 
@@ -216,6 +218,7 @@ Kalau sebuah slug ternyata sudah pensiun, sistem tidak akan mogok: model cadanga
 | `TELEGRAM_TOKEN` | Ya |
 | `TELEGRAM_CHAT_ID` | Ya |
 | `FRED_API_KEY` | Tidak — dilewati kalau kosong |
+| `TELEGRAM_SUBSCRIBER_KEY` | Tidak — hanya kalau ingin fitur pelanggan `/start` |
 
 ### 6. Aktifkan GitHub Pages
 
@@ -241,14 +244,53 @@ python -m http.server 8000 --directory docs
 
 ---
 
+## Mengirim ke Banyak Penerima
+
+Ada dua cara, bisa dipakai bersamaan.
+
+### Cara 1: daftar tetap
+
+`TELEGRAM_CHAT_ID` menerima beberapa ID sekaligus, dipisah koma:
+
+```
+123311673,-1001234567890,987654321
+```
+
+Cocok untuk beberapa penerima yang jarang berubah, termasuk grup (ID grup diawali tanda minus).
+
+### Cara 2: pelanggan lewat /start
+
+Siapa pun bisa mengirim `/start` ke bot untuk berlangganan, dan `/stop` untuk berhenti. Tiap run membaca perintah baru, mengirim sapaan ke pendaftar, lalu memasukkan mereka ke daftar kirim.
+
+Butuh satu secret tambahan: **`TELEGRAM_SUBSCRIBER_KEY`** — isi bebas, misalnya hasil `openssl rand -base64 32`.
+
+**Kenapa ada kunci itu:** chat ID Telegram adalah identitas personal yang tetap. Repo ini kemungkinan publik, jadi daftar pelanggan disimpan **terenkripsi** di `state/subscribers.enc`. Kalau secret tidak diisi, fitur pelanggan **dimatikan** — bukan diturunkan diam-diam jadi teks biasa, karena kebocoran semacam itu baru ketahuan setelah terlambat.
+
+Jangan mengganti kunci setelah ada pelanggan terdaftar; kunci lama tidak bisa dipulihkan dan daftarnya harus dibangun ulang.
+
+Beberapa hal yang sudah ditangani:
+
+- Telegram menyimpan update yang belum diambil selama **24 jam**, jadi selama brief jalan minimal sekali sehari tidak ada pendaftaran yang terlewat.
+- Penerima yang **memblokir bot** otomatis dikeluarkan dari daftar. Error sementara seperti Bad Gateway **tidak** mengeluarkan siapa pun.
+- Ada jeda antar pesan supaya tidak menabrak batas ~30 pesan/detik Telegram.
+
+### Alternatif paling sederhana: channel
+
+Kalau tujuannya menyiarkan ke banyak orang, **channel Telegram** sering lebih praktis: buat channel, jadikan bot sebagai admin, lalu isi `TELEGRAM_CHAT_ID` dengan ID channel. Telegram sendiri yang mengurus daftar anggota — tidak ada chat ID yang perlu disimpan, tidak ada batas jumlah, dan tidak ada state sama sekali.
+
+---
+
 ## Jadwal
 
-Workflow berjalan dua kali sehari:
+Workflow berjalan sekali sehari:
 
 | Cron (UTC) | Waktu WIB |
 |---|---|
-| `0 0 * * *` | 07:00 |
-| `0 13 * * *` | 20:00 |
+| `0 23 * * *` | 06:00 |
+
+**Kenapa 06:00 WIB dan bukan 07:00?** Candle harian Binance berganti tepat pukul 00:00 UTC — yang persis sama dengan 07:00 WIB. Menjalankan brief di jam itu membuat candle 1D yang sedang berjalan baru berumur nol menit: volumenya nyaris nol, VWAP harian tidak bermakna, dan rasio "volume vs rata-rata" jadi menyesatkan. Pada 23:00 UTC candle sudah terisi 23 dari 24 jam, sesi saham AS sudah tutup dan tercerna, dan arus ETF harian sudah terbit.
+
+Kalau tetap ingin 07:00 WIB, ganti ke `0 0 * * *` — sadari saja angka volume harian pada run itu tidak bisa dipercaya.
 
 Catatan penting:
 
@@ -283,6 +325,8 @@ src/
 ├── output/
 │   ├── builder.py          # susun brief.json, diff, arsip
 │   └── telegram.py         # render + kirim
+├── output/
+│   └── subscribers.py      # daftar pelanggan bot (terenkripsi)
 └── utils/
     ├── http.py             # retry + backoff + timeout
     ├── format.py           # angka gaya Indonesia
