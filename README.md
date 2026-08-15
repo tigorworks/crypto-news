@@ -128,34 +128,48 @@ Untuk mengirim ke grup: tambahkan bot ke grup, kirim satu pesan di grup, lalu ul
 ### 3. Ambil API key OpenRouter
 
 1. Daftar di [openrouter.ai](https://openrouter.ai), buka **Keys**, buat key baru.
-2. Isi saldo secukupnya. Rantai analisa kini 8 langkah dengan keluaran naratif panjang, jadi batas bawaannya `max_cost_usd_per_run: 0.40`. Dengan dua run per hari, itu berarti **maksimal sekitar $24/bulan** — biasanya jauh di bawah itu karena batas ini adalah plafon, bukan tarif tetap. Turunkan angkanya kalau mau lebih hemat; langkah yang kena batas akan dilewati dan brief tetap terbit.
+2. Isi saldo secukupnya. Rantai analisa terdiri dari 9 langkah dengan keluaran naratif panjang, dan `max_cost_usd_per_run: 0.40` adalah **plafon**, bukan tarif tetap — dengan model bawaan, satu run biasanya hanya ~$0,12–0,18 (lihat tabel di langkah 4). Turunkan plafonnya kalau mau lebih hemat; langkah yang kena batas dilewati dan brief tetap terbit.
 
-### 4. Isi nama model di `config.yaml`
+### 4. Model LLM di `config.yaml`
 
-Bagian `llm` sengaja diisi placeholder (`ISI-MODEL-...`) karena katalog OpenRouter berubah terus. Buka [openrouter.ai/models](https://openrouter.ai/models), lalu isi tiap step:
+Kesembilan step sudah terisi model yang wajar sebagai titik awal, jadi bisa langsung jalan tanpa diubah:
 
-| Step | Pilih model yang | Alasan |
-|---|---|---|
-| `filter` | paling murah | tugasnya hanya memberi skor 0–100 |
-| `classify` | kecil tapi patuh JSON | keluarannya terstruktur, bukan naratif |
-| `mechanism` | menengah | butuh penalaran sebab-akibat |
-| `statements` | menengah | menyaring pernyataan tokoh dari derau berita |
-| `technical` | menengah–kuat | menafsirkan indikator lintas timeframe |
-| `whale` | menengah–kuat | membaca divergensi posisi dan pola manipulasi |
-| `synthesis` | kuat | menulis analisa panjang berbahasa Indonesia |
-| `outlook` | kuat | menggabungkan teknikal, makro, dan geopolitik |
-| `critic` | kuat, **keluarga berbeda** dari `synthesis` | model yang sama cenderung tidak menemukan kesalahannya sendiri |
+| Step | Model utama | Cadangan | Alasan |
+|---|---|---|---|
+| `filter` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | murah, tugasnya cuma skor 0–100 |
+| `classify` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | patuh JSON, keluaran pendek |
+| `mechanism` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | butuh penalaran sebab-akibat |
+| `statements` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | menyaring pernyataan dari derau |
+| `technical` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menafsirkan indikator lintas timeframe |
+| `whale` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | membaca divergensi posisi |
+| `synthesis` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menulis analisa panjang |
+| `outlook` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menggabungkan banyak sumber |
+| `critic` | `openai/gpt-5.1` | `google/gemini-3.1-flash-lite-preview` | **beda keluarga** dari `synthesis` |
 
-Tiap step berupa array — model kedua dipakai otomatis oleh OpenRouter kalau yang pertama error atau kena rate limit.
+Dengan kombinasi ini satu run biasanya menghabiskan sekitar **$0,12–0,18**, jauh di bawah plafon `max_cost_usd_per_run: 0.40`. Dua run per hari berarti kira-kira **$7–11 per bulan**.
 
-```yaml
-llm:
-  filter:    ["penyedia/model-murah", "penyedia/model-cadangan"]
-  synthesis: ["penyedia/model-kuat", "penyedia/model-cadangan"]
-  critic:    ["penyedia-lain/model-kuat", "penyedia-lain/model-cadangan"]
+Entri kedua tiap baris adalah cadangan: OpenRouter otomatis memakainya kalau model pertama error, kena rate limit, atau kehabisan kapasitas.
+
+**Aturan yang jangan dilanggar:** `critic` harus dari **keluarga model berbeda** dengan `synthesis`. Model cenderung tidak menemukan kesalahannya sendiri — kalau keduanya sekeluarga, fungsi pemeriksaan jadi percuma. Saat ini `synthesis` memakai Anthropic dan `critic` memakai OpenAI.
+
+#### Memelihara daftar model
+
+Katalog OpenRouter berubah cukup sering: model pensiun, slug berganti, harga turun. Ada skrip untuk itu:
+
+```bash
+export OPENROUTER_API_KEY="sk-or-v1-..."
+
+python -m scripts.list_models --cek          # periksa slug di config.yaml
+python -m scripts.list_models                # 40 model termurah
+python -m scripts.list_models --cari claude  # saring per nama
+python -m scripts.list_models --maks-harga 1 # <= $1 per juta token input
+python -m scripts.list_models --gratis       # model berharga nol
+python -m scripts.list_models --urut konteks # urut dari konteks terpanjang
 ```
 
-Kalau placeholder dibiarkan, langkah LLM otomatis dilewati dan brief tetap terbit — hanya tanpa bagian analisa AI.
+`--cek` membandingkan tiap slug di `config.yaml` dengan katalog yang sedang aktif dan menandai yang sudah tidak ada. Keluar dengan kode 1 kalau ada yang perlu diperbaiki, jadi bisa dipakai di CI.
+
+Kalau sebuah slug ternyata sudah pensiun, sistem tidak akan mogok: model cadangan dipakai, dan kalau dua-duanya gagal step itu dilewati sementara brief tetap terbit — kegagalannya tercatat di `data_quality.catatan`.
 
 ### 5. Isi GitHub Secrets
 
@@ -234,6 +248,9 @@ src/
     ├── http.py             # retry + backoff + timeout
     ├── format.py           # angka gaya Indonesia
     └── timezone.py         # helper WIB + format tanggal Indonesia
+
+scripts/
+└── list_models.py          # bantu memelihara daftar model OpenRouter
 
 docs/                       # GitHub Pages
 ├── index.html
