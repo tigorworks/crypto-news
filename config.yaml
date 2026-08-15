@@ -1,0 +1,71 @@
+# Konfigurasi Bitcoin Market Brief
+# Semua nilai di sini aman untuk repo publik (tidak ada kredensial).
+
+symbol: BTCUSDT
+timeframes: [1d, 4h, 1h]
+candle_limit: 250
+
+llm:
+  base_url: https://openrouter.ai/api/v1
+  # Setiap step memakai array agar OpenRouter otomatis fallback ke model berikutnya
+  # kalau model pertama error / rate limit / kehabisan kapasitas.
+  #
+  # ISI SENDIRI setelah mengecek katalog https://openrouter.ai/models
+  # Aturan praktis:
+  #   filter    -> model paling murah (tugasnya cuma memberi skor 0-100)
+  #   classify  -> model kecil tapi patuh JSON
+  #   mechanism -> model menengah (butuh penalaran sebab-akibat)
+  #   synthesis -> model kuat (menulis narasi panjang)
+  #   critic    -> model kuat dari KELUARGA BERBEDA dengan synthesis,
+  #                supaya bias model tidak saling menutupi
+  filter:    ["ISI-MODEL-MURAH", "ISI-MODEL-CADANGAN"]
+  classify:  ["ISI-MODEL-KECIL", "ISI-MODEL-CADANGAN"]
+  mechanism: ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
+  synthesis: ["ISI-MODEL-KUAT", "ISI-MODEL-CADANGAN"]
+  critic:    ["ISI-MODEL-KUAT-KELUARGA-LAIN", "ISI-MODEL-CADANGAN"]
+  max_cost_usd_per_run: 0.15
+
+news:
+  max_fetch: 120
+  max_after_filter: 25
+  max_deep_analysis: 10
+  max_age_hours: 36
+  min_relevance: 40
+  feeds:
+    - https://www.coindesk.com/arc/outboundfeeds/rss/
+    - https://cointelegraph.com/rss
+    - https://decrypt.co/feed
+    - https://bitcoinmagazine.com/feed
+    - https://www.theblock.co/rss.xml
+
+# Tier kredibilitas sumber untuk pembobotan skor sentimen.
+# tier 1 = 1.0, tier 2 = 0.7, tier 3 = 0.4 (default tier 3 kalau tidak terdaftar)
+source_tiers:
+  reuters.com: 1
+  bloomberg.com: 1
+  wsj.com: 1
+  ft.com: 1
+  apnews.com: 1
+  cnbc.com: 1
+  coindesk.com: 2
+  theblock.co: 2
+  cointelegraph.com: 2
+  decrypt.co: 2
+  bitcoinmagazine.com: 3
+
+# Tanggal FOMC (UTC). Perbarui sekali setahun dari kalender resmi The Fed.
+fomc_dates:
+  - 2026-01-28
+  - 2026-03-18
+  - 2026-04-29
+  - 2026-06-17
+  - 2026-07-29
+  - 2026-09-16
+  - 2026-11-04
+  - 2026-12-16
+
+archive_retention_days: 90
+
+# Link yang dipakai di pesan Telegram dan footer web.
+site_url: https://tigorworks.github.io/crypto-news/
+repo_url: https://github.com/tigorworks/crypto-news
