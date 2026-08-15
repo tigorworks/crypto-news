@@ -119,9 +119,12 @@ def collect(hari: int = 30) -> Dict[str, Any]:
             if nilai is None:
                 continue
             try:
-                data[kunci_kita] = float(nilai)
+                angka = float(nilai)
             except (TypeError, ValueError):
                 continue
+            # Rasio cukup 3 desimal; nilai besar (kapitalisasi, pasokan,
+            # jumlah alamat) dibulatkan ke bilangan bulat.
+            data[kunci_kita] = round(angka, 3) if abs(angka) < 1000 else round(angka)
 
         # Perubahan sebulan untuk metrik yang arahnya bermakna.
         for kunci_cm, kunci_kita in METRIK.items():

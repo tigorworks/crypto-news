@@ -156,6 +156,19 @@
 
             <div class="mt-4 h-40"><canvas id="grafikHarga"></canvas></div>
 
+            <template x-if="data.tautan_luar?.length">
+              <div class="mt-4 flex flex-wrap gap-2">
+                <template x-for="t in data.tautan_luar" :key="t.url">
+                  <a :href="t.url" target="_blank" rel="noopener noreferrer"
+                     class="tap inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+                            bg-amber-500 hover:bg-amber-600 text-white transition">
+                    <i :data-lucide="t.ikon || 'external-link'" class="w-4 h-4"></i>
+                    <span x-text="t.label"></span>
+                  </a>
+                </template>
+              </div>
+            </template>
+
             <dl class="mt-4 grid grid-cols-3 gap-3 text-sm">
               <div><dt class="text-slate-500 dark:text-slate-400">Tertinggi 24j</dt>
                    <dd class="font-semibold" x-text="uang(data.price.high_24h)"></dd></div>
@@ -483,7 +496,7 @@
           <section id="s-pernyataan" class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
             <h2 class="font-semibold flex items-center gap-2">
               <i data-lucide="megaphone" class="w-4 h-4 text-slate-400"></i> Pernyataan Berpengaruh
-              <span class="text-sm font-normal text-slate-400" x-text="'(' + data.statements.length + ')'"></span>
+              <span class="text-sm font-normal text-slate-400" x-text="'(' + pernyataanTersaring.length + ')'"></span>
             </h2>
             <p class="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5">
               <span class="inline-flex items-center gap-1 text-[11px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-600 text-white shrink-0">
@@ -549,10 +562,21 @@
               </template>
             </ul>
 
-            <template x-if="data.statements.length > pernyataanTampil.length || semuaPernyataan">
-              <button @click="semuaPernyataan = !semuaPernyataan"
-                      class="mt-3 w-full sm:w-auto px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition"
-                      x-text="semuaPernyataan ? 'Tampilkan lebih sedikit' : ('Tampilkan semua ' + data.statements.length + ' pernyataan')"></button>
+            <template x-if="totalHalamanPernyataan > 1">
+              <div class="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <button @click="gantiHalamanPernyataan(-1)" :disabled="halamanPernyataan === 1"
+                        class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                  <span class="hidden sm:inline">Sebelumnya</span>
+                </button>
+                <span class="text-sm text-slate-500 dark:text-slate-400 text-center"
+                      x-text="'Halaman ' + halamanPernyataan + ' dari ' + totalHalamanPernyataan + ' · ' + pernyataanTersaring.length + ' pernyataan'"></span>
+                <button @click="gantiHalamanPernyataan(1)" :disabled="halamanPernyataan === totalHalamanPernyataan"
+                        class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                  <span class="hidden sm:inline">Berikutnya</span>
+                  <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+              </div>
             </template>
           </section>
         </template>
@@ -656,9 +680,15 @@
                 Bagian ini dihasilkan oleh AI dan dapat mengandung kesalahan. Data mentah di atas tidak dihasilkan AI.
               </p>
             </div>
-            <template x-if="data.ai.model_used">
-              <span class="text-xs sm:text-[11px] text-indigo-900/60 dark:text-indigo-200/60" x-text="'Model: ' + data.ai.model_used"></span>
-            </template>
+            <div class="flex items-center gap-2 flex-wrap">
+              <template x-if="data.ai.critic && data.ai.critic.dijalankan === false">
+                <span class="text-xs sm:text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                      title="Pemeriksa fakta gagal dijalankan pada run ini">belum terverifikasi</span>
+              </template>
+              <template x-if="data.ai.model_used">
+                <span class="text-xs sm:text-[11px] text-indigo-900/60 dark:text-indigo-200/60" x-text="'Model: ' + data.ai.model_used"></span>
+              </template>
+            </div>
           </div>
 
           <!-- Critic gagal: sembunyikan narasi, tampilkan peringatan -->

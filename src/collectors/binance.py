@@ -85,9 +85,13 @@ def fetch_funding_rate(symbol: str) -> Optional[float]:
     except (HttpError, KeyError, ValueError, TypeError) as exc:
         log.warning("Funding rate Binance gagal (%s), coba Bybit", _ringkas(exc))
         nilai = bybit.fetch_funding_rate(symbol)
-        if nilai is None:
-            log.warning("Bybit juga gagal, coba Deribit")
-            nilai = options.perp_funding_rate()
+        if nilai is not None:
+            log.info("Funding rate diambil dari Bybit")
+            return nilai
+        log.warning("Bybit juga gagal, coba Deribit")
+        nilai = options.perp_funding_rate()
+        if nilai is not None:
+            log.info("Funding rate diambil dari Deribit")
         return nilai
 
 
@@ -99,9 +103,13 @@ def fetch_open_interest(symbol: str) -> Optional[float]:
     except (HttpError, KeyError, ValueError, TypeError) as exc:
         log.warning("Open interest Binance gagal (%s), coba Bybit", _ringkas(exc))
         nilai = bybit.fetch_open_interest(symbol)
-        if nilai is None:
-            log.warning("Bybit juga gagal, coba Deribit")
-            nilai = options.perp_open_interest()
+        if nilai is not None:
+            log.info("Open interest diambil dari Bybit")
+            return nilai
+        log.warning("Bybit juga gagal, coba Deribit")
+        nilai = options.perp_open_interest()
+        if nilai is not None:
+            log.info("Open interest diambil dari Deribit")
         return nilai
 
 

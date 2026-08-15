@@ -39,8 +39,8 @@ function briefApp() {
     filterSentimen: '',
     daftarArsip: [],
     arsipDipilih: '',
-    semuaPernyataan: false,
     halamanBerita: 1,
+    halamanPernyataan: 1,
     perHalaman: 3,
     grafik: null,
     _jam: null,
@@ -543,12 +543,6 @@ function briefApp() {
       return item.filter((i) => i.ada);
     },
 
-    /* Layar sempit memotong daftar panjang supaya halaman tidak jadi
-       gulungan tanpa ujung; desktop menampilkan semuanya sekaligus. */
-    get layarSempit() {
-      return typeof window !== 'undefined' && window.innerWidth < 640;
-    },
-
     /* Berita dipaginasi 3 baris per halaman, bukan digulung habis: daftar
        panjang membuat bagian di bawahnya sulit dijangkau. */
     get totalHalamanBerita() {
@@ -568,12 +562,29 @@ function briefApp() {
       if (this.$nextTick) this.$nextTick(() => this.gambarIkon());
     },
 
-    get pernyataanTampil() {
-      const semua = (this.data?.statements || []).filter(
+    get pernyataanTersaring() {
+      const hasil = (this.data?.statements || []).filter(
         (s) => s.tokoh && !['tidak disebutkan', 'tidak diketahui'].includes(String(s.tokoh).toLowerCase())
       );
-      if (this.semuaPernyataan || !this.layarSempit) return semua;
-      return semua.slice(0, 3);
+      const maks = Math.max(1, Math.ceil(hasil.length / this.perHalaman));
+      if (this.halamanPernyataan > maks) this.halamanPernyataan = 1;
+      return hasil;
+    },
+
+    get totalHalamanPernyataan() {
+      return Math.max(1, Math.ceil(this.pernyataanTersaring.length / this.perHalaman));
+    },
+
+    get pernyataanTampil() {
+      const mulai = (this.halamanPernyataan - 1) * this.perHalaman;
+      return this.pernyataanTersaring.slice(mulai, mulai + this.perHalaman);
+    },
+
+    gantiHalamanPernyataan(arah) {
+      const tujuan = this.halamanPernyataan + arah;
+      if (tujuan < 1 || tujuan > this.totalHalamanPernyataan) return;
+      this.halamanPernyataan = tujuan;
+      if (this.$nextTick) this.$nextTick(() => this.gambarIkon());
     },
 
     get daftarMakro() {

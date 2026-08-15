@@ -219,6 +219,23 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     if funding is None and open_interest is None:
         gagal.append("funding_oi")
 
+    # Tidak ada bursa yang menyediakan riwayat OI dari IP runner ini, jadi
+    # perubahannya diturunkan dari brief sebelumnya. Satu titik pembanding
+    # sehari cukup untuk sinyal OI-vs-harga, dan jauh lebih baik daripada
+    # kehilangan sinyalnya sama sekali.
+    if not oi_history and open_interest is not None:
+        sebelumnya_awal = builder.brief_sebelumnya()
+        oi_lama = ((sebelumnya_awal or {}).get("market") or {}).get("open_interest")
+        if oi_lama:
+            oi_history = [
+                {"timestamp": 0, "open_interest": float(oi_lama)},
+                {"timestamp": 1, "open_interest": float(open_interest)},
+            ]
+            log.info(
+                "Riwayat OI tidak tersedia; perubahan dihitung dari brief sebelumnya "
+                "(%.0f -> %.0f)", float(oi_lama), float(open_interest),
+            )
+
     teknikal = technical.analyze(klines, price, oi_history, funding)
     if not teknikal.get("1d"):
         gagal.append("technical")
@@ -470,6 +487,15 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
 
             ai["critic"] = hasil_critic
 
+            # Critic yang gagal dijalankan diperlakukan sebagai lolos supaya
+            # analisa tidak hilang, tapi statusnya TIDAK boleh diam-diam
+            # tampak seperti sudah diverifikasi.
+            if not hasil_critic.get("dijalankan", True):
+                catatan.append(
+                    "Analisa AI terkirim tanpa sempat diverifikasi critic "
+                    "(pemeriksaan gagal dijalankan)."
+                )
+
             if hasil_critic["passed"]:
                 if hasil_sintesis:
                     ai["narrative"] = hasil_sintesis["narrative"]
@@ -564,6 +590,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             {"t": k["open_time"], "c": round(k["close"], 2)}
             for k in klines.get("1d", [])[-60:]
         ],
+        tautan_luar=cfg.tautan_luar,
         previous=sebelumnya,
     )
 

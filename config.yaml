@@ -144,3 +144,10 @@ archive_retention_days: 90
 # Link yang dipakai di pesan Telegram dan footer web.
 site_url: https://tigorworks.github.io/crypto-news/
 repo_url: https://github.com/tigorworks/crypto-news
+
+# Tautan tambahan yang muncul sebagai tombol di kartu harga.
+# `ikon` memakai nama ikon Lucide (https://lucide.dev/icons).
+tautan_luar:
+  - label: Arena Pertempuran BTC
+    url: https://tigorworks.github.io/crypto-battlefield/
+    ikon: swords
