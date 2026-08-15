@@ -30,7 +30,7 @@ DISCLAIMER = "Konten ini bersifat informasional dan bukan saran investasi."
 # Semua sumber yang dihitung dalam skor kualitas data.
 SUMBER_DIPANTAU = [
     "price", "technical", "funding_oi", "fear_greed",
-    "onchain", "etf_flow", "macro", "news", "whale",
+    "onchain", "etf_flow", "macro", "news", "whale", "statements",
 ]
 
 
@@ -222,6 +222,7 @@ def build_brief(
     macro: Dict[str, Any],
     whale: Dict[str, Any],
     news: List[Dict[str, Any]],
+    statements: List[Dict[str, Any]],
     aggregate: Dict[str, Any],
     calendar: List[Dict[str, Any]],
     conflicts: List[Dict[str, Any]],
@@ -245,6 +246,7 @@ def build_brief(
         "macro": macro,
         "whale": whale,
         "news": bersihkan_berita(news),
+        "statements": statements,
         "aggregate": aggregate,
         "calendar": calendar,
         "conflicts": conflicts,

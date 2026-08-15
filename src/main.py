@@ -23,6 +23,7 @@ from .collectors import (
     macro,
     market,
     news,
+    statements as statements_collector,
     whale,
 )
 from .config import Config, load_config
@@ -72,6 +73,7 @@ def _konteks_llm(
     diff: Dict[str, Any],
     posisi_whale: Dict[str, Any],
     agenda: List[Dict[str, Any]],
+    pernyataan: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Konteks ringkas untuk sintesis & critic.
 
@@ -107,6 +109,20 @@ def _konteks_llm(
             }
             for b in berita[:12]
         ],
+        "pernyataan_tokoh": [
+            {
+                "tokoh": p.get("tokoh"),
+                "ringkasan": p.get("ringkasan"),
+                "kutipan": p.get("kutipan"),
+                "topik": p.get("topik"),
+                "dampak_btc": p.get("dampak_btc"),
+                "kekuatan": p.get("kekuatan"),
+                "status": p.get("status"),
+                "mekanisme": p.get("mekanisme"),
+                "waktu_utc": p.get("waktu_utc"),
+            }
+            for p in pernyataan[:8]
+        ],
         "sinyal_bertentangan": conflicts,
         "perubahan_vs_sebelumnya": diff.get("ringkasan") if diff else None,
     }
@@ -117,7 +133,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     catatan: List[str] = []
 
     # -- 1. Harga + klines (FATAL kalau gagal) --------------------------
-    log.info("[1/18] Ambil harga dan klines")
+    log.info("[1/20] Ambil harga dan klines")
     data_harga = binance.fetch_price_and_klines(cfg.symbol, cfg.timeframes, cfg.candle_limit)
     price = data_harga["price"]
     klines = data_harga["klines"]
@@ -125,7 +141,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         catatan.append("Harga memakai sumber cadangan CoinGecko; candle merupakan hasil resampling.")
 
     # -- 2. Indikator teknikal ------------------------------------------
-    log.info("[2/18] Hitung indikator teknikal")
+    log.info("[2/20] Hitung indikator teknikal")
     funding = binance.fetch_funding_rate(cfg.symbol)
     open_interest = binance.fetch_open_interest(cfg.symbol)
     oi_history = binance.fetch_open_interest_history(cfg.symbol)
@@ -139,7 +155,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         log.info("Sinyal mencurigakan terdeteksi: %d pola", len(teknikal["sinyal_palsu"]))
 
     # -- 3. Data pasar + posisi whale ------------------------------------
-    log.info("[3/18] Ambil data pasar dan posisi whale")
+    log.info("[3/20] Ambil data pasar dan posisi whale")
     hasil_pasar = market.collect(cfg.symbol)
     gagal.extend(hasil_pasar["failed"])
     pasar = {
@@ -155,13 +171,13 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         catatan.append("Data posisi whale tidak tersedia; analisa manipulasi dilewati.")
 
     # -- 4. Makro --------------------------------------------------------
-    log.info("[4/18] Ambil data makro")
+    log.info("[4/20] Ambil data makro")
     hasil_makro = macro.collect(cfg.secrets.fred_api_key)
     gagal.extend(hasil_makro["failed"])
     makro = hasil_makro["data"]
 
     # -- 5. Berita -------------------------------------------------------
-    log.info("[5/18] Ambil berita RSS")
+    log.info("[5/20] Ambil berita RSS")
     hasil_berita = news.collect(
         cfg.news.get("feeds", []),
         max_fetch=int(cfg.news.get("max_fetch", 120)),
@@ -176,7 +192,19 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     for a in artikel:
         a["kredibilitas_sumber"] = cfg.tier(a.get("domain", ""))
 
-    # -- 6-8. Rangkaian LLM untuk berita ---------------------------------
+    # -- 6. Pernyataan tokoh berpengaruh ----------------------------------
+    log.info("[6/20] Ambil pernyataan tokoh berpengaruh")
+    hasil_pernyataan = statements_collector.collect(cfg.statements)
+    kandidat_pernyataan = hasil_pernyataan["items"]
+    gagal.extend(hasil_pernyataan["failed"])
+    if hasil_pernyataan["sumber_gagal"] and not hasil_pernyataan["failed"]:
+        catatan.append(
+            "Sebagian sumber pernyataan tidak terjangkau: "
+            + ", ".join(hasil_pernyataan["sumber_gagal"])
+        )
+    pernyataan: List[Dict[str, Any]] = []
+
+    # -- 7-10. Rangkaian LLM untuk berita dan pernyataan ---------------------------------
     client: Optional[LLMClient] = None
     if cfg.secrets.llm_enabled and artikel:
         client = LLMClient(
@@ -190,7 +218,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         log.warning("OPENROUTER_API_KEY kosong, pipeline berjalan tanpa analisa AI")
 
     if client:
-        log.info("[6/18] LLM filter relevansi")
+        log.info("[7/20] LLM filter relevansi")
         artikel = news_analysis.filter_relevansi(
             client,
             cfg.llm_models("filter"),
@@ -199,15 +227,24 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             max_keep=int(cfg.news.get("max_after_filter", 25)),
         )
 
-        log.info("[7/18] LLM klasifikasi berita")
+        log.info("[8/20] LLM klasifikasi berita")
         artikel = news_analysis.klasifikasi(client, cfg.llm_models("classify"), artikel)
 
-        log.info("[8/18] LLM analisa mekanisme")
+        log.info("[9/20] LLM analisa mekanisme")
         artikel = news_analysis.analisa_mekanisme(
             client,
             cfg.llm_models("mechanism"),
             artikel,
             top_n=int(cfg.news.get("max_deep_analysis", 10)),
+        )
+
+        log.info("[10/20] LLM analisa pernyataan tokoh")
+        pernyataan = news_analysis.analisa_pernyataan(
+            client,
+            cfg.llm_models("statements"),
+            kandidat_pernyataan,
+            min_relevansi=int(cfg.statements.get("min_relevance", 35)),
+            maks_hasil=int(cfg.statements.get("max_analyzed", 12)),
         )
     else:
         # Tanpa LLM, tetap tampilkan berita paling relevan menurut skor kata kunci.
@@ -216,18 +253,18 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             a["relevansi_btc"] = a.get("skor_prioritas")
 
     # -- 9. Cross-check berita vs harga ----------------------------------
-    log.info("[9/18] Cross-check berita vs pergerakan harga 1H")
+    log.info("[11/20] Cross-check berita vs pergerakan harga 1H")
     hasil_cross = news_analysis.cross_check(artikel, klines.get("1h", []), funding)
     conflicts = hasil_cross["conflicts"]
 
     # -- 10. Agregasi sentimen -------------------------------------------
-    log.info("[10/18] Agregasi sentimen dan tema")
+    log.info("[12/20] Agregasi sentimen dan tema")
     agregat = news_analysis.skor_sentimen(artikel, cfg.tier)
     agregat["dominant_themes"] = news_analysis.tema_dominan(artikel)
     agregat["narrative_shift"] = ""
 
     # -- 11. Baca brief sebelumnya ---------------------------------------
-    log.info("[11/18] Baca brief sebelumnya")
+    log.info("[13/20] Baca brief sebelumnya")
     sebelumnya = builder.brief_sebelumnya()
     diff_sementara = builder.hitung_diff(
         {"price": price, "aggregate": agregat, "market": pasar, "technical": teknikal, "news": artikel},
@@ -254,16 +291,16 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     if client:
         konteks = _konteks_llm(
             price, teknikal, pasar, makro, artikel, agregat, conflicts,
-            diff_sementara, posisi_whale, agenda,
+            diff_sementara, posisi_whale, agenda, pernyataan,
         )
 
         # Interpretasi teknikal: angka tetap dari kode, penafsiran dari LLM.
-        log.info("[12/18] LLM interpretasi teknikal")
+        log.info("[14/20] LLM interpretasi teknikal")
         hasil_teknikal = news_analysis.interpretasi_teknikal(
             client, cfg.llm_models("technical"), teknikal, price
         )
 
-        log.info("[13/18] LLM analisa whale dan sinyal palsu")
+        log.info("[15/20] LLM analisa whale dan sinyal palsu")
         hasil_whale_ai = news_analysis.analisa_whale(
             client, cfg.llm_models("whale"), posisi_whale,
             teknikal.get("sinyal_palsu") or [], teknikal, price,
@@ -276,12 +313,12 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             "analisa_whale": hasil_whale_ai,
         }
 
-        log.info("[14/18] LLM sintesis narasi")
+        log.info("[16/20] LLM sintesis narasi")
         hasil_sintesis = news_analysis.sintesis(
             client, cfg.llm_models("synthesis"), konteks_sintesis
         )
 
-        log.info("[15/18] LLM analisa outlook")
+        log.info("[17/20] LLM analisa outlook")
         hasil_outlook = news_analysis.outlook(
             client, cfg.llm_models("outlook"), konteks_sintesis
         )
@@ -303,7 +340,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             )
 
         if any(teks_diperiksa.values()):
-            log.info("[16/18] LLM critic")
+            log.info("[18/20] LLM critic")
             hasil_critic = news_analysis.critic(
                 client, cfg.llm_models("critic"), teks_diperiksa, konteks
             )
@@ -355,6 +392,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         macro=makro,
         whale=posisi_whale,
         news=artikel,
+        statements=pernyataan,
         aggregate=agregat,
         calendar=agenda,
         conflicts=conflicts,
@@ -370,20 +408,20 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     # -- 15. Kirim Telegram (SEBELUM tulis file) --------------------------
     pesan = telegram.render(brief, cfg.site_url)
     if dry_run:
-        log.info("[17/18] Dry-run: Telegram tidak dikirim. Pratinjau pesan:\n%s", pesan)
+        log.info("[19/20] Dry-run: Telegram tidak dikirim. Pratinjau pesan:\n%s", pesan)
     elif cfg.secrets.telegram_enabled:
-        log.info("[17/18] Kirim Telegram")
+        log.info("[19/20] Kirim Telegram")
         terkirim = telegram.kirim(
             cfg.secrets.telegram_token, cfg.secrets.telegram_chat_id, pesan
         )
         if not terkirim:
             log.error("Telegram gagal dikirim, pipeline tetap lanjut menulis file")
     else:
-        log.warning("[17/18] TELEGRAM_TOKEN/CHAT_ID kosong, pengiriman dilewati")
+        log.warning("[19/20] TELEGRAM_TOKEN/CHAT_ID kosong, pengiriman dilewati")
 
     # -- 16. Tulis file ---------------------------------------------------
     if dry_run:
-        log.info("[18/18] Dry-run: arsip tidak ditulis, hanya latest.json diperbarui")
+        log.info("[20/20] Dry-run: arsip tidak ditulis, hanya latest.json diperbarui")
     ditulis = builder.tulis_output(
         brief,
         retention_days=cfg.archive_retention_days,

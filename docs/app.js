@@ -39,6 +39,8 @@ function briefApp() {
     filterSentimen: '',
     daftarArsip: [],
     arsipDipilih: '',
+    semuaBerita: false,
+    semuaPernyataan: false,
     grafik: null,
     _jam: null,
     _detak: 0,          // dinaikkan tiap menit supaya waktu relatif ikut menyegar
@@ -250,6 +252,20 @@ function briefApp() {
       }[jenis] || (jenis || '').replace(/_/g, ' ');
     },
 
+    labelStatus(status) {
+      return {
+        verbatim: 'pernyataan langsung',
+        dilaporkan_media: 'dilaporkan media',
+        rumor: 'rumor',
+      }[status] || status || 'tidak jelas';
+    },
+
+    kelasStatusPernyataan(status) {
+      if (status === 'verbatim') return 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900';
+      if (status === 'dilaporkan_media') return 'bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200';
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
+    },
+
     labelZona(zona) {
       return { jenuh_beli: 'jenuh beli', jenuh_jual: 'jenuh jual', netral: 'netral' }[zona] || zona || '';
     },
@@ -361,6 +377,42 @@ function briefApp() {
         { nama: 'Skenario menguat', data: o.skenario_naik || { pemicu: [] }, panah: '↑', warna: 'text-emerald-600 dark:text-emerald-400' },
         { nama: 'Skenario melemah', data: o.skenario_turun || { pemicu: [] }, panah: '↓', warna: 'text-rose-600 dark:text-rose-400' },
       ].filter((s) => s.data.pemicu?.length || s.data.kondisi);
+    },
+
+    /* Nav lompat ponsel. Bagian yang datanya kosong tidak ikut ditampilkan
+       supaya tidak ada tautan yang menuju ke mana-mana. */
+    get navLompat() {
+      const d = this.data;
+      if (!d) return [];
+      const item = [
+        { id: 's-harga', label: 'Harga', ada: true },
+        { id: 's-teknikal', label: 'Teknikal', ada: !!d.technical?.['1d'] },
+        { id: 's-pasar', label: 'Pasar', ada: true },
+        { id: 's-pernyataan', label: 'Pernyataan', ada: !!d.statements?.length },
+        { id: 's-whale', label: 'Whale', ada: this.adaDataWhale || !!d.technical?.sinyal_palsu?.length },
+        { id: 's-ai', label: 'Analisa AI', ada: true },
+        { id: 's-berita', label: 'Berita', ada: !!d.news?.length },
+        { id: 's-agenda', label: 'Agenda', ada: true },
+      ];
+      return item.filter((i) => i.ada);
+    },
+
+    /* Layar sempit memotong daftar panjang supaya halaman tidak jadi
+       gulungan tanpa ujung; desktop menampilkan semuanya sekaligus. */
+    get layarSempit() {
+      return typeof window !== 'undefined' && window.innerWidth < 640;
+    },
+
+    get beritaTampil() {
+      const semua = this.beritaTersaring;
+      if (this.semuaBerita || !this.layarSempit) return semua;
+      return semua.slice(0, 4);
+    },
+
+    get pernyataanTampil() {
+      const semua = this.data?.statements || [];
+      if (this.semuaPernyataan || !this.layarSempit) return semua;
+      return semua.slice(0, 3);
     },
 
     get daftarMakro() {

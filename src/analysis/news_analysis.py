@@ -444,6 +444,140 @@ def tema_dominan(articles: List[Dict[str, Any]], top_n: int = 3) -> List[str]:
 
 
 # --------------------------------------------------------------------------
+# LLM — pernyataan tokoh berpengaruh
+# --------------------------------------------------------------------------
+TOPIK_PERNYATAAN = ["kripto", "moneter", "tarif", "regulasi", "geopolitik", "fiskal", "lainnya"]
+SIKAP_PERNYATAAN = ["mendukung", "menentang", "netral"]
+STATUS_PERNYATAAN = ["verbatim", "dilaporkan_media", "rumor"]
+
+
+def analisa_pernyataan(
+    client: LLMClient,
+    models: List[str],
+    kandidat: List[Dict[str, Any]],
+    batch_size: int = 6,
+    min_relevansi: int = 35,
+    maks_hasil: int = 12,
+) -> List[Dict[str, Any]]:
+    """Saring kandidat jadi pernyataan yang benar-benar bisa menggerakkan pasar.
+
+    Sebagian besar kandidat dari pencarian berita hanya MENYEBUT nama tokoh
+    tanpa memuat pernyataan apa pun. Membuang item semacam itu adalah tugas
+    utama langkah ini — tanpanya daftar akan penuh derau.
+    """
+    if not kandidat:
+        return []
+
+    system = (
+        "Kamu analis yang melacak pernyataan tokoh berpengaruh yang bisa menggerakkan "
+        "pasar kripto dan aset berisiko.\n\n"
+        "Untuk setiap item, tentukan lebih dulu: APAKAH item ini benar-benar memuat "
+        "pernyataan, kebijakan, atau keputusan dari seorang tokoh?\n"
+        "  - Artikel yang hanya MENYEBUT nama tokoh tanpa pernyataannya -> relevansi_btc 0\n"
+        "  - Analisa jurnalis tentang tokoh, bukan ucapan tokohnya -> relevansi_btc 0\n"
+        "  - Berita lama yang diulang tanpa perkembangan baru -> relevansi_btc 0\n\n"
+        "Kalau ADA pernyataannya, isi field berikut.\n\n"
+        "Balas array JSON, satu objek per item:\n"
+        "  id (string, sama persis dengan input)\n"
+        "  tokoh: nama orang yang menyatakan (null kalau tidak jelas)\n"
+        "  kutipan: kutipan langsung kalau ada di teks, null kalau hanya parafrase\n"
+        "  ringkasan_id: satu kalimat isi pernyataan, dalam bahasa Indonesia\n"
+        f"  topik: salah satu dari {TOPIK_PERNYATAAN}\n"
+        f"  sikap_kripto: salah satu dari {SIKAP_PERNYATAAN} (sikap terhadap kripto/aset berisiko)\n"
+        "  dampak_btc: bullish | bearish | netral\n"
+        "  kekuatan: 1-5 (potensi dampak ke harga BTC)\n"
+        f"  status: salah satu dari {STATUS_PERNYATAAN}\n"
+        "  jalur_transmisi: likuiditas | risk_appetite | supply_demand | regulasi\n"
+        "  mekanisme: satu kalimat rantai sebab-akibat menuju harga BTC\n"
+        "  relevansi_btc: 0-100\n\n"
+        "PEMBEDAAN YANG WAJIB KAMU JAGA:\n"
+        "  - status 'verbatim' hanya kalau teks memuat ucapan/postingan langsung\n"
+        "  - status 'dilaporkan_media' kalau media melaporkan tokoh mengatakan sesuatu\n"
+        "  - status 'rumor' kalau bersumber dari 'orang dalam' atau belum dikonfirmasi\n"
+        "Jangan menaikkan status hanya karena beritanya terdengar meyakinkan.\n\n"
+        "Pernyataan soal suku bunga, tarif, regulasi kripto, cadangan Bitcoin negara, "
+        "dan independensi bank sentral biasanya berkekuatan tinggi. Komentar politik "
+        "umum tanpa kaitan ekonomi biasanya berkekuatan rendah.\n\n" + ATURAN_DASAR
+    )
+
+    hasil_per_id: Dict[str, Dict[str, Any]] = {}
+    for i in range(0, len(kandidat), batch_size):
+        batch = kandidat[i : i + batch_size]
+        payload = [
+            {
+                "id": k["id"],
+                "teks": k["teks"][:900],
+                "sumber": k["sumber"],
+                "jenis_sumber": k["jenis_sumber"],
+                "waktu_utc": k["waktu_utc"],
+            }
+            for k in batch
+        ]
+        try:
+            hasil = client.chat_json(
+                models,
+                system,
+                "Analisa item berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
+                step="statements",
+                max_tokens=3000,
+            )
+        except BudgetExceeded as exc:
+            log.warning("Analisa pernyataan berhenti di batch %d: %s", i // batch_size + 1, exc)
+            break
+        except LLMError as exc:
+            log.warning("Batch pernyataan %d gagal: %s", i // batch_size + 1, exc)
+            continue
+
+        for item in hasil if isinstance(hasil, list) else []:
+            if isinstance(item, dict) and item.get("id"):
+                hasil_per_id[str(item["id"])] = item
+
+    def enum(nilai: Any, daftar: List[str]) -> Optional[str]:
+        return nilai if nilai in daftar else None
+
+    keluaran: List[Dict[str, Any]] = []
+    for k in kandidat:
+        analisa = hasil_per_id.get(k["id"])
+        if not analisa:
+            continue
+        try:
+            relevansi = int(analisa.get("relevansi_btc") or 0)
+        except (TypeError, ValueError):
+            relevansi = 0
+        if relevansi < min_relevansi:
+            continue
+        try:
+            kekuatan = max(1, min(5, int(analisa.get("kekuatan"))))
+        except (TypeError, ValueError):
+            kekuatan = None
+
+        keluaran.append({
+            "id": k["id"],
+            "tokoh": (str(analisa["tokoh"])[:80] if analisa.get("tokoh") else k.get("tokoh")),
+            "kutipan": str(analisa["kutipan"])[:500] if analisa.get("kutipan") else None,
+            "ringkasan": str(analisa.get("ringkasan_id", ""))[:400] or None,
+            "topik": enum(analisa.get("topik"), TOPIK_PERNYATAAN),
+            "sikap_kripto": enum(analisa.get("sikap_kripto"), SIKAP_PERNYATAAN),
+            "dampak_btc": enum(analisa.get("dampak_btc"), SENTIMEN),
+            "kekuatan": kekuatan,
+            "status": enum(analisa.get("status"), STATUS_PERNYATAAN),
+            "jalur_transmisi": enum(analisa.get("jalur_transmisi"), JALUR_TRANSMISI),
+            "mekanisme": str(analisa["mekanisme"])[:400] if analisa.get("mekanisme") else None,
+            "relevansi_btc": relevansi,
+            "url": k["url"],
+            "sumber": k["sumber"],
+            "jenis_sumber": k["jenis_sumber"],
+            "waktu_utc": k["waktu_utc"],
+        })
+
+    keluaran.sort(
+        key=lambda s: (s["kekuatan"] or 0) * (s["relevansi_btc"] or 0), reverse=True
+    )
+    log.info("Pernyataan relevan: %d dari %d kandidat", len(keluaran), len(kandidat))
+    return keluaran[:maks_hasil]
+
+
+# --------------------------------------------------------------------------
 # LLM — interpretasi teknikal
 # --------------------------------------------------------------------------
 def interpretasi_teknikal(

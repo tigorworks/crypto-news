@@ -186,6 +186,29 @@ def _blok_agenda(brief: Dict[str, Any], maks: int = 3) -> List[str]:
     return baris
 
 
+def _blok_pernyataan(brief: Dict[str, Any], maks: int = 3) -> List[str]:
+    """Pernyataan tokoh berpengaruh yang berpotensi menggerakkan pasar."""
+    pernyataan = brief.get("statements") or []
+    if not pernyataan:
+        return []
+
+    baris = ["", "🗣 <b>Pernyataan Berpengaruh</b>"]
+    for s in pernyataan[:maks]:
+        tokoh = esc(s.get("tokoh") or "Tidak disebutkan")
+        isi = _potong(s.get("ringkasan") or s.get("kutipan") or "", 160)
+        detail = []
+        if s.get("dampak_btc"):
+            detail.append(s["dampak_btc"])
+        if s.get("kekuatan"):
+            detail.append(f"kekuatan {s['kekuatan']}")
+        # Rumor ditandai eksplisit supaya tidak terbaca seperti fakta.
+        if s.get("status") == "rumor":
+            detail.append("belum terkonfirmasi")
+        akhiran = f" ({', '.join(detail)})" if detail else ""
+        baris.append(f"• <b>{tokoh}</b>: {esc(isi)}{akhiran}")
+    return baris
+
+
 def _blok_whale(brief: Dict[str, Any]) -> List[str]:
     """Posisi whale vs ritel — angka mentah, belum ditafsirkan AI."""
     whale = brief.get("whale") or {}
@@ -316,22 +339,23 @@ def render(brief: Dict[str, Any], site_url: str = "") -> str:
     # dibaca ulang di web. Blok AI dipertahankan sampai langkah terakhir
     # karena justru itu isi utama brief ini.
     tangga = [
-        (5, True, True, True),
-        (3, True, True, True),
-        (2, True, True, True),
-        (1, True, True, True),
-        (0, True, True, True),
-        (0, False, True, True),   # buang sinyal palsu
-        (0, False, False, True),  # buang blok whale
-        (0, False, False, False), # buang agenda
+        (5, 3, True, True, True),
+        (3, 3, True, True, True),
+        (2, 2, True, True, True),
+        (1, 2, True, True, True),
+        (0, 2, True, True, True),
+        (0, 1, False, True, True),   # buang sinyal palsu
+        (0, 1, False, False, True),  # buang blok whale
+        (0, 0, False, False, False), # buang pernyataan dan agenda
     ]
 
-    for jumlah_berita, pakai_sinyal, pakai_whale, pakai_agenda in tangga:
+    for jumlah_berita, jumlah_pernyataan, pakai_sinyal, pakai_whale, pakai_agenda in tangga:
         bagian = kepala + inti
         if pakai_whale:
             bagian += _blok_whale(brief)
         if pakai_sinyal:
             bagian += _blok_sinyal_palsu(brief)
+        bagian += _blok_pernyataan(brief, jumlah_pernyataan)
         bagian += _blok_berita(brief, jumlah_berita)
         if pakai_agenda:
             bagian += _blok_agenda(brief)
