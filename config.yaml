@@ -2,7 +2,17 @@
 # Semua nilai di sini aman untuk repo publik (tidak ada kredensial).
 
 symbol: BTCUSDT
-timeframes: [1d, 4h, 1h]
+
+# Brief ini terbit sekali sehari, jadi analisanya bertumpu pada candle HARIAN.
+# Timeframe 4H dan 1H sudah dibuang: pada laporan harian keduanya cuma menambah
+# derau, dan pernah membuat pemeriksa fakta salah menuduh angka 1H sebagai
+# karangan karena tertukar dengan angka 4H.
+timeframes: [1d]
+
+# Candle halus yang TIDAK ikut dianalisa/ditampilkan. Dipakai satu hal saja:
+# mengukur reaksi harga satu jam setelah sebuah berita terbit.
+timeframe_reaksi: 1h
+
 candle_limit: 250
 
 llm:

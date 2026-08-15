@@ -19,6 +19,16 @@ HASHRATE_URL = "https://mempool.space/api/v1/mining/hashrate/3d"
 FEES_URL = "https://mempool.space/api/v1/fees/recommended"
 FARSIDE_URL = "https://farside.co.uk/bitcoin-etf-flow-all-data/"
 
+# Farside di belakang Cloudflare: User-Agent skrip ditolak, browser diterima.
+HEADER_BROWSER = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
 FNG_LABEL_ID = {
     "extreme fear": "Ketakutan Ekstrem",
     "fear": "Ketakutan",
@@ -86,8 +96,12 @@ def _etf_flow() -> Dict[str, Any]:
     Farside adalah halaman HTML biasa tanpa API. Struktur tabelnya bisa berubah
     kapan saja, jadi parsing di sini sengaja longgar: cari baris data terakhir
     yang tanggalnya valid, lalu ambil kolom total di ujung baris.
+
+    Header di bawah meniru browser sungguhan. Farside berada di belakang
+    Cloudflare, dan permintaan dengan User-Agent skrip dari IP pusat data
+    ditolak 403 — itu yang membuat sumber ini gagal terus di produksi.
     """
-    html = get_text(FARSIDE_URL, timeout=45)
+    html = get_text(FARSIDE_URL, timeout=45, headers=HEADER_BROWSER)
     rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL | re.IGNORECASE)
 
     for row in reversed(rows):
@@ -121,6 +135,9 @@ def collect(symbol: str) -> Dict[str, Any]:
         "fee_hour_sat_vb": None,
         "etf_flow_usd": None,
         "etf_flow_date": None,
+        # Ditandai True oleh pipeline kalau angkanya dipakai ulang dari brief
+        # sebelumnya karena scrape hari ini gagal.
+        "etf_flow_kedaluwarsa": False,
     }
     failed: List[str] = []
 

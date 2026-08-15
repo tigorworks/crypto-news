@@ -199,7 +199,9 @@ def _blok_berita(brief: Dict[str, Any], maks: int = 5) -> List[str]:
 
     baris = ["", "📰 <b>Berita Utama</b>"]
     for i, n in enumerate(berperingkat[:maks], 1):
-        baris.append(f"{i}. {esc(n['judul'][:110])}")
+        # Judul terjemahan dipakai kalau ada, supaya seluruh pesan satu bahasa.
+        judul_berita = n.get("judul_id") or n.get("judul") or ""
+        baris.append(f"{i}. {esc(judul_berita[:110])}")
         detail = [t for t in (_label_arah(n.get("sentimen")), _label_dampak(n.get("kekuatan"))) if t]
         if n.get("status_kepastian") in ("rumor", "belum_dikonfirmasi"):
             detail.append(KEPASTIAN[n["status_kepastian"]])
@@ -298,9 +300,12 @@ def _blok_aliran(brief: Dict[str, Any]) -> List[str]:
     baris = ["", "💵 <b>Aliran Dana</b>"]
     if fl.get("premium_coinbase_pct") is not None:
         p = fl["premium_coinbase_pct"]
+        # Label bisa kosong kalau sumbernya tidak memberi keterangan; tanpa
+        # penjagaan ini barisnya berakhir dengan tanda kurung kosong.
+        label = (fl.get("premium_coinbase_label") or "").strip()
+        keterangan = f" ({esc(label)})" if label else ""
         baris.append(
-            f"Premium Coinbase {'+' if p > 0 else ''}{_angka(p, 3)}% "
-            f"({esc(fl.get('premium_coinbase_label', ''))})"
+            f"Premium Coinbase {'+' if p > 0 else ''}{_angka(p, 3)}%{keterangan}"
         )
     if fl.get("stablecoin_cap_usd"):
         miliar = fl["stablecoin_cap_usd"] / 1e9
@@ -388,7 +393,10 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     # Kalau critic hanya menolak sebagian, bagian yang lolos tetap dikirim —
     # menahan semuanya berarti membuang analisa yang tidak bermasalah.
     if not critic.get("passed", True) and not tersisa:
-        baris.append("⚠️ Analisa AI ditahan karena tidak lolos verifikasi.")
+        baris.append(
+            "⚠️ Analisa AI ditahan: pemeriksa fakta menemukan angka yang tidak "
+            "ada di data. Data mentah di atas tetap valid."
+        )
         baris.append(PEMISAH)
         return baris
 
@@ -481,8 +489,15 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     baris.append("")
     if ditahan:
         baris.append(
-            "⚠️ <i>Bagian berikut ditahan karena tidak lolos verifikasi: "
-            + esc(", ".join(ditahan)) + ".</i>"
+            "⚠️ <i>Bagian berikut ditahan karena memuat angka yang tidak ada di "
+            "data: " + esc(", ".join(ditahan)) + ".</i>"
+        )
+    # Kalimat bernada anjuran TIDAK menahan analisa — cuma diberi keterangan,
+    # karena keputusannya tetap di tangan pembaca.
+    if ai.get("tanda_editorial"):
+        baris.append(
+            "<i>ℹ️ Sebagian kalimat terbaca menyerempet anjuran tindakan. "
+            "Ini analisa, bukan instruksi.</i>"
         )
     if not critic.get("dijalankan", True):
         baris.append("<i>⚠️ Belum sempat diverifikasi — pemeriksa fakta gagal dijalankan.</i>")

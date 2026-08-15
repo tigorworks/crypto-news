@@ -1,5 +1,6 @@
 /* Ringkasan Pasar Bitcoin — logika halaman.
- * Tanpa build step: Alpine.js untuk state, Chart.js untuk grafik, Lucide untuk ikon.
+ * Tanpa build step: Alpine.js untuk state, TradingView untuk grafik candle,
+ * Lucide untuk ikon.
  */
 
 const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -34,15 +35,15 @@ function briefApp() {
     memuat: true,
     error: '',
     gelap: document.documentElement.classList.contains('dark'),
-    tabTf: '1d',
     filterKategori: '',
     filterSentimen: '',
     daftarArsip: [],
     arsipDipilih: '',
+    // Berita dan pernyataan tokoh berbagi satu bagian dengan dua tab.
+    tabKonten: 'berita',
     halamanBerita: 1,
     halamanPernyataan: 1,
     perHalaman: 3,
-    grafik: null,
     _jam: null,
     _detak: 0,          // dinaikkan tiap menit supaya waktu relatif ikut menyegar
 
@@ -112,66 +113,46 @@ function briefApp() {
     },
 
     // ---------------------------------------------------------------
-    // Grafik harga
+    // Grafik candlestick (TradingView)
     // ---------------------------------------------------------------
+    /* Grafik garis dari price_series diganti widget TradingView: candle
+       sungguhan, bisa di-zoom, dan intervalnya bisa diubah pembaca sendiri.
+       Kalau skripnya gagal dimuat (jaringan diblokir, pemblokir iklan), area
+       grafik dibiarkan menampilkan pesan pengganti — bukan kotak kosong. */
     gambarGrafik() {
-      const kanvas = document.getElementById('grafikHarga');
-      if (!kanvas || !this.data || !window.Chart) return;
+      const wadah = document.getElementById('grafikTV');
+      if (!wadah) return;
 
-      const deret = this.data.price_series || [];
-      if (this.grafik) { this.grafik.destroy(); this.grafik = null; }
-      if (!deret.length) return;
+      if (!window.TradingView || !window.TradingView.widget) {
+        wadah.innerHTML =
+          '<div class="h-full flex items-center justify-center text-sm text-slate-400 text-center px-4">'
+          + 'Grafik TradingView tidak bisa dimuat. Angka harga di samping tetap akurat.'
+          + '</div>';
+        return;
+      }
 
-      const naik = deret[deret.length - 1].c >= deret[0].c;
-      const warna = naik ? '#10b981' : '#f43f5e';
-      const kisi = this.gelap ? 'rgba(148,163,184,0.15)' : 'rgba(100,116,139,0.15)';
-      const teks = this.gelap ? '#94a3b8' : '#64748b';
-
-      const isian = kanvas.getContext('2d').createLinearGradient(0, 0, 0, 160);
-      isian.addColorStop(0, naik ? 'rgba(16,185,129,0.25)' : 'rgba(244,63,94,0.25)');
-      isian.addColorStop(1, 'rgba(0,0,0,0)');
-
-      this.grafik = new Chart(kanvas, {
-        type: 'line',
-        data: {
-          labels: deret.map((d) => this.tanggalSingkat(d.t)),
-          datasets: [{
-            data: deret.map((d) => d.c),
-            borderColor: warna,
-            backgroundColor: isian,
-            borderWidth: 2,
-            fill: true,
-            tension: 0.25,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            pointHoverBackgroundColor: warna,
-          }],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => `$${formatAngka(ctx.parsed.y, 0)}`,
-              },
-            },
-          },
-          scales: {
-            x: { grid: { display: false }, ticks: { color: teks, maxTicksLimit: 6, font: { size: 10 } } },
-            y: {
-              grid: { color: kisi },
-              ticks: {
-                color: teks,
-                font: { size: 10 },
-                callback: (v) => `$${formatAngka(v, 0)}`,
-              },
-            },
-          },
-        },
-      });
+      wadah.innerHTML = '';
+      try {
+        new window.TradingView.widget({
+          container_id: 'grafikTV',
+          symbol: 'BINANCE:BTCUSDT',
+          interval: 'D',              // brief harian, jadi candle harian
+          timezone: 'Asia/Jakarta',
+          theme: this.gelap ? 'dark' : 'light',
+          style: '1',                 // 1 = candlestick
+          locale: 'id',
+          autosize: true,
+          hide_side_toolbar: true,
+          hide_legend: false,
+          allow_symbol_change: false,
+          save_image: false,
+          withdateranges: true,
+        });
+      } catch (e) {
+        wadah.innerHTML =
+          '<div class="h-full flex items-center justify-center text-sm text-slate-400">'
+          + 'Grafik gagal ditampilkan.</div>';
+      }
     },
 
     // ---------------------------------------------------------------
@@ -267,6 +248,15 @@ function briefApp() {
       return 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
     },
 
+    /* "kekuatan 4" tidak berarti apa-apa bagi pembaca umum; kata-katanya
+       disamakan dengan yang dipakai di pesan Telegram. */
+    labelDampak(kekuatan) {
+      return {
+        1: 'dampak kecil', 2: 'dampak terbatas', 3: 'dampak sedang',
+        4: 'dampak besar', 5: 'dampak sangat besar',
+      }[kekuatan] || '';
+    },
+
     labelZona(zona) {
       return { jenuh_beli: 'jenuh beli', jenuh_jual: 'jenuh jual', netral: 'netral' }[zona] || zona || '';
     },
@@ -331,8 +321,9 @@ function briefApp() {
         : `right:50%; width:${lebar}%`;
     },
 
+    /* Brief harian memakai satu timeframe saja: candle harian. */
     get tfAktif() {
-      return this.data?.technical?.[this.tabTf] || null;
+      return this.data?.technical?.['1d'] || null;
     },
 
     /* Bagian analis sesuai struktur laporan harian: temuan, penyebab, data
@@ -394,6 +385,12 @@ function briefApp() {
 
     get adaBagianDitahan() {
       return (this.data?.ai?.bagian_ditahan || []).length > 0;
+    },
+
+    /* Kalimat yang menyerempet anjuran tindakan tidak lagi menahan analisa —
+       cuma diberi keterangan. Yang tetap ditahan hanya kesalahan fakta. */
+    get tandaEditorial() {
+      return this.data?.ai?.tanda_editorial || [];
     },
 
     get adaDataInstitusional() {
@@ -534,10 +531,9 @@ function briefApp() {
         { id: 's-teknikal', label: 'Teknikal', ada: !!d.technical?.['1d'] },
         { id: 's-pasar', label: 'Pasar', ada: true },
         { id: 's-institusional', label: 'Opsi & Valuasi', ada: this.adaDataInstitusional },
-        { id: 's-pernyataan', label: 'Pernyataan', ada: !!d.statements?.length },
         { id: 's-whale', label: 'Whale', ada: this.adaDataWhale || !!d.technical?.sinyal_palsu?.length },
         { id: 's-ai', label: 'Analisa AI', ada: true },
-        { id: 's-berita', label: 'Berita', ada: !!d.news?.length },
+        { id: 's-berita', label: 'Berita', ada: !!d.news?.length || !!d.statements?.length },
         { id: 's-agenda', label: 'Agenda', ada: true },
       ];
       return item.filter((i) => i.ada);
@@ -585,6 +581,17 @@ function briefApp() {
       if (tujuan < 1 || tujuan > this.totalHalamanPernyataan) return;
       this.halamanPernyataan = tujuan;
       if (this.$nextTick) this.$nextTick(() => this.gambarIkon());
+    },
+
+    /* Berpindah tab berita/pernyataan: ikon Lucide pada isi yang baru muncul
+       perlu digambar ulang, kalau tidak yang tampil cuma placeholder kosong. */
+    gantiTab(nama) {
+      this.tabKonten = nama;
+      if (this.$nextTick) this.$nextTick(() => this.gambarIkon());
+    },
+
+    get adaPernyataan() {
+      return this.pernyataanTersaring.length > 0;
     },
 
     get daftarMakro() {

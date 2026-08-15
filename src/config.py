@@ -43,7 +43,10 @@ class Secrets:
 @dataclass
 class Config:
     symbol: str = "BTCUSDT"
-    timeframes: List[str] = field(default_factory=lambda: ["1d", "4h", "1h"])
+    timeframes: List[str] = field(default_factory=lambda: ["1d"])
+    # Candle halus khusus pengukuran reaksi harga terhadap berita — tidak ikut
+    # dianalisa maupun ditampilkan sebagai timeframe.
+    timeframe_reaksi: str = "1h"
     candle_limit: int = 250
     llm: Dict[str, Any] = field(default_factory=dict)
     news: Dict[str, Any] = field(default_factory=dict)
@@ -99,7 +102,8 @@ def load_config(path: Path = CONFIG_PATH) -> Config:
 
     cfg = Config(
         symbol=raw.get("symbol", "BTCUSDT"),
-        timeframes=raw.get("timeframes", ["1d", "4h", "1h"]),
+        timeframes=raw.get("timeframes", ["1d"]),
+        timeframe_reaksi=str(raw.get("timeframe_reaksi", "1h")),
         candle_limit=int(raw.get("candle_limit", 250)),
         llm=raw.get("llm", {}) or {},
         news=raw.get("news", {}) or {},

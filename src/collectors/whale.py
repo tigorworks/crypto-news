@@ -5,11 +5,16 @@ terbesar — proksi whale) dari "global account" (seluruh akun — didominasi
 ritel). Ketika keduanya berlawanan arah, itu sinyal yang tidak terlihat dari
 grafik harga saja.
 
-Pemisahan itu hanya ada di Binance. Saat Binance memblokir IP (403/451),
-Bybit dipakai sebagai cadangan — tapi Bybit cuma menyediakan rasio AGREGAT
-seluruh akun. Jadi yang pulih hanya sisi ritel; divergensi whale-vs-ritel
-tetap tidak tersedia dan dilaporkan apa adanya, bukan ditambal dengan angka
-yang berbeda maknanya.
+Urutan sumber:
+
+  1. Binance  — punya pemisahan top trader vs seluruh akun (terbaik)
+  2. OKX      — punya pemisahan yang sama, jadi divergensi tetap utuh
+  3. Bybit    — hanya rasio AGREGAT, jadi cuma sisi ritel yang pulih
+
+Binance menolak IP runner GitHub Actions (451) dan Bybit menolak lewat
+CloudFront (403), sehingga sebelum ada OKX sumber ini gagal pada setiap run.
+Apa pun yang tidak berhasil diambil tetap dilaporkan sebagai kosong, bukan
+ditambal angka dari sisi lain yang maknanya berbeda.
 """
 
 from __future__ import annotations
@@ -18,7 +23,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from ..utils.http import HttpError, get_json
-from . import bybit
+from . import bybit, okx
 from .binance import _ringkas
 
 log = logging.getLogger(__name__)
@@ -71,6 +76,7 @@ def collect(symbol: str, period: str = "1h", limit: int = 24) -> Dict[str, Any]:
         "taker_tren": None,
         "periode": period,
         "jam_dipantau": limit,
+        "sumber_whale": "binance",
         "sumber_ritel": "binance",
     }
     failed: List[str] = []
@@ -118,7 +124,33 @@ def collect(symbol: str, period: str = "1h", limit: int = 24) -> Dict[str, Any]:
         log.warning("Rasio taker gagal: %s", _ringkas(exc))
         failed.append("taker_flow")
 
-    # -- cadangan Bybit kalau Binance memblokir ---------------------------
+    # -- cadangan 1: OKX --------------------------------------------------
+    # OKX memisahkan top trader dari seluruh akun persis seperti Binance, jadi
+    # divergensi whale-vs-ritel bisa pulih utuh. Tiap sisi diisi sendiri-sendiri
+    # supaya sumber yang sebagian berhasil tetap berguna.
+    if data["whale_long_pct"] is None or data["ritel_long_pct"] is None:
+        cadangan_okx = okx.fetch_rasio_posisi()
+        for awalan, nama_gagal in (("whale", "whale_posisi"), ("ritel", "ritel_posisi")):
+            if data[f"{awalan}_long_pct"] is not None:
+                continue
+            if cadangan_okx.get(f"{awalan}_long_pct") is None:
+                continue
+            for akhiran in ("long_pct", "short_pct", "ratio", "tren_long_pp"):
+                data[f"{awalan}_{akhiran}"] = cadangan_okx.get(f"{awalan}_{akhiran}")
+            data["sumber_ritel" if awalan == "ritel" else "sumber_whale"] = "okx"
+            log.info("Rasio posisi %s diambil dari OKX", awalan)
+            if nama_gagal in failed:
+                failed.remove(nama_gagal)
+
+    if data["taker_buy_sell_ratio"] is None:
+        cadangan_taker = okx.fetch_taker_ratio()
+        if cadangan_taker["taker_buy_sell_ratio"] is not None:
+            data.update(cadangan_taker)
+            log.info("Rasio taker diambil dari OKX")
+            if "taker_flow" in failed:
+                failed.remove("taker_flow")
+
+    # -- cadangan 2: Bybit ------------------------------------------------
     # Bybit hanya punya rasio agregat seluruh akun, jadi yang bisa dipulihkan
     # cuma sisi "ritel". Divergensi whale-vs-ritel tetap tidak tersedia, dan
     # itu dilaporkan apa adanya ketimbang ditambal angka yang beda maknanya.
