@@ -18,10 +18,13 @@ mempool.space      ├─→ pipeline Python ─→ docs/data/latest.json ─→
 alternative.me     │        │
 Farside (ETF)      │        └──────────→ Telegram
 Yahoo Finance      │
-RSS kripto+makro ──┘
+RSS kripto+makro ──┤
+Truth Social       │   (pernyataan tokoh)
+whitehouse.gov     │
+Google News ───────┘
 ```
 
-Pipeline berjalan berurutan dalam 18 langkah (lihat `src/main.py`). Hanya langkah pertama — pengambilan harga — yang fatal. Sumber lain boleh gagal; kegagalannya dicatat di `data_quality.failed_sources` dan pipeline tetap menghasilkan brief.
+Pipeline berjalan berurutan dalam 20 langkah (lihat `src/main.py`). Hanya langkah pertama — pengambilan harga — yang fatal. Sumber lain boleh gagal; kegagalannya dicatat di `data_quality.failed_sources` dan pipeline tetap menghasilkan brief.
 
 **Pemisahan tanggung jawab yang dipegang ketat:**
 
@@ -41,6 +44,7 @@ Tidak ada satu pun angka di output yang dihitung oleh LLM. Prinsipnya tegas: **k
 - **Kenapa harga bergerak** — narasi 6–9 paragraf yang mengurai sebab pergerakan, plus daftar `penyebab_pergerakan` terurut lengkap dengan tingkat keyakinan dan dasar datanya. Kalau penyebabnya tidak jelas, model diwajibkan mengatakan begitu.
 - **Pembacaan teknikal** — kondisi tiap timeframe, di mana 1D/4H/1H saling menguatkan, di mana saling bertentangan, dan apa yang membatalkan pembacaannya.
 - **Sinyal palsu & pemain besar** — divergensi posisi top trader versus ritel, ditambah pola candle yang sering menandai pergerakan tidak tulus.
+- **Pernyataan tokoh berpengaruh** — ucapan pejabat dan tokoh yang berpotensi menggerakkan pasar, lengkap dengan status keasliannya.
 - **Pandangan ke depan** — skenario menguat/melemah beserta pemicunya, faktor geopolitik, keputusan besar yang dipantau, dan risiko utama.
 
 ### Deteksi sinyal palsu
@@ -58,6 +62,43 @@ Kode mendeteksi pola berikut dari geometri candle dan volume, lalu LLM menafsirk
 Ditambah divergensi posisi: Binance memisahkan statistik *top trader* (proksi pemain besar) dari *seluruh akun* (didominasi ritel). Ketika whale net short sementara ritel net long, itu pola distribusi klasik — dan sebaliknya untuk akumulasi.
 
 Semua ini disajikan sebagai **petunjuk probabilistik, bukan bukti**. Prompt secara eksplisit melarang model mengarang cerita manipulasi dari sinyal yang tipis, dan setiap temuan wajib menyertakan tingkat keyakinan.
+
+### Pelacakan pernyataan tokoh
+
+Pernyataan seperti "The Fed harus memangkas suku bunga" atau kebijakan soal cadangan Bitcoin bisa menggerakkan pasar dalam hitungan menit. Sistem melacaknya dari tiga lapis sumber:
+
+| Lapis | Sumber | Sifat |
+|---|---|---|
+| Primer | Truth Social (`realDonaldTrump`) | postingan langsung |
+| Resmi | `whitehouse.gov` presidential actions | dokumen resmi |
+| Media | Google News RSS (beberapa query terarah) | laporan atas pernyataan di platform mana pun |
+
+**Kenapa bukan langsung dari Twitter/X:** API gratis X sudah tidak mengizinkan pembacaan timeline sejak kebijakan barunya, dan instance Nitter praktis mati semua. Membaca X secara langsung sekarang menuntut API berbayar. Karena itu pernyataan di X tetap tertangkap, tapi lewat laporan media — bukan sebagai kutipan mentah.
+
+Konsekuensinya penting dan sengaja tidak disembunyikan: sebagian item adalah **laporan tentang** pernyataan, bukan pernyataan itu sendiri. Setiap item karena itu wajib punya `status`:
+
+- `verbatim` — teks memuat ucapan atau postingan langsung
+- `dilaporkan_media` — media melaporkan tokoh mengatakan sesuatu
+- `rumor` — bersumber "orang dalam", belum dikonfirmasi
+
+Di web ketiganya diberi warna berbeda; di Telegram item rumor ditandai "belum terkonfirmasi". Prompt melarang model menaikkan status hanya karena beritanya terdengar meyakinkan.
+
+Tugas utama langkah LLM di sini adalah **membuang derau**: pencarian berita untuk nama tokoh mengembalikan banyak artikel yang cuma menyebut namanya tanpa memuat pernyataan apa pun. Item semacam itu diberi relevansi 0 dan dibuang.
+
+Daftar akun dan query bisa diubah di `config.yaml` bagian `statements` — menambah tokoh lain (misalnya ketua bank sentral) cukup menambah query, tanpa mengubah kode.
+
+---
+
+## Tampilan Mobile
+
+Halaman dirancang mobile-first dan diuji di lebar 360px, 390px, dan 430px:
+
+- **Tanpa gulir horizontal** di semua lebar tersebut
+- **Target sentuh minimal 44px** pada perangkat sentuh, sesuai pedoman iOS dan Android
+- **Ukuran teks minimal 11px** di ponsel; ukuran yang lebih kecil hanya dipakai mulai breakpoint `sm`
+- **Nav lompat** khusus ponsel di bawah header — halaman ini panjang, jadi ada baris pintasan yang bisa digulir ke samping menuju tiap bagian
+- **Daftar panjang dipotong** di layar sempit (4 berita, 3 pernyataan) dengan tombol "Tampilkan semua"; di desktop semuanya langsung tampil
+- Grafik, tabel indikator, dan grid makro menyusun ulang jadi satu kolom
 
 ---
 
@@ -98,6 +139,7 @@ Bagian `llm` sengaja diisi placeholder (`ISI-MODEL-...`) karena katalog OpenRout
 | `filter` | paling murah | tugasnya hanya memberi skor 0–100 |
 | `classify` | kecil tapi patuh JSON | keluarannya terstruktur, bukan naratif |
 | `mechanism` | menengah | butuh penalaran sebab-akibat |
+| `statements` | menengah | menyaring pernyataan tokoh dari derau berita |
 | `technical` | menengah–kuat | menafsirkan indikator lintas timeframe |
 | `whale` | menengah–kuat | membaca divergensi posisi dan pola manipulasi |
 | `synthesis` | kuat | menulis analisa panjang berbahasa Indonesia |
@@ -171,7 +213,7 @@ Catatan penting:
 
 ```
 src/
-├── main.py                 # orkestrator 18 langkah
+├── main.py                 # orkestrator 20 langkah
 ├── config.py               # baca env + config.yaml
 ├── collectors/
 │   ├── binance.py          # harga, klines, funding, OI (+ fallback CoinGecko)
@@ -179,11 +221,12 @@ src/
 │   ├── macro.py            # yfinance: DXY, yield, minyak, indeks (+ FRED opsional)
 │   ├── news.py             # RSS + dedup + skor prioritas
 │   ├── whale.py            # posisi top trader vs ritel, aliran taker
+│   ├── statements.py       # pernyataan tokoh berpengaruh
 │   └── calendar.py         # agenda ekonomi 7 hari
 ├── analysis/
 │   ├── technical.py        # indikator + deteksi sinyal palsu — murni kode
 │   ├── llm.py              # klien OpenRouter + budget + logging biaya
-│   └── news_analysis.py    # rangkaian 8 panggilan LLM
+│   └── news_analysis.py    # rangkaian 9 panggilan LLM
 ├── output/
 │   ├── builder.py          # susun brief.json, diff, arsip
 │   └── telegram.py         # render + kirim
@@ -232,6 +275,7 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 |---|---|
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |
 | `failed_sources` memuat `etf_flow` | Struktur tabel Farside berubah. Tidak fatal — kolom ETF akan tampil "tidak tersedia". |
+| Bagian pernyataan kosong | Wajar kalau memang tidak ada pernyataan relevan dalam 48 jam. Kalau selalu kosong, cek `sumber_gagal` di log — Truth Social memang sering memblokir IP data center. |
 | Bagian whale kosong | Binance Futures memblokir IP runner. Tidak fatal — kartu posisi whale disembunyikan dan `failed_sources` memuat `whale`. |
 | Brief terbit tanpa bagian AI | `OPENROUTER_API_KEY` kosong, nama model masih placeholder, atau budget per run tercapai. Cek `data_quality.catatan`. |
 | Telegram tidak masuk | Pastikan sudah mengirim pesan pertama ke bot, dan `TELEGRAM_CHAT_ID` benar (ID grup diawali minus). |

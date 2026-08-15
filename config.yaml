@@ -15,6 +15,7 @@ llm:
   #   filter    -> model paling murah (tugasnya cuma memberi skor 0-100)
   #   classify  -> model kecil tapi patuh JSON
   #   mechanism -> model menengah (butuh penalaran sebab-akibat)
+  #   statements-> model menengah (menyaring pernyataan tokoh dari derau berita)
   #   technical -> model menengah/kuat (MENAFSIRKAN indikator, bukan menghitung)
   #   whale     -> model menengah/kuat (membaca posisi whale vs ritel)
   #   synthesis -> model kuat (menulis analisa panjang bersebab-akibat)
@@ -24,6 +25,7 @@ llm:
   filter:    ["ISI-MODEL-MURAH", "ISI-MODEL-CADANGAN"]
   classify:  ["ISI-MODEL-KECIL", "ISI-MODEL-CADANGAN"]
   mechanism: ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
+  statements: ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
   technical: ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
   whale:     ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
   synthesis: ["ISI-MODEL-KUAT", "ISI-MODEL-CADANGAN"]
@@ -81,6 +83,25 @@ fomc_dates:
   - 2026-09-16
   - 2026-11-04
   - 2026-12-16
+
+# Pelacakan pernyataan tokoh yang bisa menggerakkan pasar.
+# Twitter/X tidak dipakai langsung: API gratisnya tidak lagi mengizinkan
+# pembacaan timeline. Pernyataan di X tetap tertangkap lewat laporan media.
+statements:
+  max_age_hours: 48
+  max_items: 25          # kandidat maksimum sebelum masuk LLM
+  max_analyzed: 12       # pernyataan maksimum yang disimpan di brief
+  min_relevance: 35
+  truth_social_accounts:
+    - realDonaldTrump
+  official_feeds:
+    - https://www.whitehouse.gov/presidential-actions/feed/
+  google_news_queries:
+    - Trump bitcoin
+    - Trump cryptocurrency reserve
+    - Trump Federal Reserve interest rates
+    - Trump tariffs economy
+    - Trump crypto regulation SEC
 
 archive_retention_days: 90
 
