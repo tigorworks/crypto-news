@@ -22,17 +22,34 @@ llm:
   #   outlook   -> model kuat (pandangan ke depan: teknikal+makro+geopolitik)
   #   critic    -> model kuat dari KELUARGA BERBEDA dengan synthesis,
   #                supaya bias model tidak saling menutupi
-  filter:    ["ISI-MODEL-MURAH", "ISI-MODEL-CADANGAN"]
-  classify:  ["ISI-MODEL-KECIL", "ISI-MODEL-CADANGAN"]
-  mechanism: ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
-  statements: ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
-  technical: ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
-  whale:     ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
-  synthesis: ["ISI-MODEL-KUAT", "ISI-MODEL-CADANGAN"]
-  outlook:   ["ISI-MODEL-KUAT", "ISI-MODEL-CADANGAN"]
-  critic:    ["ISI-MODEL-KUAT-KELUARGA-LAIN", "ISI-MODEL-CADANGAN"]
-  # Rantai analisa sekarang 8 langkah dengan keluaran naratif panjang, jadi
-  # batasnya dinaikkan dari 0.15. Naikkan lagi kalau memakai model mahal.
+  #
+  # Cek ulang daftar ini secara berkala:  python -m scripts.list_models
+  # Katalog OpenRouter berubah cukup sering; model bisa pensiun atau berganti
+  # slug. Model yang tidak dikenali akan otomatis jatuh ke cadangan di
+  # sebelahnya, dan kalau dua-duanya gagal step-nya dilewati tanpa
+  # menggagalkan brief.
+
+  # Tugas murah dan berulang: skor 0-100 dan klasifikasi terstruktur.
+  filter:     ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+  classify:   ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+
+  # Butuh penalaran sebab-akibat, tapi keluarannya pendek.
+  mechanism:  ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  statements: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+
+  # Menafsirkan data dan menulis panjang: di sini kualitas model terasa.
+  technical:  ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
+  whale:      ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
+  synthesis:  ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
+  outlook:    ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
+
+  # PENTING: critic wajib beda keluarga dari synthesis. Synthesis memakai
+  # Anthropic, jadi critic memakai OpenAI. Model cenderung tidak menemukan
+  # kesalahannya sendiri — kalau keduanya sekeluarga, critic jadi percuma.
+  critic:     ["openai/gpt-5.1", "google/gemini-3.1-flash-lite-preview"]
+
+  # Rantai analisa sekarang 9 langkah dengan keluaran naratif panjang.
+  # Dengan pilihan model di atas, satu run biasanya ~$0,12-0,18.
   max_cost_usd_per_run: 0.40
 
 news:
