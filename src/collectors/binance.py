@@ -1,8 +1,13 @@
 """Harga, klines, funding rate, dan open interest.
 
-Sumber utama Binance. IP GitHub Actions kadang diblokir Binance (HTTP 451/403),
-jadi ada fallback penuh ke CoinGecko untuk harga + klines. Funding/OI tidak
-punya padanan di CoinGecko sehingga di-null-kan kalau Binance mati.
+Sumber utama Binance, tapi IP runner GitHub Actions (berbasis AS) ditolak
+Binance dengan HTTP 451 — pembatasan wilayah permanen, bukan gangguan
+sementara. Karena itu ada dua jalur cadangan:
+
+  harga + klines  -> CoinGecko
+  funding + OI    -> Bybit
+
+Keduanya publik dan tanpa API key.
 """
 
 from __future__ import annotations
@@ -11,6 +16,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from ..utils.http import HttpError, get_json
+from . import bybit
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +31,12 @@ BLOCKED_STATUS = (403, 451)
 # ditentukan oleh rentang hari, jadi kita ambil lalu resample sendiri).
 _CG_DAYS = {"1d": 250, "4h": 60, "1h": 14}
 _TF_MINUTES = {"1h": 60, "4h": 240, "1d": 1440}
+
+
+def _ringkas(exc: Exception, batas: int = 120) -> str:
+    """Pesan 451 Binance memuat kutipan panjang syarat layanan; dipangkas."""
+    teks = " ".join(str(exc).split())
+    return teks if len(teks) <= batas else teks[:batas] + "…"
 
 
 class PriceDataError(Exception):
@@ -65,23 +77,23 @@ def _binance_klines(symbol: str, interval: str, limit: int) -> List[Dict[str, An
 
 
 def fetch_funding_rate(symbol: str) -> Optional[float]:
-    """Funding rate terkini (fraksi, bukan persen). None kalau gagal."""
+    """Funding rate terkini (fraksi, bukan persen), Binance lalu Bybit."""
     try:
         data = get_json(f"{FUTURES_BASE}/fapi/v1/premiumIndex", params={"symbol": symbol})
         return float(data["lastFundingRate"])
     except (HttpError, KeyError, ValueError, TypeError) as exc:
-        log.warning("Gagal ambil funding rate: %s", exc)
-        return None
+        log.warning("Funding rate Binance gagal (%s), coba Bybit", _ringkas(exc))
+        return bybit.fetch_funding_rate(symbol)
 
 
 def fetch_open_interest(symbol: str) -> Optional[float]:
-    """Open interest dalam BTC. None kalau gagal."""
+    """Open interest dalam BTC, Binance lalu Bybit."""
     try:
         data = get_json(f"{FUTURES_BASE}/fapi/v1/openInterest", params={"symbol": symbol})
         return float(data["openInterest"])
     except (HttpError, KeyError, ValueError, TypeError) as exc:
-        log.warning("Gagal ambil open interest: %s", exc)
-        return None
+        log.warning("Open interest Binance gagal (%s), coba Bybit", _ringkas(exc))
+        return bybit.fetch_open_interest(symbol)
 
 
 def fetch_open_interest_history(symbol: str, period: str = "1d", limit: int = 30) -> List[Dict[str, Any]]:
@@ -96,8 +108,8 @@ def fetch_open_interest_history(symbol: str, period: str = "1d", limit: int = 30
             for r in rows
         ]
     except (HttpError, KeyError, ValueError, TypeError) as exc:
-        log.warning("Gagal ambil riwayat OI: %s", exc)
-        return []
+        log.warning("Riwayat OI Binance gagal (%s), coba Bybit", _ringkas(exc))
+        return bybit.fetch_open_interest_history(symbol)
 
 
 # --------------------------------------------------------------------------

@@ -12,8 +12,8 @@ Seluruh teks yang dilihat pengguna berbahasa Indonesia. Sifatnya informasional �
 ## Cara Kerja
 
 ```
-Binance/CoinGecko ─┐   (harga, klines, funding, OI)
-Binance Futures    │   (posisi whale vs ritel)
+Binance/CoinGecko ─┐   (harga, klines)
+Binance/Bybit      │   (funding, OI, posisi)
 mempool.space      ├─→ pipeline Python ─→ docs/data/latest.json ─→ GitHub Pages
 alternative.me     │        │
 Farside (ETF)      │        └──────────→ Telegram
@@ -128,7 +128,7 @@ Untuk mengirim ke grup: tambahkan bot ke grup, kirim satu pesan di grup, lalu ul
 ### 3. Ambil API key OpenRouter
 
 1. Daftar di [openrouter.ai](https://openrouter.ai), buka **Keys**, buat key baru.
-2. Isi saldo secukupnya. Rantai analisa terdiri dari 9 langkah dengan keluaran naratif panjang, dan `max_cost_usd_per_run: 0.40` adalah **plafon**, bukan tarif tetap — dengan model bawaan, satu run biasanya hanya ~$0,12–0,18 (lihat tabel di langkah 4). Turunkan plafonnya kalau mau lebih hemat; langkah yang kena batas dilewati dan brief tetap terbit.
+2. Isi saldo secukupnya. Rantai analisa terdiri dari 9 langkah dengan keluaran naratif panjang, dan `max_cost_usd_per_run: 0.60` adalah **plafon**, bukan tarif tetap — dengan model bawaan, satu run biasanya ~$0,25–0,35 (lihat tabel di langkah 4). Turunkan plafonnya kalau mau lebih hemat; langkah yang kena batas dilewati dan brief tetap terbit.
 
 ### 4. Model LLM di `config.yaml`
 
@@ -146,7 +146,7 @@ Kesembilan step sudah terisi model yang wajar sebagai titik awal, jadi bisa lang
 | `outlook` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menggabungkan banyak sumber |
 | `critic` | `openai/gpt-5.1` | `google/gemini-3.1-flash-lite-preview` | **beda keluarga** dari `synthesis` |
 
-Dengan kombinasi ini satu run biasanya menghabiskan sekitar **$0,12–0,18**, jauh di bawah plafon `max_cost_usd_per_run: 0.40`. Dua run per hari berarti kira-kira **$7–11 per bulan**.
+Dengan kombinasi ini satu run biasanya menghabiskan sekitar **$0,25–0,35**, di bawah plafon `max_cost_usd_per_run: 0.60`. Dua run per hari berarti kira-kira **$15–21 per bulan**.
 
 Entri kedua tiap baris adalah cadangan: OpenRouter otomatis memakainya kalau model pertama error, kena rate limit, atau kehabisan kapasitas.
 
@@ -293,7 +293,9 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |
 | `failed_sources` memuat `etf_flow` | Struktur tabel Farside berubah. Tidak fatal — kolom ETF akan tampil "tidak tersedia". |
 | Bagian pernyataan kosong | Wajar kalau memang tidak ada pernyataan relevan dalam 48 jam. Kalau selalu kosong, cek `sumber_gagal` di log — Truth Social memang sering memblokir IP data center. |
-| Bagian whale kosong | Binance Futures memblokir IP runner. Tidak fatal — kartu posisi whale disembunyikan dan `failed_sources` memuat `whale`. |
+| Log penuh "HTTP 451 restricted location" | Normal di GitHub Actions. Binance menolak IP runner yang berbasis AS — pembatasan wilayah permanen. Harga otomatis pindah ke CoinGecko, funding/OI ke Bybit. |
+| Divergensi whale kosong | Pemisahan "top trader" vs "seluruh akun" hanya ada di Binance. Saat Binance terblokir, hanya sisi ritel yang pulih lewat Bybit, jadi divergensi memang tidak bisa dihitung. |
+| Step AI gagal dengan "terpotong di batas max_tokens" | Naikkan `max_tokens` step tersebut di `src/analysis/news_analysis.py`. Balasan yang terpotong ditolak sengaja, karena JSON separuh jadi lebih berbahaya daripada tidak ada hasil. |
 | Brief terbit tanpa bagian AI | `OPENROUTER_API_KEY` kosong, nama model masih placeholder, atau budget per run tercapai. Cek `data_quality.catatan`. |
 | Telegram tidak masuk | Pastikan sudah mengirim pesan pertama ke bot, dan `TELEGRAM_CHAT_ID` benar (ID grup diawali minus). |
 | Halaman Pages kosong | GitHub Pages belum diarahkan ke folder `/docs`, atau `latest.json` belum pernah dibuat. |

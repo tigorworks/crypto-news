@@ -71,7 +71,7 @@ def filter_relevansi(
     user = "Nilai relevansi setiap artikel berikut:\n\n" + json.dumps(daftar, ensure_ascii=False)
 
     try:
-        hasil = client.chat_json(models, system, user, step="filter", max_tokens=3000)
+        hasil = client.chat_json(models, system, user, step="filter", max_tokens=6000)
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Filter relevansi gagal (%s), pakai skor prioritas kata kunci", exc)
         # Fallback deterministik: pakai skor kata kunci yang sudah dihitung kode.
@@ -177,7 +177,7 @@ def klasifikasi(
                 system,
                 "Klasifikasikan artikel berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
                 step="classify",
-                max_tokens=2500,
+                max_tokens=4000,
             )
         except BudgetExceeded as exc:
             log.warning("Klasifikasi berhenti di batch %d: %s", i // batch_size + 1, exc)
@@ -251,7 +251,7 @@ def analisa_mekanisme(
             system,
             "Jelaskan mekanisme untuk artikel berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
             step="mechanism",
-            max_tokens=2500,
+            max_tokens=4000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Analisa mekanisme gagal: %s", exc)
@@ -519,7 +519,7 @@ def analisa_pernyataan(
                 system,
                 "Analisa item berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
                 step="statements",
-                max_tokens=3000,
+                max_tokens=5000,
             )
         except BudgetExceeded as exc:
             log.warning("Analisa pernyataan berhenti di batch %d: %s", i // batch_size + 1, exc)
@@ -620,13 +620,14 @@ def interpretasi_teknikal(
             "Tafsirkan kondisi teknikal berikut:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
             step="technical",
             temperature=0.3,
-            max_tokens=2500,
+            max_tokens=6000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Interpretasi teknikal gagal: %s", exc)
         return None
 
     if not isinstance(hasil, dict) or not hasil.get("ringkasan"):
+        log.warning("Interpretasi teknikal: balasan tanpa field 'ringkasan', dilewati")
         return None
 
     per_tf = hasil.get("per_timeframe")
@@ -716,13 +717,14 @@ def analisa_whale(
             "Analisa kondisi berikut:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
             step="whale",
             temperature=0.3,
-            max_tokens=2000,
+            max_tokens=4000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Analisa whale gagal: %s", exc)
         return None
 
     if not isinstance(hasil, dict) or not hasil.get("ringkasan"):
+        log.warning("Analisa whale: balasan tanpa field 'ringkasan', dilewati")
         return None
 
     daftar = []
@@ -788,13 +790,14 @@ def outlook(
             "Data terkini:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
             step="outlook",
             temperature=0.4,
-            max_tokens=3000,
+            max_tokens=7000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Analisa outlook gagal: %s", exc)
         return None
 
     if not isinstance(hasil, dict) or not hasil.get("ringkasan"):
+        log.warning("Analisa outlook: balasan tanpa field 'ringkasan', dilewati")
         return None
 
     def skenario(kunci: str) -> Dict[str, Any]:
@@ -875,7 +878,7 @@ def sintesis(
             "Data hari ini:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
             step="synthesis",
             temperature=0.4,
-            max_tokens=4000,
+            max_tokens=10000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Sintesis narasi gagal: %s", exc)
@@ -955,7 +958,7 @@ def critic(
     )
 
     try:
-        hasil = client.chat_json(models, system, user, step="critic", temperature=0.0, max_tokens=1500)
+        hasil = client.chat_json(models, system, user, step="critic", temperature=0.0, max_tokens=3000)
     except (LLMError, BudgetExceeded) as exc:
         # Critic tidak jalan bukan berarti narasi salah, tapi juga belum terverifikasi.
         log.warning("Critic gagal dijalankan: %s", exc)
