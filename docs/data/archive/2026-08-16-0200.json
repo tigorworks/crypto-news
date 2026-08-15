@@ -1,0 +1,1428 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-15T18:59:06Z",
+  "generated_at_wib": "16 Agustus 2026, 01:59 WIB",
+  "run_type": "pagi",
+  "data_quality": {
+    "sources_ok": 11,
+    "sources_total": 13,
+    "failed_sources": [
+      "etf_flow",
+      "whale"
+    ],
+    "confidence": "sedang",
+    "llm_cost_usd": 0.32134,
+    "catatan": [
+      "Harga memakai sumber cadangan CoinGecko; candle merupakan hasil resampling.",
+      "Data posisi whale tidak tersedia; analisa manipulasi dilewati.",
+      "Sebagian sumber pernyataan tidak terjangkau: truth_social:realDonaldTrump",
+      "Bagian AI yang ditahan critic: narasi, outlook",
+      "Fitur pelanggan dimatikan: TELEGRAM_SUBSCRIBER_KEY belum diisi. Tanpa kunci itu daftar chat ID akan tersimpan sebagai teks biasa di repo, jadi fiturnya sengaja tidak diaktifkan diam-diam."
+    ]
+  },
+  "price": {
+    "last": 62986.0,
+    "change_24h_pct": 0.22611,
+    "high_24h": 63121.0,
+    "low_24h": 62749.0,
+    "volume_24h": 11413144071.0
+  },
+  "price_series": [
+    {
+      "t": 1781654400000,
+      "c": 65619.28
+    },
+    {
+      "t": 1781740800000,
+      "c": 64444.55
+    },
+    {
+      "t": 1781827200000,
+      "c": 62897.24
+    },
+    {
+      "t": 1781913600000,
+      "c": 63489.81
+    },
+    {
+      "t": 1782000000000,
+      "c": 64253.4
+    },
+    {
+      "t": 1782086400000,
+      "c": 63255.49
+    },
+    {
+      "t": 1782172800000,
+      "c": 63937.29
+    },
+    {
+      "t": 1782259200000,
+      "c": 62662.29
+    },
+    {
+      "t": 1782345600000,
+      "c": 60989.57
+    },
+    {
+      "t": 1782432000000,
+      "c": 59726.74
+    },
+    {
+      "t": 1782518400000,
+      "c": 60022.33
+    },
+    {
+      "t": 1782604800000,
+      "c": 59953.44
+    },
+    {
+      "t": 1782691200000,
+      "c": 59494.61
+    },
+    {
+      "t": 1782777600000,
+      "c": 60152.36
+    },
+    {
+      "t": 1782864000000,
+      "c": 58566.09
+    },
+    {
+      "t": 1782950400000,
+      "c": 59967.69
+    },
+    {
+      "t": 1783036800000,
+      "c": 61490.21
+    },
+    {
+      "t": 1783123200000,
+      "c": 62553.61
+    },
+    {
+      "t": 1783209600000,
+      "c": 63088.41
+    },
+    {
+      "t": 1783296000000,
+      "c": 63586.1
+    },
+    {
+      "t": 1783382400000,
+      "c": 64001.24
+    },
+    {
+      "t": 1783468800000,
+      "c": 63335.31
+    },
+    {
+      "t": 1783555200000,
+      "c": 62247.13
+    },
+    {
+      "t": 1783641600000,
+      "c": 63192.88
+    },
+    {
+      "t": 1783728000000,
+      "c": 64110.97
+    },
+    {
+      "t": 1783814400000,
+      "c": 63791.35
+    },
+    {
+      "t": 1783900800000,
+      "c": 63746.66
+    },
+    {
+      "t": 1783987200000,
+      "c": 62278.96
+    },
+    {
+      "t": 1784073600000,
+      "c": 64983.52
+    },
+    {
+      "t": 1784160000000,
+      "c": 64717.17
+    },
+    {
+      "t": 1784246400000,
+      "c": 63792.29
+    },
+    {
+      "t": 1784332800000,
+      "c": 63904.95
+    },
+    {
+      "t": 1784419200000,
+      "c": 64795.7
+    },
+    {
+      "t": 1784505600000,
+      "c": 64670.4
+    },
+    {
+      "t": 1784592000000,
+      "c": 65184.92
+    },
+    {
+      "t": 1784678400000,
+      "c": 66520.98
+    },
+    {
+      "t": 1784764800000,
+      "c": 66077.06
+    },
+    {
+      "t": 1784851200000,
+      "c": 65033.02
+    },
+    {
+      "t": 1784937600000,
+      "c": 64099.0
+    },
+    {
+      "t": 1785024000000,
+      "c": 64316.36
+    },
+    {
+      "t": 1785110400000,
+      "c": 65310.39
+    },
+    {
+      "t": 1785196800000,
+      "c": 63673.71
+    },
+    {
+      "t": 1785283200000,
+      "c": 63957.04
+    },
+    {
+      "t": 1785369600000,
+      "c": 63934.1
+    },
+    {
+      "t": 1785456000000,
+      "c": 64776.94
+    },
+    {
+      "t": 1785542400000,
+      "c": 62896.51
+    },
+    {
+      "t": 1785628800000,
+      "c": 62802.63
+    },
+    {
+      "t": 1785715200000,
+      "c": 63466.47
+    },
+    {
+      "t": 1785801600000,
+      "c": 63472.83
+    },
+    {
+      "t": 1785888000000,
+      "c": 64039.41
+    },
+    {
+      "t": 1785974400000,
+      "c": 64574.31
+    },
+    {
+      "t": 1786060800000,
+      "c": 64289.46
+    },
+    {
+      "t": 1786147200000,
+      "c": 64872.6
+    },
+    {
+      "t": 1786233600000,
+      "c": 64916.01
+    },
+    {
+      "t": 1786320000000,
+      "c": 64860.52
+    },
+    {
+      "t": 1786406400000,
+      "c": 63915.71
+    },
+    {
+      "t": 1786492800000,
+      "c": 63537.56
+    },
+    {
+      "t": 1786579200000,
+      "c": 63408.63
+    },
+    {
+      "t": 1786665600000,
+      "c": 63417.39
+    },
+    {
+      "t": 1786752000000,
+      "c": 62984.92
+    }
+  ],
+  "technical": {
+    "1d": {
+      "harga": 62984.92,
+      "tren": {
+        "ema20": 63919.87,
+        "ema50": 64416.24,
+        "ema100": 66452.07,
+        "ema200": 70724.76,
+        "posisi": {
+          "ema20": "di_bawah",
+          "ema50": "di_bawah",
+          "ema100": "di_bawah",
+          "ema200": "di_bawah"
+        },
+        "cross_50_200": null,
+        "cross_20_50": null,
+        "struktur": "turun"
+      },
+      "momentum": {
+        "rsi": 42.7,
+        "rsi_zona": "netral",
+        "macd": -142.99,
+        "macd_signal": -4.44,
+        "macd_histogram": -138.55,
+        "macd_arah": "melemah",
+        "stoch_rsi_k": 8.6,
+        "stoch_rsi_d": 16.0,
+        "divergensi_rsi": null
+      },
+      "volatilitas": {
+        "bb_atas": 65390.92,
+        "bb_tengah": 63955.36,
+        "bb_bawah": 62519.8,
+        "bb_bandwidth": 4.49,
+        "bb_squeeze": true,
+        "posisi_dalam_band": "dalam",
+        "atr": 515.62,
+        "atr_pct": 0.82
+      },
+      "volume": {
+        "terakhir": 31538487340.0,
+        "rata_20": 21475779987.0,
+        "rasio_vs_rata": 1.47,
+        "obv": -775501901977.0,
+        "obv_arah": "turun",
+        "vwap_harian": 62984.71
+      },
+      "level": {
+        "support": [
+          62790.43,
+          62247.13,
+          60855.25
+        ],
+        "resistance": [
+          64073.55,
+          64949.76,
+          66212.36
+        ],
+        "high": 82018.37,
+        "low": 58566.09,
+        "fib_236": 76483.63,
+        "fib_382": 73059.6,
+        "fib_500": 70292.23,
+        "fib_618": 67524.86,
+        "fib_786": 63584.88,
+        "pivot": {
+          "pivot": 63417.39,
+          "r1": 63417.39,
+          "r2": 63417.39,
+          "s1": 63417.39,
+          "s2": 63417.39
+        }
+      }
+    },
+    "4h": {
+      "harga": 62984.92,
+      "tren": {
+        "ema20": 63226.0,
+        "ema50": 63656.61,
+        "ema100": 63886.1,
+        "ema200": 63903.11,
+        "posisi": {
+          "ema20": "di_bawah",
+          "ema50": "di_bawah",
+          "ema100": "di_bawah",
+          "ema200": "di_bawah"
+        },
+        "cross_50_200": null,
+        "cross_20_50": null,
+        "struktur": "turun"
+      },
+      "momentum": {
+        "rsi": 41.8,
+        "rsi_zona": "netral",
+        "macd": -282.01,
+        "macd_signal": -307.78,
+        "macd_histogram": 25.77,
+        "macd_arah": "menguat",
+        "stoch_rsi_k": 53.7,
+        "stoch_rsi_d": 56.2,
+        "divergensi_rsi": "bullish"
+      },
+      "volatilitas": {
+        "bb_atas": 63876.42,
+        "bb_tengah": 63198.8,
+        "bb_bawah": 62521.19,
+        "bb_bandwidth": 2.14,
+        "bb_squeeze": false,
+        "posisi_dalam_band": "dalam",
+        "atr": 249.37,
+        "atr_pct": 0.4
+      },
+      "volume": {
+        "terakhir": 48026946792.0,
+        "rata_20": 78197322534.0,
+        "rasio_vs_rata": 0.61,
+        "obv": 617615315946.0,
+        "obv_arah": "naik",
+        "vwap_harian": 63003.85
+      },
+      "level": {
+        "support": [
+          62830.12,
+          61740.14
+        ],
+        "resistance": [
+          64597.67,
+          66803.0
+        ],
+        "high": 65438.55,
+        "low": 62456.49,
+        "fib_236": 64734.78,
+        "fib_382": 64299.4,
+        "fib_500": 63947.52,
+        "fib_618": 63595.64,
+        "fib_786": 63094.65,
+        "pivot": {
+          "pivot": 62972.3,
+          "r1": 62994.73,
+          "r2": 63007.8,
+          "s1": 62959.23,
+          "s2": 62936.79
+        }
+      }
+    },
+    "1h": {
+      "harga": 62986.42,
+      "tren": {
+        "ema20": 62987.87,
+        "ema50": 63093.78,
+        "ema100": 63361.2,
+        "ema200": 63711.29,
+        "posisi": {
+          "ema20": "di_bawah",
+          "ema50": "di_bawah",
+          "ema100": "di_bawah",
+          "ema200": "di_bawah"
+        },
+        "cross_50_200": null,
+        "cross_20_50": null,
+        "struktur": "turun"
+      },
+      "momentum": {
+        "rsi": 49.1,
+        "rsi_zona": "netral",
+        "macd": -6.49,
+        "macd_signal": -19.06,
+        "macd_histogram": 12.56,
+        "macd_arah": "melemah",
+        "stoch_rsi_k": 86.0,
+        "stoch_rsi_d": 83.0,
+        "divergensi_rsi": null
+      },
+      "volatilitas": {
+        "bb_atas": 63106.75,
+        "bb_tengah": 62987.91,
+        "bb_bawah": 62869.07,
+        "bb_bandwidth": 0.38,
+        "bb_squeeze": true,
+        "posisi_dalam_band": "dalam",
+        "atr": 58.3,
+        "atr_pct": 0.09
+      },
+      "volume": {
+        "terakhir": 23074958320.0,
+        "rata_20": 17812613738.0,
+        "rasio_vs_rata": 1.3,
+        "obv": 8346685316.0,
+        "obv_arah": "turun",
+        "vwap_harian": 62996.89
+      },
+      "level": {
+        "support": [],
+        "resistance": [
+          64153.18
+        ],
+        "high": 64374.92,
+        "low": 62552.9,
+        "fib_236": 63944.92,
+        "fib_382": 63678.91,
+        "fib_500": 63463.91,
+        "fib_618": 63248.91,
+        "fib_786": 62942.81,
+        "pivot": {
+          "pivot": 63037.0,
+          "r1": 63037.0,
+          "r2": 63037.0,
+          "s1": 63037.0,
+          "s2": 63037.0
+        }
+      }
+    },
+    "key_levels": {
+      "support": [
+        62810.28,
+        62247.13,
+        61740.14,
+        60855.25
+      ],
+      "resistance": [
+        64113.37,
+        64773.71,
+        66212.36,
+        66803.0
+      ],
+      "invalidasi_naik": 62552.47,
+      "invalidasi_turun": 64371.18
+    },
+    "oi_price_signal": null,
+    "oi_price_interpretasi": null,
+    "oi_change_pct": null,
+    "sinyal_palsu": []
+  },
+  "market": {
+    "funding_rate": 2.4e-07,
+    "open_interest": 11479.61,
+    "fear_greed": {
+      "value": 34,
+      "label": "Ketakutan",
+      "previous": 29
+    },
+    "hashrate": 902.73,
+    "difficulty": 127479855693691.4,
+    "fee_fastest_sat_vb": 1,
+    "fee_hour_sat_vb": 1,
+    "etf_flow_usd": null,
+    "etf_flow_date": null
+  },
+  "macro": {
+    "dxy": 99.67,
+    "ust10y": 4.7,
+    "wti": 82.4,
+    "gold": 4380.4,
+    "nasdaq": 26729.16,
+    "sp500": 7785.76,
+    "vix": 14.25,
+    "dxy_change_pct": -0.29,
+    "ust10y_change_pct": 1.19,
+    "wti_change_pct": 1.42,
+    "gold_change_pct": 0.38,
+    "nasdaq_change_pct": -0.28,
+    "sp500_change_pct": -0.17,
+    "vix_change_pct": -2.6,
+    "fed_balance_sheet": 6759955.0,
+    "m2": 23155.2
+  },
+  "whale": {
+    "whale_long_pct": null,
+    "whale_short_pct": null,
+    "whale_ratio": null,
+    "whale_tren_long_pp": null,
+    "ritel_long_pct": null,
+    "ritel_short_pct": null,
+    "ritel_ratio": null,
+    "ritel_tren_long_pp": null,
+    "divergensi": null,
+    "divergensi_label": null,
+    "taker_buy_sell_ratio": null,
+    "taker_tren": null,
+    "periode": "1h",
+    "jam_dipantau": 24,
+    "sumber_ritel": "binance"
+  },
+  "options": {
+    "dvol": 35.01,
+    "dvol_perubahan_7h_pp": 1.07,
+    "dvol_min_7h": 33.94,
+    "dvol_maks_7h": 36.33,
+    "put_call_ratio_oi": 0.557,
+    "oi_call_btc": 214309.8,
+    "oi_put_btc": 119279.9,
+    "iv_atm_call": 33.41,
+    "iv_atm_put": 33.41,
+    "skew_put_call": 0.0,
+    "max_pain_expiry_terdekat": 63000.0,
+    "expiry_terdekat": "2026-08-16T08:00:00Z",
+    "expiry_oi_terbesar": "2026-09-25T08:00:00Z",
+    "oi_pada_expiry_terbesar_btc": 110536.1,
+    "harga_dasar_deribit": 63998.69
+  },
+  "onchain": {
+    "metrik_tersedia": [
+      "CapMVRVCur",
+      "AdrActCnt",
+      "SplyCur",
+      "CapMrktCurUSD"
+    ],
+    "mvrv": 1.195,
+    "alamat_aktif": 660290,
+    "pasokan_beredar": 20070195,
+    "market_cap_usd": 1262911020667,
+    "mvrv_perubahan_30h_pct": -0.97,
+    "alamat_aktif_perubahan_30h_pct": 6.29,
+    "pasokan_beredar_perubahan_30h_pct": 0.06,
+    "market_cap_usd_perubahan_30h_pct": -1.28,
+    "mvrv_zona": "wajar"
+  },
+  "flows": {
+    "harga_coinbase": 62979.89,
+    "premium_coinbase_usd": -6.11,
+    "premium_coinbase_pct": -0.0097,
+    "premium_coinbase_label": "seimbang",
+    "stablecoin_cap_usd": 254877162162.0,
+    "stablecoin_perubahan_24j_usd": -37307166.0,
+    "stablecoin_perubahan_24j_pct": -0.015,
+    "stablecoin_rincian": {
+      "tether": 183015797503.0,
+      "usd-coin": 71861364659.0
+    }
+  },
+  "news": [
+    {
+      "id": "9ac429f16785",
+      "judul": "Paul Tudor Jones’ investment firm increases stake in BlackRock's bitcoin ETF after year of selling",
+      "sumber": "CoinDesk: Bitcoin, Ethereum, Crypto News and Price Data",
+      "url": "https://www.coindesk.com/business/2026/08/15/paul-tudor-jones-investment-firm-increases-blackrock-s-bitcoin-etf-stake-after-year-of-selling",
+      "waktu_utc": "2026-08-15T15:12:29Z",
+      "kategori": "etf",
+      "relevansi_btc": 90,
+      "sentimen": "bullish",
+      "kekuatan": 3,
+      "horizon": "pendek",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": "risk_appetite",
+      "mekanisme": "Paul Tudor Jones menambah posisi di BlackRock Bitcoin ETF setelah tahun penjualan -> perubahan sentimen institusional dari bearish ke bullish -> permintaan ETF meningkat.",
+      "entitas": [
+        "Paul Tudor Jones",
+        "BlackRock"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "5b2992a393f2",
+      "judul": "Bitcoin price drops to $62.5K as trader warns weekly close may spark more losses",
+      "sumber": "Cointelegraph.com News",
+      "url": "https://cointelegraph.com/markets/bitcoin-price-drops-trader-warns-weekly-close-may-spark-more-losses?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "waktu_utc": "2026-08-14T14:38:27Z",
+      "kategori": "makro",
+      "relevansi_btc": 90,
+      "sentimen": "bearish",
+      "kekuatan": 2,
+      "horizon": "langsung",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "94e6b5fc1f72",
+      "judul": "Bitcoin slips as U.S. inflation fails to spark gains, ETFs see August's first two-day drawdown",
+      "sumber": "CoinDesk: Bitcoin, Ethereum, Crypto News and Price Data",
+      "url": "https://www.coindesk.com/markets/2026/08/14/bitcoin-slips-as-u-s-inflation-fails-to-spark-gains-etfs-see-august-s-first-two-day-drawdown",
+      "waktu_utc": "2026-08-14T11:06:12Z",
+      "kategori": "etf",
+      "relevansi_btc": 90,
+      "sentimen": "bearish",
+      "kekuatan": 2,
+      "horizon": "langsung",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "5de8558b448a",
+      "judul": "Crypto Biz: Bitcoin’s $116M self-custody wake-up call",
+      "sumber": "Cointelegraph.com News",
+      "url": "https://cointelegraph.com/news/crypto-biz-bitcoin-self-custody-etf-inflows-strategy-riot-ai?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "waktu_utc": "2026-08-14T15:29:13Z",
+      "kategori": "hack",
+      "relevansi_btc": 85,
+      "sentimen": "bearish",
+      "kekuatan": 4,
+      "horizon": "pendek",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": "risk_appetite",
+      "mekanisme": "Exploit self-custody $116M -> kepercayaan pada penyimpanan mandiri menurun -> investor beralih ke custodian terpusat seperti ETF -> tekanan penjualan pada Bitcoin peer-to-peer.",
+      "entitas": [],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": 0.0,
+      "catatan_reaksi": "Pasar praktis mengabaikan berita ini."
+    },
+    {
+      "id": "34d4002b22de",
+      "judul": "Abu Dhabi Sovereign Wealth Funds Keep Big Bitcoin Positions",
+      "sumber": "Bitcoin Magazine",
+      "url": "https://bitcoinmagazine.com/news/abu-dhabi-funds-keep-big-bitcoin-positions",
+      "waktu_utc": "2026-08-14T21:17:12Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 85,
+      "sentimen": "bullish",
+      "kekuatan": 4,
+      "horizon": "struktural",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": "supply_demand",
+      "mekanisme": "Dana berdaulat Abu Dhabi menambah posisi Bitcoin $490M di iShares Bitcoin Trust -> permintaan institusional meningkat -> tekanan beli pada Bitcoin spot dan ETF.",
+      "entitas": [
+        "Abu Dhabi",
+        "Mubadala Investment Company",
+        "BlackRock"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": 0.0,
+      "catatan_reaksi": "Pasar praktis mengabaikan berita ini."
+    },
+    {
+      "id": "3d2605173794",
+      "judul": "Swiss mega-bank UBS ramps up its Bitcoin exposure with a massive 24-fold surge in ETF call options",
+      "sumber": "CoinDesk: Bitcoin, Ethereum, Crypto News and Price Data",
+      "url": "https://www.coindesk.com/business/2026/08/15/swiss-mega-bank-ubs-ramps-up-its-bitcoin-exposure-with-a-massive-24-fold-surge-in-etf-call-options",
+      "waktu_utc": "2026-08-15T15:56:05Z",
+      "kategori": "etf",
+      "relevansi_btc": 85,
+      "sentimen": "bullish",
+      "kekuatan": 4,
+      "horizon": "pendek",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": "risk_appetite",
+      "mekanisme": "UBS meningkatkan call options Bitcoin ETF 24x lipat -> ekspektasi kenaikan harga Bitcoin meningkat di kalangan institusional -> permintaan derivatif bullish mendorong harga spot.",
+      "entitas": [
+        "UBS"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": 0.0,
+      "catatan_reaksi": "Pasar praktis mengabaikan berita ini."
+    },
+    {
+      "id": "c50dc4ceb62a",
+      "judul": "Norway sovereign wealth fund sees indirect bitcoin exposure hit all-time high, with Strategy accounting for 86%: K33",
+      "sumber": "The Block",
+      "url": "https://www.theblock.co/news/markets/2026-08-14-norway-sovereign-wealth-fund-indirect-bitcoin-exposure-all-time-high-strategy-k33-411815",
+      "waktu_utc": "2026-08-14T12:25:38Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 85,
+      "sentimen": "bullish",
+      "kekuatan": 4,
+      "horizon": "struktural",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": "supply_demand",
+      "mekanisme": "Dana berdaulat Norwegia mencapai eksposur Bitcoin tertinggi sepanjang masa melalui Strategy -> aliran modal institusional besar ke Bitcoin -> peningkatan permintaan jangka panjang.",
+      "entitas": [
+        "Norway sovereign wealth fund",
+        "Norges Bank Investment Management",
+        "Bitmine",
+        "K33"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": 0.0,
+      "catatan_reaksi": "Pasar praktis mengabaikan berita ini."
+    },
+    {
+      "id": "59aea06338c3",
+      "judul": "Edelman Financial, Tudor Investment Reveal Significant Bitcoin Holdings",
+      "sumber": "Bitcoin Magazine",
+      "url": "https://bitcoinmagazine.com/news/edelman-financial-reveals-bitcoin-positio",
+      "waktu_utc": "2026-08-14T22:18:16Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 85,
+      "sentimen": "bullish",
+      "kekuatan": 4,
+      "horizon": "pendek",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": "risk_appetite",
+      "mekanisme": "Edelman Financial dan Tudor Investment mengungkapkan kepemilikan Bitcoin signifikan -> sinyal adopsi dari firma investasi besar -> peningkatan kredibilitas dan permintaan institusional.",
+      "entitas": [
+        "Edelman Financial",
+        "Tudor Investment"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": 0.0,
+      "catatan_reaksi": "Pasar praktis mengabaikan berita ini."
+    },
+    {
+      "id": "f07bb618e6f7",
+      "judul": "What the CLARITY Act Actually Does for Bitcoin",
+      "sumber": "Bitcoin Magazine",
+      "url": "https://bitcoinmagazine.com/takes/what-the-clarity-act-actually-does-for-bitcoin",
+      "waktu_utc": "2026-08-14T14:09:26Z",
+      "kategori": "regulasi",
+      "relevansi_btc": 85,
+      "sentimen": "netral",
+      "kekuatan": 5,
+      "horizon": "struktural",
+      "status_kepastian": null,
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "opini",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": 0.0,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "f6923aed275e",
+      "judul": "Bitcoin eyes new August lows as Binance longs face ‘cleanout’",
+      "sumber": "Cointelegraph.com News",
+      "url": "https://cointelegraph.com/markets/bitcoin-liquidation-cleanout-open-interest-falls-btc?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "waktu_utc": "2026-08-14T10:43:57Z",
+      "kategori": "onchain",
+      "relevansi_btc": 85,
+      "sentimen": "bearish",
+      "kekuatan": 3,
+      "horizon": "langsung",
+      "status_kepastian": null,
+      "jalur_transmisi": "supply_demand",
+      "mekanisme": "Open interest futures Bitcoin di Binance turun bersamaan harga BTC -> liquidasi posisi long leverage -> tekanan penjualan kaskade pada Bitcoin.",
+      "entitas": [
+        "Binance"
+      ],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "02f22efbd578",
+      "judul": "Live updates: Bitcoin slips back to $63,000; MSCI threatens to exclude Strategy from indices",
+      "sumber": "CoinDesk: Bitcoin, Ethereum, Crypto News and Price Data",
+      "url": "https://www.coindesk.com/tech/2026/08/14/live-updates-bitcoin-slips-below-usd63-000-as-oil-yields-climb",
+      "waktu_utc": "2026-08-14T08:51:48Z",
+      "kategori": "regulasi",
+      "relevansi_btc": 85,
+      "sentimen": "bearish",
+      "kekuatan": 3,
+      "horizon": "langsung",
+      "status_kepastian": "rumor",
+      "jalur_transmisi": "risk_appetite",
+      "mekanisme": "MSCI mengancam mengeluarkan Strategy dari indeks -> risiko delisting mengurangi permintaan institusional -> tekanan penjualan pada Bitcoin ETF dan spot.",
+      "entitas": [
+        "MSCI",
+        "Strategy"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "a1ed83109612",
+      "judul": "Morgan Stanley’s BlackRock Bitcoin ETF holdings rise 23% in Q2",
+      "sumber": "Cointelegraph.com News",
+      "url": "https://cointelegraph.com/news/morgan-stanley-buys-blackrock-bitcoin-etf-q2?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "waktu_utc": "2026-08-14T14:22:57Z",
+      "kategori": "etf",
+      "relevansi_btc": 80,
+      "sentimen": "bullish",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Morgan Stanley",
+        "BlackRock"
+      ],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "b4484a2057a9",
+      "judul": "Cboe seeks SEC nod for first US 3x bitcoin and ether ETFs",
+      "sumber": "The Block",
+      "url": "https://www.theblock.co/news/regulation/2026-08-14-cboe-seeks-sec-nod-for-first-us-3x-bitcoin-and-ether-etfs-411879",
+      "waktu_utc": "2026-08-14T19:01:18Z",
+      "kategori": "etf",
+      "relevansi_btc": 80,
+      "sentimen": "bullish",
+      "kekuatan": 4,
+      "horizon": "struktural",
+      "status_kepastian": "terjadwal",
+      "jalur_transmisi": "likuiditas",
+      "mekanisme": "Cboe mengajukan persetujuan SEC untuk ETF Bitcoin 3x leverage -> jika disetujui, akses leverage yang lebih mudah meningkatkan volume trading -> volatilitas dan likuiditas pasar meningkat.",
+      "entitas": [
+        "Cboe",
+        "SEC",
+        "LeverageShares"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": 0.0,
+      "catatan_reaksi": "Pasar praktis mengabaikan berita ini."
+    },
+    {
+      "id": "11f2fc450d52",
+      "judul": "JPMorgan boosts Bitcoin, Ether ETF positions in Q2 filing",
+      "sumber": "Cointelegraph.com News",
+      "url": "https://cointelegraph.com/markets/jpmorgan-crypto-etf-moves-risk-not-bullish-bet-analyst?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "waktu_utc": "2026-08-14T14:14:06Z",
+      "kategori": "etf",
+      "relevansi_btc": 80,
+      "sentimen": "bullish",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "JPMorgan"
+      ],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "62d4e58cb2dd",
+      "judul": "SEC Shelves Crypto Rule Meeting Days After Senate Punted Clarity Act",
+      "sumber": "Decrypt",
+      "url": "https://decrypt.co/375622/sec-shelves-crypto-rule-meeting-days-after-senate-punted-clarity-act",
+      "waktu_utc": "2026-08-14T10:39:39Z",
+      "kategori": "regulasi",
+      "relevansi_btc": 80,
+      "sentimen": "bearish",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "SEC",
+        "Senate"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "a0218ecf9350",
+      "judul": "SEC cancels key crypto regulatory meeting",
+      "sumber": "Cointelegraph.com News",
+      "url": "https://cointelegraph.com/news/sec-cancels-crypto-regulatory-meeting?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "waktu_utc": "2026-08-14T08:02:18Z",
+      "kategori": "regulasi",
+      "relevansi_btc": 80,
+      "sentimen": "bearish",
+      "kekuatan": 3,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "SEC",
+        "Senate"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "87b2df547508",
+      "judul": "Citi CEO Wants ‘Good’ Crypto Clarity Act To Get Passed",
+      "sumber": "Bitcoin Magazine",
+      "url": "https://bitcoinmagazine.com/news/citi-ceo-wants-clarity-act-passed",
+      "waktu_utc": "2026-08-14T20:03:41Z",
+      "kategori": "regulasi",
+      "relevansi_btc": 80,
+      "sentimen": "bullish",
+      "kekuatan": 2,
+      "horizon": "struktural",
+      "status_kepastian": null,
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Citigroup",
+        "Jane Fraser"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "opini",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "8ad42c385558",
+      "judul": "Trump, CFTC Chair Selig expected at Wednesday White House meeting with crypto and prediction market executives",
+      "sumber": "The Block",
+      "url": "https://www.theblock.co/news/regulation/2026-08-15-trump-cftc-chair-selig-expected-at-wednesday-white-house-meeting-with-crypto-and-prediction-market-executives-411919",
+      "waktu_utc": "2026-08-15T15:20:19Z",
+      "kategori": "regulasi",
+      "relevansi_btc": 80,
+      "sentimen": "netral",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "terjadwal",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Trump",
+        "CFTC",
+        "Selig"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "526816242794",
+      "judul": "Galaxy lowers CLARITY Act odds to 10%",
+      "sumber": "Cointelegraph.com News",
+      "url": "https://cointelegraph.com/news/galaxy-lowers-clarity-act-odds-10?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "waktu_utc": "2026-08-15T08:40:59Z",
+      "kategori": "regulasi",
+      "relevansi_btc": 80,
+      "sentimen": "bearish",
+      "kekuatan": 2,
+      "horizon": "struktural",
+      "status_kepastian": null,
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Galaxy"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "prediktif",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "a8ea25403859",
+      "judul": "Trump expected to attend White House meeting with crypto CEOs, sources say",
+      "sumber": "CoinDesk: Bitcoin, Ethereum, Crypto News and Price Data",
+      "url": "https://www.coindesk.com/policy/2026/08/14/trump-expected-to-attend-white-house-meeting-with-crypto-ceos-sources-say",
+      "waktu_utc": "2026-08-14T23:41:49Z",
+      "kategori": "regulasi",
+      "relevansi_btc": 80,
+      "sentimen": "netral",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "belum_dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Trump"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "9244d8c73276",
+      "judul": "Harvard leaves bitcoin ETF stake untouched in Q2 after cutting it 43% in the prior quarter",
+      "sumber": "The Block",
+      "url": "https://www.theblock.co/news/markets/2026-08-15-harvard-leaves-bitcoin-etf-stake-untouched-in-q2-after-cutting-it-43-in-the-prior-quarter-411926",
+      "waktu_utc": "2026-08-15T18:37:59Z",
+      "kategori": "etf",
+      "relevansi_btc": 75,
+      "sentimen": "netral",
+      "kekuatan": 2,
+      "horizon": "langsung",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Harvard",
+        "Mubadala Investment Company",
+        "Abu Dhabi Investment Council"
+      ],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "397992818c97",
+      "judul": "Israel’s Largest Bank Will Give Bitcoin Trading Another Try",
+      "sumber": "Decrypt",
+      "url": "https://decrypt.co/375665/israel-largest-bank-leumi-bitcoin-trading",
+      "waktu_utc": "2026-08-14T17:14:02Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 75,
+      "sentimen": "bullish",
+      "kekuatan": 3,
+      "horizon": "struktural",
+      "status_kepastian": "terjadwal",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Bank Leumi",
+        "Bank of Israel",
+        "Galaxy"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "5befd2c0b044",
+      "judul": "Bitcoin Treasury Strategy Bites Back After MSCI Announces Possible Index Removal",
+      "sumber": "Bitcoin Magazine",
+      "url": "https://bitcoinmagazine.com/news/strategy-slams-msci-possible-index-removal",
+      "waktu_utc": "2026-08-14T17:24:58Z",
+      "kategori": "makro",
+      "relevansi_btc": 75,
+      "sentimen": "bearish",
+      "kekuatan": 3,
+      "horizon": "pendek",
+      "status_kepastian": "belum_dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "MSCI",
+        "Bitcoin Magazine"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "b7b46124c12e",
+      "judul": "Another Bitcoin Miner Sells Off BTC to Fund AI Data Center Pivot",
+      "sumber": "Decrypt",
+      "url": "https://decrypt.co/375655/bitcoin-miner-sells-btc-ai-pivot-hyperscale",
+      "waktu_utc": "2026-08-14T16:23:20Z",
+      "kategori": "onchain",
+      "relevansi_btc": 75,
+      "sentimen": "bearish",
+      "kekuatan": 2,
+      "horizon": "langsung",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Hyperscale"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "b90f51fa9cc6",
+      "judul": "Israel’s largest bank taps Galaxy to offer bitcoin, ether and solana trading",
+      "sumber": "The Block",
+      "url": "https://www.theblock.co/news/business/2026-08-14-israels-largest-bank-taps-galaxy-to-offer-bitcoin-ether-and-solana-trading-411868",
+      "waktu_utc": "2026-08-14T15:41:49Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 75,
+      "sentimen": "bullish",
+      "kekuatan": 3,
+      "horizon": "struktural",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Bank Leumi",
+        "Galaxy",
+        "Chainalysis"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 2,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    }
+  ],
+  "statements": [
+    {
+      "id": "st48cc377e1b",
+      "tokoh": "Trump",
+      "kutipan": null,
+      "ringkasan": "Gedung Putih Trump akan mengadakan pertemuan dengan eksekutif kripto dan pasar prediksi sementara SEC membatalkan pertemuan regulasi digital penting.",
+      "topik": "regulasi",
+      "sikap_kripto": "mendukung",
+      "dampak_btc": "bullish",
+      "kekuatan": 3,
+      "status": "dilaporkan_media",
+      "jalur_transmisi": "regulasi",
+      "mekanisme": "Keterlibatan Gedung Putih dengan industri kripto dan pembatalan pertemuan regulasi SEC menunjukkan pendekatan pro-kripto yang dapat mengurangi hambatan regulasi dan meningkatkan sentimen pasar.",
+      "relevansi_btc": 65,
+      "url": "https://news.google.com/rss/articles/CBMiwwFBVV95cUxPcHE5Q3A1TVBPTTFieDNwWFJ5endoak05MnNsYWxwTFY1c3A5a1k4UGpnMV9lMk9OVE9QN1N3eEwzMXNJLWk3Wm1fNDdvbldwWUZlLXpaWDhPVW5CeWU5R2ZGYVRCQUE0UTB0S3k1Qk1tMk5VZmFYSElsTXNHSlN5c0JNTVRLdzh0TmM0MGNYeUl0ZnVDOGdraHI2dmlkTTd0M1J2aXJJZHA4SmZKb25uQm9BdTlIWTZTQmVSZTAyRVBoYzg?oc=5",
+      "sumber": "Benzinga",
+      "jenis_sumber": "media",
+      "waktu_utc": "2026-08-14T03:12:00Z"
+    },
+    {
+      "id": "st7592d38027",
+      "tokoh": "Trump",
+      "kutipan": null,
+      "ringkasan": "Trump mendesak Fed untuk memotong suku bunga sementara inflasi AS mendingin.",
+      "topik": "moneter",
+      "sikap_kripto": "netral",
+      "dampak_btc": "bullish",
+      "kekuatan": 3,
+      "status": "dilaporkan_media",
+      "jalur_transmisi": "likuiditas",
+      "mekanisme": "Penurunan suku bunga meningkatkan likuiditas pasar dan mengurangi biaya modal, mendorong aliran dana ke aset berisiko termasuk Bitcoin.",
+      "relevansi_btc": 45,
+      "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTFBGVWFVTEl3WmI0Z1pieGp3NG9YS1o4REtiMGg0cnFqa2YzWm4zRUlVeDZaaXVHM25FbnF5QThsaUR1SE9OVW5FVF85clpyWGpSSzNaN2hZbzY0cGwwV0NmUUdBNkhzcVZlSEE?oc=5",
+      "sumber": "Межа. Новини України.",
+      "jenis_sumber": "media",
+      "waktu_utc": "2026-08-14T11:23:08Z"
+    },
+    {
+      "id": "stf957e9f7f1",
+      "tokoh": "Trump family",
+      "kutipan": null,
+      "ringkasan": "Perusahaan kripto keluarga Trump menerima persetujuan untuk charter perbankan bersyarat.",
+      "topik": "regulasi",
+      "sikap_kripto": "mendukung",
+      "dampak_btc": "bullish",
+      "kekuatan": 2,
+      "status": "dilaporkan_media",
+      "jalur_transmisi": "regulasi",
+      "mekanisme": "Persetujuan charter perbankan untuk entitas kripto menunjukkan normalisasi regulasi dan integrasi kripto ke sistem keuangan formal, meningkatkan legitimasi aset digital.",
+      "relevansi_btc": 40,
+      "url": "https://news.google.com/rss/articles/CBMigAFBVV95cUxQM3JoYzVQQzQwT0RTbHMyYjdtNTFKemNBeHZBa1Rrai1keVliZkVMc3hjLWN5T0JWOHMwN2Zad2xSNWNQMS1CWUM1M19RM2xVNEFncjJXU3JmUWd4aEJ2aUdKZGcySTVLNWZBSFNRNnF5ald5LTZaeDRSRkRrR1FNWNIBhgFBVV95cUxQdTRwTkZXckJDRmhOc3RaTnlLc1ZYQjMxSExOTWxqeXlzYy10dVMxc1QxczcwSTJyTW9oU1lKYkd4OWd6RGxPSXZVN3V4VzZSY1l0Wm0zanQzUXVsZGhWdjlRV2xNR2ZQSHJyWU5ERms2V3lNTjdxTjJqclhxREhRTXl0TnRaUQ?oc=5",
+      "sumber": "The Hill",
+      "jenis_sumber": "media",
+      "waktu_utc": "2026-08-15T16:32:00Z"
+    },
+    {
+      "id": "st16551b2979",
+      "tokoh": "Trump family",
+      "kutipan": null,
+      "ringkasan": "Perusahaan kripto keluarga Trump menerima persetujuan untuk charter perbankan.",
+      "topik": "regulasi",
+      "sikap_kripto": "mendukung",
+      "dampak_btc": "bullish",
+      "kekuatan": 2,
+      "status": "dilaporkan_media",
+      "jalur_transmisi": "regulasi",
+      "mekanisme": "Persetujuan charter perbankan untuk entitas kripto menunjukkan normalisasi regulasi dan integrasi kripto ke sistem keuangan formal, meningkatkan legitimasi aset digital.",
+      "relevansi_btc": 40,
+      "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQVXA4eTlfek5PQnpjZVNsVC1mOUVsLUIwS2RzSHBFandEQU5ZMkhYd1JoSkF2V2tmTGFfd0gycE91ZWF2ek44ODh6c3ZPdFRpZzlmdk5DaGlUckt3TEo4dDFPc3E5SXRybzR1Vl81R2I1TE1UcjczRHN4cW1OU2dZTUZ2UlI3LXFGdG14UjlqU25BZw?oc=5",
+      "sumber": "Truthout",
+      "jenis_sumber": "media",
+      "waktu_utc": "2026-08-15T15:22:28Z"
+    },
+    {
+      "id": "stacc4549e6b",
+      "tokoh": "Trump family",
+      "kutipan": null,
+      "ringkasan": "Proyek kripto keluarga Trump mencapai tahap lanjut menuju persetujuan charter perbankan.",
+      "topik": "regulasi",
+      "sikap_kripto": "mendukung",
+      "dampak_btc": "bullish",
+      "kekuatan": 2,
+      "status": "dilaporkan_media",
+      "jalur_transmisi": "regulasi",
+      "mekanisme": "Kemajuan regulasi untuk entitas kripto keluarga Trump menunjukkan tren positif terhadap integrasi kripto dalam sistem perbankan formal, meningkatkan kepercayaan pasar.",
+      "relevansi_btc": 40,
+      "url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxPUlhRLWFrTFQzS0dpOGxIeDktY2dYNFVzQnJ4aXZBejYweHlrZFNCZk5TWWgwM3RRa1FPYnZOSDhuQ2U2LWNjemtfT1IyWDV1SElyU2UtWHJDOHdNQ0pRaXdsalliSVVPUlg1VWRqbFdZVE9DdXFtMldJRnVSQXcwNERCZVR1aGdUYWVaeEpoOGd0NFdoWXNv?oc=5",
+      "sumber": "Mother Jones",
+      "jenis_sumber": "media",
+      "waktu_utc": "2026-08-15T14:16:01Z"
+    },
+    {
+      "id": "st976fcb39c5",
+      "tokoh": "Trump",
+      "kutipan": null,
+      "ringkasan": "Trump mengancam tarif 50 persen terhadap Kanada dalam negosiasi perdagangan bilateral.",
+      "topik": "tarif",
+      "sikap_kripto": "netral",
+      "dampak_btc": "bearish",
+      "kekuatan": 2,
+      "status": "dilaporkan_media",
+      "jalur_transmisi": "risk_appetite",
+      "mekanisme": "Ancaman tarif tinggi meningkatkan ketidakpastian ekonomi dan mengurangi risk appetite investor terhadap aset berisiko seperti Bitcoin.",
+      "relevansi_btc": 35,
+      "url": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxNeDVheDVoWHZFUE15X1hWTkgzeHlIY3JfdVVNU1JlYXdQb3RiaXdnTTg2Rl9PX3FkblUzYzRPd0tPMEdBVHUtTWV6TW5pdTBFVUpQN0l0QWJHYWptODdaMkhqN0dnWGxFcGhJVU5WbU41TVFYVzV4cXd6RWZEZ0NVLVg0LURzeC1Y?oc=5",
+      "sumber": "The Washington Post",
+      "jenis_sumber": "media",
+      "waktu_utc": "2026-08-15T17:00:01Z"
+    }
+  ],
+  "aggregate": {
+    "sentiment_score": 22.3,
+    "sentiment_label": "bullish",
+    "rasio_faktual": 0.88,
+    "jumlah_dinilai": 25,
+    "dominant_themes": [
+      "regulasi",
+      "etf",
+      "adopsi"
+    ],
+    "narrative_shift": ""
+  },
+  "calendar": [],
+  "conflicts": [],
+  "diff_vs_previous": {
+    "tersedia": false,
+    "alasan": "Belum ada brief sebelumnya untuk dibandingkan.",
+    "ringkasan": []
+  },
+  "ai": {
+    "narrative": "",
+    "bagian": {},
+    "narrative_singkat": "",
+    "penyebab_pergerakan": [],
+    "bagian_ditahan": [
+      "narasi",
+      "outlook"
+    ],
+    "teknikal": {
+      "ringkasan": "Bitcoin saat ini berada di bawah seluruh EMA utama (20, 50, 100, 200) di ketiga timeframe, menegaskan tren turun yang masih dominan secara struktural. Namun timeframe 4H mulai menunjukkan tanda pelemahan tren turun (MACD histogram menguat, divergensi bullish RSI), sementara 1H sudah overbought jangka sangat pendek dan volatilitas menyempit (BB squeeze) di 1D dan 1H mengindikasikan konsolidasi menjelang breakout. Konfirmasi volume tidak konsisten antar timeframe sehingga sinyal keseluruhan campuran, bukan tren turun yang solid.",
+      "per_timeframe": {
+        "1d": "Harga berada di bawah EMA20 (63.919), EMA50 (64.416), EMA100 (66.452), dan EMA200 (70.724), menegaskan struktur turun jangka panjang. RSI 42,7 masih netral (belum oversold), sementara MACD histogram negatif dan arahnya melemah menunjukkan momentum turun masih berlanjut. Bollinger Band mengalami squeeze (bandwidth 4,49) yang menandakan volatilitas menyempit menjelang pergerakan besar, dan volume naik 1,47x rata-rata namun OBV (indikator akumulasi/distribusi berbasis volume) justru turun — artinya volume tinggi ini lebih mengonfirmasi tekanan jual ketimbang mendukung pembalikan naik.",
+        "4h": "Struktur juga tercatat turun dengan harga di bawah semua EMA, tapi MACD histogram sudah positif dan arahnya menguat, disertai divergensi bullish pada RSI (harga membuat titik rendah baru tapi RSI tidak, sinyal potensi pelemahan tren turun). Stoch RSI berada di area netral-naik (53,7/56,2). Volume di bawah rata-rata (rasio 0,61x) namun OBV justru naik, menunjukkan akumulasi ringan meski partisipasi volume tergolong rendah — sinyal ini agak melemahkan keyakinan pada tren turun murni di skala 1D.",
+        "1h": "Harga praktis menempel di EMA20 (62.986 vs 62.987) sehingga struktur turun di sini sangat tipis dan mendekati sideways. RSI 49,1 netral mendekati titik tengah, tapi Stoch RSI sudah overbought (86/83), menandakan momentum naik jangka sangat pendek sudah jenuh dan rawan koreksi. Bollinger Band sangat ketat (bandwidth 0,38, squeeze) menandakan range sempit menjelang breakout ke salah satu arah. Volume naik 1,3x rata-rata tapi OBV turun, sinyal campuran antara aktivitas tinggi dan tekanan jual yang masih berlanjut."
+      },
+      "konfluensi": [
+        "Ketiga timeframe (1D, 4H, 1H) menunjukkan harga di bawah seluruh EMA utama dan struktur tren turun, mengonfirmasi tekanan turun jangka menengah-panjang yang konsisten di semua horizon waktu.",
+        "RSI di ketiga timeframe berada di zona netral (42,7 / 41,8 / 49,1), menunjukkan momentum turun belum mencapai kondisi jenuh jual (oversold) ekstrem di skala manapun.",
+        "Volatilitas menyempit (BB squeeze) terjadi baik di 1D maupun 1H, mengindikasikan pasar sedang berkonsolidasi ketat menjelang pergerakan besar (breakout) yang konsisten antar timeframe besar dan kecil."
+      ],
+      "kontradiksi": [
+        "4H menunjukkan MACD histogram menguat dan divergensi bullish RSI (sinyal awal pelemahan tren turun), sementara 1D masih menunjukkan momentum turun yang melemah searah tren turun — dua timeframe memberi sinyal momentum berlawanan arah.",
+        "1H menunjukkan Stoch RSI overbought (86/83), mengindikasikan rally jangka sangat pendek sudah jenuh, sementara 4H justru baru mulai menunjukkan penguatan momentum naik — potensi pelemahan rally kecil di 1H bertentangan dengan sinyal awal pembalikan d",
+        "Konfirmasi volume tidak seragam: di 1D volume naik di atas rata-rata namun OBV turun (bearish), di 4H volume di bawah rata-rata namun OBV naik (bullish ringan), dan di 1H volume naik namun OBV turun lagi (bearish) — tidak ada konfirmasi volume yang k"
+      ],
+      "kualitas_tren": "melemah",
+      "pembatalan": "Pembacaan tren turun dominan ini akan terbatalkan jika harga menembus dan bertahan di atas level invalidasi_turun 64.371,18 (resistance kunci), yang akan mengonfirmasi kekuatan sinyal reversal yang mulai terlihat di 4H. Sebaliknya, jika harga jatuh dan bertahan di bawah level invalidasi_naik 62.552,47, sinyal divergensi bullish di 4H akan gugur dan tren turun di 1D akan terkonfirmasi lanjut tanpa "
+    },
+    "whale": null,
+    "outlook": null,
+    "model_used": "deepseek/deepseek-v3.2, anthropic/claude-haiku-4.5, anthropic/claude-sonnet-5, openai/gpt-5.1",
+    "generated_at": "2026-08-15T18:59:06Z",
+    "critic": {
+      "passed": false,
+      "corrections": [
+        {
+          "jenis": "angka_karangan",
+          "keparahan": "fatal",
+          "bagian": "narasi_utama",
+          "kutipan": "di 4H sudah menempel ke EMA20 ($62.987 vs harga $62.986)",
+          "alasan": "Di data teknikal_4h, EMA20 tercatat 63.226 (dibulatkan 63.226,0), bukan 62.987. Angka 62.987 adalah EMA20 timeframe 1H, sehingga penyebutan sebagai EMA20 4H tidak didukung data.",
+          "dicari_di": "teknikal_4h.tren.ema20 dan teknikal_1h.tren.ema20"
+        },
+        {
+          "jenis": "angka_karangan",
+          "keparahan": "fatal",
+          "bagian": "outlook_skenario",
+          "kutipan": "Selama harga bertahan di atas level invalidasi_turun 64.371,18, ... dengan resistance berikutnya di 64.773,71",
+          "alasan": "Level invalidasi_turun yang benar di data level_kunci adalah 64.371,18 (dengan titik sebagai pemisah ribuan dan koma desimal jika diformat Indonesia) sehingga angka dasar 64.371,18 masih sesuai, tetapi resistance 64.773,71 tidak ada di daftar level mana pun (level_kunci.resistance atau teknikal_* .l",
+          "dicari_di": "level_kunci.resistance, teknikal_1d.level.resistance, teknikal_4h.level.resistance, teknikal_1h.level.resistance"
+        },
+        {
+          "jenis": "saran_investasi",
+          "keparahan": "fatal",
+          "bagian": "outlook_skenario",
+          "kutipan": "\"tekanan turun berpotensi berlanjut menuju support 62.247,13, 61.740,14, dan 60.855,25\"",
+          "alasan": "Kalimat ini mengarah pada skenario penurunan ke level-level harga tertentu sebagai tujuan pergerakan, sehingga secara praktik berfungsi sebagai target harga eksplisit untuk pergerakan turun, yang termasuk kategori yang harus dihindari.",
+          "dicari_di": "level_kunci.support, teknikal_1d.level.support, teknikal_4h.level.support"
+        },
+        {
+          "jenis": "pengetahuan_luar",
+          "keparahan": "minor",
+          "bagian": "outlook_skenario",
+          "kutipan": "Perkembangan regulasi pro-kripto: CLARITY Act, persetujuan charter perbankan bersyarat untuk entitas kripto, pertemuan Gedung Putih dengan eksekutif kripto",
+          "alasan": "Data hanya menyebut artikel tentang CLARITY Act dan beberapa entitas kripto keluarga Trump yang terkait charter perbankan, serta pernyataan Gedung Putih Trump akan mengadakan pertemuan dengan eksekutif kripto. Penyebutan ketiganya secara eksplisit sebagai satu paket \"perkembangan regulasi pro-kripto",
+          "dicari_di": "berita[judul='What the CLARITY Act Actually Does for Bitcoin'], pernyataan_tokoh (Trump, Trump family)"
+        }
+      ],
+      "dijalankan": true
+    }
+  },
+  "tautan_luar": [
+    {
+      "label": "Arena Pertempuran BTC",
+      "url": "https://tigorworks.github.io/crypto-battlefield/",
+      "ikon": "swords"
+    }
+  ],
+  "disclaimer": "Konten ini bersifat informasional dan bukan saran investasi."
+}
