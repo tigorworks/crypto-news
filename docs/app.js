@@ -187,7 +187,7 @@ function briefApp() {
       if (nilai === null || nilai === undefined) return '—';
       const tanda = pakaiTanda && nilai > 0 ? '+' : (nilai < 0 ? '-' : '');
       const abs = Math.abs(nilai);
-      if (abs >= 1e9) return `${tanda}$${formatAngka(abs / 1e9, 2)} M`;   // miliar
+      if (abs >= 1e9) return `${tanda}$${formatAngka(abs / 1e9, 2)} miliar`;
       if (abs >= 1e6) return `${tanda}$${formatAngka(abs / 1e6, 1)} jt`;
       if (abs >= 1e3) return `${tanda}$${formatAngka(abs / 1e3, 1)} rb`;
       return `${tanda}$${formatAngka(abs, 0)}`;
@@ -353,6 +353,103 @@ function briefApp() {
       });
     },
 
+    get adaDataInstitusional() {
+      const d = this.data;
+      if (!d) return false;
+      return [d.options, d.onchain, d.flows].some((o) => o && Object.keys(o).length);
+    },
+
+    get barisOpsi() {
+      const o = this.data?.options || {};
+      const b = [];
+      const ada = (v) => v !== null && v !== undefined;
+      if (ada(o.dvol)) {
+        const d = ada(o.dvol_perubahan_7h_pp)
+          ? ` (${o.dvol_perubahan_7h_pp > 0 ? '+' : ''}${this.angka(o.dvol_perubahan_7h_pp, 1)} pp/7h)` : '';
+        b.push({ label: 'DVOL', nilai: this.angka(o.dvol, 1) + d,
+                 jelas: 'Indeks volatilitas implied — "VIX"-nya Bitcoin' });
+      }
+      if (ada(o.put_call_ratio_oi)) {
+        b.push({ label: 'Put/Call (OI)', nilai: this.angka(o.put_call_ratio_oi, 2),
+                 jelas: 'Rasio open interest opsi jual terhadap opsi beli' });
+      }
+      if (ada(o.skew_put_call)) {
+        b.push({ label: 'Skew put−call', nilai: (o.skew_put_call > 0 ? '+' : '') + this.angka(o.skew_put_call, 1),
+                 jelas: 'Selisih volatilitas implied put dan call di sekitar ATM' });
+      }
+      if (ada(o.iv_atm_put) && ada(o.iv_atm_call)) {
+        b.push({ label: 'IV ATM (put/call)', nilai: `${this.angka(o.iv_atm_put, 1)} / ${this.angka(o.iv_atm_call, 1)}`,
+                 jelas: 'Volatilitas implied di sekitar harga saat ini' });
+      }
+      if (ada(o.max_pain_expiry_terdekat)) {
+        b.push({ label: 'Max pain', nilai: this.uang(o.max_pain_expiry_terdekat),
+                 jelas: 'Strike yang paling merugikan pemegang opsi saat expiry terdekat' });
+      }
+      if (ada(o.oi_put_btc) && ada(o.oi_call_btc)) {
+        b.push({ label: 'OI put/call (BTC)',
+                 nilai: `${this.angka(o.oi_put_btc, 0)} / ${this.angka(o.oi_call_btc, 0)}`,
+                 jelas: 'Total open interest opsi dalam BTC' });
+      }
+      return b;
+    },
+
+    get barisOnchain() {
+      const o = this.data?.onchain || {};
+      const b = [];
+      const ada = (v) => v !== null && v !== undefined;
+      if (ada(o.mvrv)) {
+        b.push({ label: 'MVRV', nilai: this.angka(o.mvrv, 2) + (o.mvrv_zona ? ` · ${o.mvrv_zona.replace(/_/g, ' ')}` : ''),
+                 perubahan: o.mvrv_perubahan_30h_pct,
+                 jelas: 'Kapitalisasi pasar dibagi realized cap — ukuran keuntungan belum terealisasi' });
+      }
+      if (ada(o.nvt)) {
+        b.push({ label: 'NVT', nilai: this.angka(o.nvt, 1), perubahan: o.nvt_perubahan_30h_pct,
+                 jelas: 'Kapitalisasi dibagi nilai transaksi — analog rasio P/E' });
+      }
+      if (ada(o.alamat_aktif)) {
+        b.push({ label: 'Alamat aktif', nilai: this.angka(o.alamat_aktif, 0),
+                 perubahan: o.alamat_aktif_perubahan_30h_pct,
+                 jelas: 'Alamat aktif harian — proksi permintaan nyata' });
+      }
+      if (ada(o.realized_cap_usd)) {
+        b.push({ label: 'Realized cap', nilai: this.ringkasUang(o.realized_cap_usd),
+                 perubahan: o.realized_cap_usd_perubahan_30h_pct,
+                 jelas: 'Nilai seluruh koin dihargai saat terakhir berpindah' });
+      }
+      if (ada(o.pasokan_diam_1thn_pct)) {
+        b.push({ label: 'Pasokan diam >1thn', nilai: this.angka(o.pasokan_diam_1thn_pct, 1) + '%',
+                 perubahan: null,
+                 jelas: 'Porsi pasokan yang tidak bergerak setahun terakhir' });
+      }
+      return b;
+    },
+
+    get barisAliran() {
+      const f = this.data?.flows || {};
+      const b = [];
+      const ada = (v) => v !== null && v !== undefined;
+      if (ada(f.premium_coinbase_pct)) {
+        b.push({ label: 'Premium Coinbase',
+                 nilai: (f.premium_coinbase_pct > 0 ? '+' : '') + this.angka(f.premium_coinbase_pct, 3) + '%',
+                 warna: this.warnaAngka(f.premium_coinbase_pct),
+                 jelas: 'Selisih harga Coinbase terhadap pasar global — proksi permintaan AS' });
+      }
+      if (ada(f.harga_coinbase)) {
+        b.push({ label: 'Harga Coinbase', nilai: this.uang(f.harga_coinbase), jelas: 'Harga spot BTC-USD di Coinbase' });
+      }
+      if (ada(f.stablecoin_cap_usd)) {
+        b.push({ label: 'Kapitalisasi stablecoin', nilai: this.ringkasUang(f.stablecoin_cap_usd),
+                 jelas: 'Total USDT + USDC — likuiditas yang siap masuk pasar' });
+      }
+      if (ada(f.stablecoin_perubahan_24j_usd)) {
+        b.push({ label: 'Perubahan stablecoin 24j',
+                 nilai: this.ringkasUang(f.stablecoin_perubahan_24j_usd, true),
+                 warna: this.warnaAngka(f.stablecoin_perubahan_24j_usd),
+                 jelas: 'Pertambahan atau pengurangan pasokan stablecoin sehari terakhir' });
+      }
+      return b;
+    },
+
     get adaDataWhale() {
       // Saat Binance terblokir hanya sisi ritel yang pulih lewat Bybit —
       // kartunya tetap berguna, jadi cukup salah satu sisi ada.
@@ -393,6 +490,7 @@ function briefApp() {
         { id: 's-harga', label: 'Harga', ada: true },
         { id: 's-teknikal', label: 'Teknikal', ada: !!d.technical?.['1d'] },
         { id: 's-pasar', label: 'Pasar', ada: true },
+        { id: 's-institusional', label: 'Opsi & Valuasi', ada: this.adaDataInstitusional },
         { id: 's-pernyataan', label: 'Pernyataan', ada: !!d.statements?.length },
         { id: 's-whale', label: 'Whale', ada: this.adaDataWhale || !!d.technical?.sinyal_palsu?.length },
         { id: 's-ai', label: 'Analisa AI', ada: true },

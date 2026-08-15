@@ -14,6 +14,9 @@ Seluruh teks yang dilihat pengguna berbahasa Indonesia. Sifatnya informasional �
 ```
 Binance/CoinGecko ─┐   (harga, klines)
 Binance/Bybit      │   (funding, OI, posisi)
+Deribit            │   (opsi: DVOL, skew, max pain)
+Coin Metrics       │   (MVRV, NVT, alamat aktif)
+Coinbase           │   (premium AS)
 mempool.space      ├─→ pipeline Python ─→ docs/data/latest.json ─→ GitHub Pages
 alternative.me     │        │
 Farside (ETF)      │        └──────────→ Telegram
@@ -24,7 +27,7 @@ whitehouse.gov     │
 Google News ───────┘
 ```
 
-Pipeline berjalan berurutan dalam 20 langkah (lihat `src/main.py`). Hanya langkah pertama — pengambilan harga — yang fatal. Sumber lain boleh gagal; kegagalannya dicatat di `data_quality.failed_sources` dan pipeline tetap menghasilkan brief.
+Pipeline berjalan berurutan dalam 21 langkah (lihat `src/main.py`). Hanya langkah pertama — pengambilan harga — yang fatal. Sumber lain boleh gagal; kegagalannya dicatat di `data_quality.failed_sources` dan pipeline tetap menghasilkan brief.
 
 **Pemisahan tanggung jawab yang dipegang ketat:**
 
@@ -62,6 +65,38 @@ Kode mendeteksi pola berikut dari geometri candle dan volume, lalu LLM menafsirk
 Ditambah divergensi posisi: Binance memisahkan statistik *top trader* (proksi pemain besar) dari *seluruh akun* (didominasi ritel). Ketika whale net short sementara ritel net long, itu pola distribusi klasik — dan sebaliknya untuk akumulasi.
 
 Semua ini disajikan sebagai **petunjuk probabilistik, bukan bukti**. Prompt secara eksplisit melarang model mengarang cerita manipulasi dari sinyal yang tipis, dan setiap temuan wajib menyertakan tingkat keyakinan.
+
+### Data tingkat institusional
+
+Sebagian besar dashboard kripto berhenti di harga, RSI, dan Fear & Greed — semuanya data retail. Yang berikut ini biasanya dijual berlangganan mahal, padahal tersedia gratis lewat API publik:
+
+**Opsi Deribit** — Deribit menguasai mayoritas volume opsi BTC, jadi posisinya mencerminkan taruhan institusional.
+
+| Metrik | Artinya |
+|---|---|
+| DVOL | Indeks volatilitas implied BTC — "VIX"-nya Bitcoin. Naik = pasar membayar mahal untuk proteksi |
+| Put/call ratio | Berapa banyak proteksi turun dibanding taruhan naik |
+| Skew put−call | Selisih IV put vs call di sekitar ATM. Positif = ketakutan berbayar |
+| Max pain | Strike yang paling merugikan pemegang opsi saat expiry. Harga cenderung tertarik ke sana menjelang expiry besar |
+
+**Valuasi on-chain (Coin Metrics)** — konteks jangka panjang yang tidak terlihat di grafik harga.
+
+| Metrik | Artinya |
+|---|---|
+| MVRV | Kapitalisasi dibagi realized cap. Historisnya > 3,5 zona euforia, < 1 harga di bawah biaya perolehan |
+| Realized cap | Nilai seluruh koin dihargai saat terakhir berpindah — "biaya perolehan" agregat jaringan |
+| NVT | Kapitalisasi dibagi nilai transaksi. Analog rasio P/E |
+| Alamat aktif | Proksi permintaan nyata, bukan spekulasi derivatif |
+| Pasokan diam >1thn | Porsi pasokan yang tidak bergerak setahun. Naik = akumulasi pemegang jangka panjang |
+
+**Aliran dana**
+
+| Metrik | Artinya |
+|---|---|
+| Premium Coinbase | Selisih harga Coinbase terhadap pasar global. Positif = permintaan AS lebih agresif, sering mendahului arus institusional |
+| Pasokan stablecoin | Total USDT + USDC — "amunisi" yang menunggu dibelanjakan. Naik = likuiditas masuk ekosistem |
+
+Semua angka ini dihitung kode dari data mentah — max pain misalnya dihitung dengan menjumlahkan pembayaran penulis opsi di tiap strike, bukan diambil dari ringkasan pihak lain. Semuanya masuk ke konteks LLM, jadi narasi dan outlook menganalisanya, bukan sekadar menampilkannya.
 
 ### Pelacakan pernyataan tokoh
 
@@ -227,7 +262,7 @@ Catatan penting:
 
 ```
 src/
-├── main.py                 # orkestrator 20 langkah
+├── main.py                 # orkestrator 21 langkah
 ├── config.py               # baca env + config.yaml
 ├── collectors/
 │   ├── binance.py          # harga, klines, funding, OI (+ fallback CoinGecko)
@@ -235,6 +270,10 @@ src/
 │   ├── macro.py            # yfinance: DXY, yield, minyak, indeks (+ FRED opsional)
 │   ├── news.py             # RSS + dedup + skor prioritas
 │   ├── whale.py            # posisi top trader vs ritel, aliran taker
+│   ├── bybit.py            # cadangan derivatif saat Binance memblokir
+│   ├── options.py          # opsi Deribit: DVOL, put/call, skew, max pain
+│   ├── onchain.py          # valuasi on-chain: MVRV, NVT, alamat aktif
+│   ├── flows.py            # premium Coinbase, pasokan stablecoin
 │   ├── statements.py       # pernyataan tokoh berpengaruh
 │   └── calendar.py         # agenda ekonomi 7 hari
 ├── analysis/
@@ -292,6 +331,7 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 |---|---|
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |
 | `failed_sources` memuat `etf_flow` | Struktur tabel Farside berubah. Tidak fatal — kolom ETF akan tampil "tidak tersedia". |
+| Kartu opsi/valuasi/aliran kosong | Deribit, Coin Metrics, atau Coinbase sedang tidak terjangkau. Semuanya opsional — brief tetap terbit, dan sumber yang gagal tercatat di `failed_sources`. |
 | Bagian pernyataan kosong | Wajar kalau memang tidak ada pernyataan relevan dalam 48 jam. Kalau selalu kosong, cek `sumber_gagal` di log — Truth Social memang sering memblokir IP data center. |
 | Log penuh "HTTP 451 restricted location" | Normal di GitHub Actions. Binance menolak IP runner yang berbasis AS — pembatasan wilayah permanen. Harga otomatis pindah ke CoinGecko, funding/OI ke Bybit. |
 | Divergensi whale kosong | Pemisahan "top trader" vs "seluruh akun" hanya ada di Binance. Saat Binance terblokir, hanya sisi ritel yang pulih lewat Bybit, jadi divergensi memang tidak bisa dihitung. |

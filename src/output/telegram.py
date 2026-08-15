@@ -186,6 +186,92 @@ def _blok_agenda(brief: Dict[str, Any], maks: int = 3) -> List[str]:
     return baris
 
 
+def _blok_opsi(brief: Dict[str, Any]) -> List[str]:
+    """Posisi opsi Deribit — cerminan taruhan institusional."""
+    opsi = brief.get("options") or {}
+    if not opsi:
+        return []
+
+    baris = ["", "🎯 <b>Opsi (Deribit)</b>"]
+
+    potongan = []
+    if opsi.get("dvol") is not None:
+        arah = ""
+        if opsi.get("dvol_perubahan_7h_pp") is not None:
+            d = opsi["dvol_perubahan_7h_pp"]
+            arah = f" ({'+' if d > 0 else ''}{_angka(d, 1)} pp/7h)"
+        potongan.append(f"DVOL {_angka(opsi['dvol'], 1)}{arah}")
+    if opsi.get("put_call_ratio_oi") is not None:
+        potongan.append(f"Put/Call {_angka(opsi['put_call_ratio_oi'], 2)}")
+    if potongan:
+        baris.append(" · ".join(potongan))
+
+    potongan = []
+    if opsi.get("skew_put_call") is not None:
+        s = opsi["skew_put_call"]
+        makna = "proteksi turun lebih mahal" if s > 0 else "taruhan naik lebih mahal"
+        potongan.append(f"Skew {'+' if s > 0 else ''}{_angka(s, 1)} ({makna})")
+    if potongan:
+        baris.append(" · ".join(potongan))
+
+    if opsi.get("max_pain_expiry_terdekat"):
+        baris.append(f"Max pain expiry terdekat: {_angka(opsi['max_pain_expiry_terdekat'], 0)}")
+    return baris
+
+
+def _blok_valuasi(brief: Dict[str, Any]) -> List[str]:
+    """Valuasi on-chain — konteks jangka panjang, bukan sinyal harian."""
+    oc = brief.get("onchain") or {}
+    if not oc:
+        return []
+
+    baris = ["", "⛓ <b>Valuasi On-chain</b>"]
+    potongan = []
+    if oc.get("mvrv") is not None:
+        zona = oc.get("mvrv_zona")
+        label = f" ({zona.replace('_', ' ')})" if zona else ""
+        potongan.append(f"MVRV {_angka(oc['mvrv'], 2)}{label}")
+    if oc.get("nvt") is not None:
+        potongan.append(f"NVT {_angka(oc['nvt'], 1)}")
+    if potongan:
+        baris.append(" · ".join(potongan))
+
+    potongan = []
+    if oc.get("alamat_aktif") is not None:
+        ubah = oc.get("alamat_aktif_perubahan_30h_pct")
+        tambahan = f" ({_persen(ubah, 1)}/30h)" if ubah is not None else ""
+        potongan.append(f"Alamat aktif {_angka(oc['alamat_aktif'], 0)}{tambahan}")
+    if oc.get("pasokan_diam_1thn_pct") is not None:
+        potongan.append(f"Pasokan diam >1thn {_angka(oc['pasokan_diam_1thn_pct'], 1)}%")
+    if potongan:
+        baris.append(" · ".join(potongan))
+    return baris if len(baris) > 2 else []
+
+
+def _blok_aliran(brief: Dict[str, Any]) -> List[str]:
+    """Premium Coinbase dan likuiditas stablecoin."""
+    fl = brief.get("flows") or {}
+    if not fl:
+        return []
+
+    baris = ["", "💵 <b>Aliran Dana</b>"]
+    if fl.get("premium_coinbase_pct") is not None:
+        p = fl["premium_coinbase_pct"]
+        baris.append(
+            f"Premium Coinbase {'+' if p > 0 else ''}{_angka(p, 3)}% "
+            f"({esc(fl.get('premium_coinbase_label', ''))})"
+        )
+    if fl.get("stablecoin_cap_usd"):
+        miliar = fl["stablecoin_cap_usd"] / 1e9
+        ubah = fl.get("stablecoin_perubahan_24j_usd")
+        tambahan = ""
+        if ubah:
+            juta = ubah / 1e6
+            tambahan = f" ({'+' if juta > 0 else ''}${_angka(juta, 0)} jt/24j)"
+        baris.append(f"Stablecoin ${_angka(miliar, 1)} miliar{tambahan}")
+    return baris if len(baris) > 2 else []
+
+
 def _blok_pernyataan(brief: Dict[str, Any], maks: int = 3) -> List[str]:
     """Pernyataan tokoh berpengaruh yang berpotensi menggerakkan pasar."""
     pernyataan = brief.get("statements") or []
@@ -245,7 +331,7 @@ def _blok_sinyal_palsu(brief: Dict[str, Any], maks: int = 2) -> List[str]:
     return baris
 
 
-def _blok_ai(brief: Dict[str, Any]) -> List[str]:
+def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     ai = brief.get("ai") or {}
     critic = ai.get("critic") or {}
 
@@ -267,7 +353,18 @@ def _blok_ai(brief: Dict[str, Any]) -> List[str]:
         return baris
 
     baris.append("✦ <b>ANALISA AI</b>")
-    if narasi:
+    # Narasi lengkap dikirim beberapa paragraf, bukan cuma satu kalimat
+    # pembuka — ruang 4096 karakter jauh lebih dari cukup, dan tangga
+    # pemangkasan di bawah yang mengurus kalau ternyata kepanjangan.
+    narasi_penuh = (ai.get("narrative") or "").strip()
+    if narasi_penuh:
+        paragraf = [p.strip() for p in narasi_penuh.split("\n\n") if p.strip()]
+        for par in paragraf[:paragraf_maks]:
+            baris.append(esc(_potong(par, 700)))
+            baris.append("")
+        if baris and baris[-1] == "":
+            baris.pop()
+    elif narasi:
         baris.append(esc(narasi))
 
     # Penyebab pergerakan — inti dari pertanyaan "kenapa naik/turun".
@@ -275,23 +372,46 @@ def _blok_ai(brief: Dict[str, Any]) -> List[str]:
     if penyebab:
         baris.append("")
         baris.append("<b>Penyebab utama:</b>")
-        for p in penyebab[:3]:
+        for p in penyebab[:4]:
             panah = {"naik": "↑", "turun": "↓"}.get(p.get("arah"), "·")
-            baris.append(f"{panah} {esc(p.get('faktor', ''))}")
+            keyakinan = p.get("keyakinan")
+            tanda = {"tinggi": "", "sedang": " (keyakinan sedang)", "rendah": " (keyakinan rendah)"}.get(keyakinan, "")
+            baris.append(f"{panah} <b>{esc(p.get('faktor', ''))}</b>{tanda}")
+            if p.get("dasar"):
+                baris.append(f"   <i>{esc(_potong(p['dasar'], 160))}</i>")
 
+    tek = ai.get("teknikal") or {}
     if teknikal_ai:
         baris.append("")
-        baris.append("<b>Teknikal:</b> " + esc(_potong(teknikal_ai, 300)))
+        baris.append("<b>Teknikal:</b> " + esc(_potong(teknikal_ai, 500)))
+        if tek.get("kontradiksi"):
+            baris.append("⚠ " + esc(_potong(tek["kontradiksi"][0], 200)))
+        if tek.get("pembatalan"):
+            baris.append("<i>Batal bila: " + esc(_potong(tek["pembatalan"], 200)) + "</i>")
 
     if whale_ai.get("ringkasan"):
         waspada = whale_ai.get("tingkat_kewaspadaan")
         tanda = "⚠️ " if waspada == "tinggi" else ""
         baris.append("")
-        baris.append(f"<b>Whale:</b> {tanda}" + esc(_potong(whale_ai["ringkasan"], 300)))
+        baris.append(f"<b>Whale:</b> {tanda}" + esc(_potong(whale_ai["ringkasan"], 400)))
+        for sp in (whale_ai.get("sinyal_palsu") or [])[:2]:
+            if sp.get("keyakinan") in ("tinggi", "sedang"):
+                baris.append(f"• {esc(sp.get('pola',''))}: {esc(_potong(sp.get('arti',''), 150))}")
 
+    ol = ai.get("outlook") or {}
     if outlook_ai:
         baris.append("")
-        baris.append("<b>Ke depan:</b> " + esc(_potong(outlook_ai, 300)))
+        horizon = f" ({esc(ol['horizon'])})" if ol.get("horizon") else ""
+        baris.append(f"<b>Ke depan{horizon}:</b> " + esc(_potong(outlook_ai, 400)))
+        for nama, kunci, panah in (("Menguat", "skenario_naik", "↑"), ("Melemah", "skenario_turun", "↓")):
+            sk = ol.get(kunci) or {}
+            pemicu = sk.get("pemicu") or []
+            if pemicu:
+                baris.append(f"{panah} <b>{nama}:</b> " + esc(_potong(", ".join(pemicu[:3]), 200)))
+                if sk.get("kondisi"):
+                    baris.append(f"   <i>syarat: {esc(_potong(sk['kondisi'], 130))}</i>")
+        if ol.get("risiko_utama"):
+            baris.append("⚠ <b>Risiko:</b> " + esc(_potong(ol["risiko_utama"][0], 200)))
 
     baris.append("")
     baris.append("<i>Dihasilkan AI, dapat keliru.</i>")
@@ -332,34 +452,41 @@ def render(brief: Dict[str, Any], site_url: str = "") -> str:
         + _blok_pasar(brief)
         + _blok_makro(brief)
     )
-    blok_ai = _blok_ai(brief)
     penutup = _blok_penutup(brief, site_url)
 
     # Tangga degradasi: yang dikorbankan lebih dulu adalah yang paling mudah
     # dibaca ulang di web. Blok AI dipertahankan sampai langkah terakhir
     # karena justru itu isi utama brief ini.
+    # Tangga degradasi. Analisa AI adalah isi utama brief, jadi paragrafnya
+    # dipertahankan lama; yang dikorbankan lebih dulu adalah daftar yang
+    # gampang dibaca ulang di web.
+    #  (berita, pernyataan, paragraf_ai, sinyal, whale, agenda, data_tambahan)
     tangga = [
-        (5, 3, True, True, True),
-        (3, 3, True, True, True),
-        (2, 2, True, True, True),
-        (1, 2, True, True, True),
-        (0, 2, True, True, True),
-        (0, 1, False, True, True),   # buang sinyal palsu
-        (0, 1, False, False, True),  # buang blok whale
-        (0, 0, False, False, False), # buang pernyataan dan agenda
+        (4, 3, 4, True, True, True, True),
+        (3, 3, 4, True, True, True, True),
+        (3, 2, 3, True, True, True, True),
+        (2, 2, 3, True, True, True, True),
+        (2, 2, 2, True, True, True, True),
+        (1, 1, 2, True, True, True, True),
+        (0, 1, 2, False, True, True, True),
+        (0, 1, 2, False, True, True, False),  # buang opsi/valuasi/aliran
+        (0, 0, 2, False, False, True, False),
+        (0, 0, 1, False, False, False, False),
     ]
 
-    for jumlah_berita, jumlah_pernyataan, pakai_sinyal, pakai_whale, pakai_agenda in tangga:
+    for berita_n, pernyataan_n, ai_n, sinyal, whale, agenda, tambahan in tangga:
         bagian = kepala + inti
-        if pakai_whale:
+        if tambahan:
+            bagian += _blok_opsi(brief) + _blok_valuasi(brief) + _blok_aliran(brief)
+        if whale:
             bagian += _blok_whale(brief)
-        if pakai_sinyal:
+        if sinyal:
             bagian += _blok_sinyal_palsu(brief)
-        bagian += _blok_pernyataan(brief, jumlah_pernyataan)
-        bagian += _blok_berita(brief, jumlah_berita)
-        if pakai_agenda:
+        bagian += _blok_pernyataan(brief, pernyataan_n)
+        bagian += _blok_berita(brief, berita_n)
+        if agenda:
             bagian += _blok_agenda(brief)
-        bagian += blok_ai + penutup
+        bagian += _blok_ai(brief, paragraf_maks=ai_n) + penutup
 
         pesan = "\n".join(bagian)
         if len(pesan) <= BATAS_KARAKTER:
@@ -368,7 +495,7 @@ def render(brief: Dict[str, Any], site_url: str = "") -> str:
     # Terakhir: pangkas isi blok AI sendiri, sisakan kepala + harga + penutup.
     dasar = "\n".join(kepala + _blok_harga(brief))
     sisa = BATAS_KARAKTER - len(dasar) - len("\n".join(penutup)) - 120
-    ai_teks = "\n".join(blok_ai)
+    ai_teks = "\n".join(_blok_ai(brief, paragraf_maks=1))
     if sisa > 200:
         ai_teks = ai_teks[:sisa].rsplit("\n", 1)[0] + f"\n…\n{PEMISAH}"
     else:

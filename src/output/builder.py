@@ -31,6 +31,7 @@ DISCLAIMER = "Konten ini bersifat informasional dan bukan saran investasi."
 SUMBER_DIPANTAU = [
     "price", "technical", "funding_oi", "fear_greed",
     "onchain", "etf_flow", "macro", "news", "whale", "statements",
+    "options", "onchain_valuasi", "flows",
 ]
 
 
@@ -221,6 +222,9 @@ def build_brief(
     market: Dict[str, Any],
     macro: Dict[str, Any],
     whale: Dict[str, Any],
+    options: Dict[str, Any],
+    onchain: Dict[str, Any],
+    flows: Dict[str, Any],
     news: List[Dict[str, Any]],
     statements: List[Dict[str, Any]],
     aggregate: Dict[str, Any],
@@ -245,6 +249,9 @@ def build_brief(
         "market": market,
         "macro": macro,
         "whale": whale,
+        "options": options,
+        "onchain": onchain,
+        "flows": flows,
         "news": bersihkan_berita(news),
         "statements": statements,
         "aggregate": aggregate,

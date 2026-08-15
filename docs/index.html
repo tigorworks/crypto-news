@@ -399,6 +399,85 @@
           </div>
         </section>
 
+        <!-- ============ DATA INSTITUSIONAL: OPSI, VALUASI, ALIRAN ============ -->
+        <template x-if="adaDataInstitusional">
+          <section id="s-institusional" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+            <template x-if="data.options && Object.keys(data.options).length">
+              <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
+                <h2 class="font-semibold flex items-center gap-2 mb-1">
+                  <i data-lucide="target" class="w-4 h-4 text-slate-400"></i> Opsi (Deribit)
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                  Posisi institusional di pasar opsi. Angka mentah, bukan hasil AI.
+                </p>
+                <dl class="space-y-2 text-sm">
+                  <template x-for="b in barisOpsi" :key="b.label">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-slate-500 dark:text-slate-400" :title="b.jelas" x-text="b.label"></dt>
+                      <dd class="font-semibold text-right" x-text="b.nilai"></dd>
+                    </div>
+                  </template>
+                </dl>
+                <template x-if="data.options.skew_put_call !== null && data.options.skew_put_call !== undefined">
+                  <p class="mt-3 text-xs text-slate-500 dark:text-slate-400"
+                     x-text="data.options.skew_put_call > 0
+                       ? 'Skew positif: opsi jual lebih mahal dari opsi beli — pasar membayar untuk proteksi turun.'
+                       : 'Skew negatif: opsi beli lebih mahal — pasar membayar untuk potensi naik.'"></p>
+                </template>
+              </div>
+            </template>
+
+            <template x-if="data.onchain && Object.keys(data.onchain).length">
+              <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
+                <h2 class="font-semibold flex items-center gap-2 mb-1">
+                  <i data-lucide="link" class="w-4 h-4 text-slate-400"></i> Valuasi On-chain
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                  Konteks jangka panjang dari data blockchain, bukan sinyal harian.
+                </p>
+                <dl class="space-y-2 text-sm">
+                  <template x-for="b in barisOnchain" :key="b.label">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-slate-500 dark:text-slate-400" :title="b.jelas" x-text="b.label"></dt>
+                      <dd class="font-semibold text-right">
+                        <span x-text="b.nilai"></span>
+                        <template x-if="b.perubahan !== null && b.perubahan !== undefined">
+                          <span class="text-xs font-normal" :class="warnaAngka(b.perubahan)"
+                                x-text="' ' + persen(b.perubahan, 1)"></span>
+                        </template>
+                      </dd>
+                    </div>
+                  </template>
+                </dl>
+              </div>
+            </template>
+
+            <template x-if="data.flows && Object.keys(data.flows).length">
+              <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
+                <h2 class="font-semibold flex items-center gap-2 mb-1">
+                  <i data-lucide="banknote" class="w-4 h-4 text-slate-400"></i> Aliran Dana
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                  Permintaan AS dan likuiditas stablecoin yang siap dibelanjakan.
+                </p>
+                <dl class="space-y-2 text-sm">
+                  <template x-for="b in barisAliran" :key="b.label">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-slate-500 dark:text-slate-400" :title="b.jelas" x-text="b.label"></dt>
+                      <dd class="font-semibold text-right" :class="b.warna || ''" x-text="b.nilai"></dd>
+                    </div>
+                  </template>
+                </dl>
+                <template x-if="data.flows.premium_coinbase_label">
+                  <p class="mt-3 text-xs text-slate-500 dark:text-slate-400"
+                     x-text="'Premium Coinbase: ' + data.flows.premium_coinbase_label + '.'"></p>
+                </template>
+              </div>
+            </template>
+          </section>
+        </template>
+
         <!-- ================= PERNYATAAN TOKOH ================= -->
         <template x-if="data.statements?.length">
           <section id="s-pernyataan" class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
