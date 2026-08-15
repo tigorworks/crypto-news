@@ -25,6 +25,7 @@ LLM, dan ambang di atas hanya dipakai kode untuk memberi label zona.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from ..utils.http import HttpError, get_json
@@ -40,6 +41,7 @@ METRIK = {
     "AdrActCnt": "alamat_aktif",
     "SplyAct1yr": "pasokan_aktif_1thn",
     "SplyCur": "pasokan_beredar",
+    "CapMrktCurUSD": "market_cap_usd",
 }
 
 
@@ -56,24 +58,58 @@ def _zona_mvrv(nilai: Optional[float]) -> Optional[str]:
     return "di_bawah_biaya_perolehan"
 
 
+# Tier community tidak menyediakan semua metrik, dan daftarnya berubah dari
+# waktu ke waktu. API menolak SELURUH permintaan kalau satu metrik saja tidak
+# tersedia, tapi pesan errornya menyebut metrik mana — jadi metrik itu dibuang
+# lalu permintaan diulang. Lebih baik kehilangan satu metrik daripada semuanya.
+_POLA_METRIK_DITOLAK = re.compile(r"metric '([A-Za-z0-9_]+)'")
+
+
+def _ambil_dengan_degradasi(metrik: List[str], hari: int) -> tuple:
+    """Minta metrik; buang yang ditolak lalu ulangi. Return (baris, terpakai)."""
+    tersisa = list(metrik)
+    dibuang: List[str] = []
+
+    for _ in range(len(metrik)):
+        if not tersisa:
+            break
+        try:
+            hasil = get_json(
+                BASE,
+                params={
+                    "assets": "btc",
+                    "metrics": ",".join(tersisa),
+                    "frequency": "1d",
+                    "page_size": hari,
+                    "sort": "time",
+                },
+                timeout=45,
+            )
+            if dibuang:
+                log.info(
+                    "Metrik on-chain tidak tersedia di tier ini, dilewati: %s",
+                    ", ".join(dibuang),
+                )
+            return hasil.get("data") or [], tersisa
+        except HttpError as exc:
+            cocok = _POLA_METRIK_DITOLAK.search(str(exc))
+            if not cocok or cocok.group(1) not in tersisa:
+                raise
+            ditolak = cocok.group(1)
+            tersisa.remove(ditolak)
+            dibuang.append(ditolak)
+
+    return [], []
+
+
 def collect(hari: int = 30) -> Dict[str, Any]:
     """Ambil metrik terkini plus perubahannya sebulan terakhir."""
     data: Dict[str, Any] = {}
     try:
-        hasil = get_json(
-            BASE,
-            params={
-                "assets": "btc",
-                "metrics": ",".join(METRIK),
-                "frequency": "1d",
-                "page_size": hari,
-                "sort": "time",
-            },
-            timeout=45,
-        )
-        baris = hasil.get("data") or []
+        baris, terpakai = _ambil_dengan_degradasi(list(METRIK), hari)
         if not baris:
-            raise ValueError("Coin Metrics mengembalikan data kosong")
+            raise ValueError("Coin Metrics tidak mengembalikan metrik yang tersedia")
+        data["metrik_tersedia"] = terpakai
 
         terkini = baris[-1]
         terlama = baris[0]
@@ -100,6 +136,14 @@ def collect(hari: int = 30) -> Dict[str, Any]:
                 data[f"{kunci_kita}_perubahan_30h_pct"] = round(
                     (baru_f - lama_f) / lama_f * 100, 2
                 )
+
+        # Kalau MVRV langsung tidak tersedia tapi kedua penyusunnya ada,
+        # hitung sendiri — rumusnya memang kapitalisasi dibagi realized cap.
+        if data.get("mvrv") is None and data.get("realized_cap_usd"):
+            cap = data.get("market_cap_usd")
+            if cap:
+                data["mvrv"] = round(cap / data["realized_cap_usd"], 3)
+                data["mvrv_dihitung_sendiri"] = True
 
         data["mvrv_zona"] = _zona_mvrv(data.get("mvrv"))
 

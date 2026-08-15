@@ -216,6 +216,13 @@ class LLMClient:
         return _extract_json(self.chat(models, system, user, **kwargs))
 
     # -- ringkasan -----------------------------------------------------
+    def model_terpakai(self, step: str) -> Optional[str]:
+        """Model yang benar-benar melayani step ini (bisa jadi cadangan)."""
+        for panggilan in reversed(self.calls):
+            if panggilan["step"] == step:
+                return panggilan["model"]
+        return None
+
     def ringkasan(self) -> Dict[str, Any]:
         return {
             "total_cost_usd": round(self.total_cost, 5),

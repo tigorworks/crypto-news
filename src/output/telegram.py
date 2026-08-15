@@ -45,6 +45,39 @@ def _persen(value: Optional[float], desimal: int = 2) -> str:
     return f"{tanda}{_angka(value, desimal)}%"
 
 
+# Istilah internal -> bahasa yang dimengerti pembaca umum. "kekuatan 4"
+# tidak berarti apa-apa bagi orang yang tidak membaca dokumentasi kita.
+DAMPAK = {
+    1: "dampak kecil", 2: "dampak terbatas", 3: "dampak sedang",
+    4: "dampak besar", 5: "dampak sangat besar",
+}
+ARAH_HARGA = {
+    "bullish": "cenderung mengangkat harga",
+    "bearish": "cenderung menekan harga",
+    "netral": "dampak dua arah",
+}
+STATUS_PERNYATAAN = {
+    "verbatim": "pernyataan langsung",
+    "dilaporkan_media": "dilaporkan media",
+    "rumor": "belum terkonfirmasi",
+}
+KEPASTIAN = {
+    "rumor": "masih rumor",
+    "belum_dikonfirmasi": "belum dikonfirmasi",
+    "dikonfirmasi": "sudah dikonfirmasi",
+    "sudah_terjadi": "sudah terjadi",
+    "terjadwal": "terjadwal",
+}
+
+
+def _label_dampak(kekuatan: Optional[int]) -> str:
+    return DAMPAK.get(kekuatan or 0, "")
+
+
+def _label_arah(sentimen: Optional[str]) -> str:
+    return ARAH_HARGA.get(sentimen or "", "")
+
+
 def _potong(teks: str, maks: int) -> str:
     """Potong di batas kata supaya kalimat tidak terputus di tengah."""
     teks = (teks or "").strip()
@@ -115,7 +148,8 @@ def _blok_pasar(brief: Dict[str, Any]) -> List[str]:
     potongan = []
     funding = market.get("funding_rate")
     if funding is not None:
-        potongan.append(f"Funding {_persen(funding * 100, 3)}")
+        sisi = "pemegang long yang membayar" if funding > 0 else "pemegang short yang membayar"
+        potongan.append(f"Funding {_persen(funding * 100, 3)} ({sisi})")
     if teknikal.get("oi_change_pct") is not None:
         arah = "naik" if teknikal["oi_change_pct"] > 0 else "turun"
         potongan.append(f"OI {arah} {_angka(abs(teknikal['oi_change_pct']), 1)}%")
@@ -165,14 +199,12 @@ def _blok_berita(brief: Dict[str, Any], maks: int = 5) -> List[str]:
 
     baris = ["", "📰 <b>Berita Utama</b>"]
     for i, n in enumerate(berperingkat[:maks], 1):
-        judul = esc(n["judul"][:110])
-        detail = []
-        if n.get("sentimen"):
-            detail.append(n["sentimen"])
-        if n.get("kekuatan"):
-            detail.append(f"kekuatan {n['kekuatan']}")
-        keterangan = f" — {', '.join(detail)}" if detail else ""
-        baris.append(f"{i}. {judul}{keterangan}")
+        baris.append(f"{i}. {esc(n['judul'][:110])}")
+        detail = [t for t in (_label_arah(n.get("sentimen")), _label_dampak(n.get("kekuatan"))) if t]
+        if n.get("status_kepastian") in ("rumor", "belum_dikonfirmasi"):
+            detail.append(KEPASTIAN[n["status_kepastian"]])
+        if detail:
+            baris.append("   <i>" + esc(" · ".join(detail)) + "</i>")
     return baris
 
 
@@ -216,7 +248,15 @@ def _blok_opsi(brief: Dict[str, Any]) -> List[str]:
         baris.append(" · ".join(potongan))
 
     if opsi.get("max_pain_expiry_terdekat"):
-        baris.append(f"Max pain expiry terdekat: {_angka(opsi['max_pain_expiry_terdekat'], 0)}")
+        baris.append(
+            f"Max pain {_angka(opsi['max_pain_expiry_terdekat'], 0)} "
+            "<i>(harga yang paling merugikan pemegang opsi saat jatuh tempo)</i>"
+        )
+    pc = opsi.get("put_call_ratio_oi")
+    if pc is not None:
+        arti = ("lebih banyak posisi proteksi turun" if pc > 1
+                else "lebih banyak taruhan naik")
+        baris.append(f"<i>Rasio put/call {_angka(pc, 2)}: {arti}.</i>")
     return baris
 
 
@@ -275,24 +315,26 @@ def _blok_aliran(brief: Dict[str, Any]) -> List[str]:
 
 def _blok_pernyataan(brief: Dict[str, Any], maks: int = 3) -> List[str]:
     """Pernyataan tokoh berpengaruh yang berpotensi menggerakkan pasar."""
-    pernyataan = brief.get("statements") or []
+    # Pernyataan tanpa tokoh yang teridentifikasi tidak punya nilai: pembaca
+    # tidak bisa menimbang bobotnya kalau tidak tahu siapa yang bicara.
+    pernyataan = [
+        p for p in (brief.get("statements") or [])
+        if p.get("tokoh") and str(p["tokoh"]).strip().lower() not in
+        ("", "tidak disebutkan", "tidak diketahui", "null", "none")
+    ]
     if not pernyataan:
         return []
 
     baris = ["", "🗣 <b>Pernyataan Berpengaruh</b>"]
     for s in pernyataan[:maks]:
-        tokoh = esc(s.get("tokoh") or "Tidak disebutkan")
-        isi = _potong(s.get("ringkasan") or s.get("kutipan") or "", 160)
-        detail = []
-        if s.get("dampak_btc"):
-            detail.append(s["dampak_btc"])
-        if s.get("kekuatan"):
-            detail.append(f"kekuatan {s['kekuatan']}")
-        # Rumor ditandai eksplisit supaya tidak terbaca seperti fakta.
-        if s.get("status") == "rumor":
-            detail.append("belum terkonfirmasi")
-        akhiran = f" ({', '.join(detail)})" if detail else ""
-        baris.append(f"• <b>{tokoh}</b>: {esc(isi)}{akhiran}")
+        isi = _potong(s.get("ringkasan") or s.get("kutipan") or "", 170)
+        baris.append(f"• <b>{esc(s['tokoh'])}</b>: {esc(isi)}")
+        detail = [t for t in (_label_arah(s.get("dampak_btc")), _label_dampak(s.get("kekuatan"))) if t]
+        status = STATUS_PERNYATAAN.get(s.get("status") or "")
+        if status and s.get("status") != "verbatim":
+            detail.append(status)
+        if detail:
+            baris.append("   <i>" + esc(" · ".join(detail)) + "</i>")
     return baris
 
 
@@ -337,7 +379,15 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     critic = ai.get("critic") or {}
 
     baris = ["", PEMISAH]
-    if not critic.get("passed", True):
+    ditahan = ai.get("bagian_ditahan") or []
+    tersisa = any([
+        ai.get("narrative"), (ai.get("teknikal") or {}).get("ringkasan"),
+        (ai.get("whale") or {}).get("ringkasan"), (ai.get("outlook") or {}).get("ringkasan"),
+    ])
+
+    # Kalau critic hanya menolak sebagian, bagian yang lolos tetap dikirim —
+    # menahan semuanya berarti membuang analisa yang tidak bermasalah.
+    if not critic.get("passed", True) and not tersisa:
         baris.append("⚠️ Analisa AI ditahan karena tidak lolos verifikasi.")
         baris.append(PEMISAH)
         return baris
@@ -354,6 +404,11 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
         return baris
 
     baris.append("✦ <b>ANALISA AI</b>")
+    # Judul memuat temuan utamanya — itu yang paling ingin dibaca duluan.
+    judul = ((ai.get("bagian") or {}).get("judul") or "").strip()
+    if judul:
+        baris.append(f"<b>{esc(_potong(judul, 160))}</b>")
+        baris.append("")
     # Narasi lengkap dikirim beberapa paragraf, bukan cuma satu kalimat
     # pembuka — ruang 4096 karakter jauh lebih dari cukup, dan tangga
     # pemangkasan di bawah yang mengurus kalau ternyata kepanjangan.
@@ -414,7 +469,21 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
         if ol.get("risiko_utama"):
             baris.append("⚠ <b>Risiko:</b> " + esc(_potong(ol["risiko_utama"][0], 200)))
 
+    bagian = ai.get("bagian") or {}
+    if bagian.get("kesimpulan"):
+        baris.append("")
+        baris.append("<b>Kesimpulan:</b> " + esc(_potong(bagian["kesimpulan"], 400)))
+    if bagian.get("katalis_berikutnya"):
+        baris.append("")
+        baris.append("<b>Katalis berikutnya:</b> " + esc(
+            _potong("; ".join(bagian["katalis_berikutnya"][:3]), 250)))
+
     baris.append("")
+    if ditahan:
+        baris.append(
+            "⚠️ <i>Bagian berikut ditahan karena tidak lolos verifikasi: "
+            + esc(", ".join(ditahan)) + ".</i>"
+        )
     baris.append("<i>Dihasilkan AI, dapat keliru.</i>")
     baris.append(PEMISAH)
     return baris

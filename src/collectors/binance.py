@@ -5,9 +5,10 @@ Binance dengan HTTP 451 — pembatasan wilayah permanen, bukan gangguan
 sementara. Karena itu ada dua jalur cadangan:
 
   harga + klines  -> CoinGecko
-  funding + OI    -> Bybit
+  funding + OI    -> Bybit, lalu Deribit
 
-Keduanya publik dan tanpa API key.
+Bybit ternyata ikut memblokir IP yang sama lewat CloudFront, jadi Deribit
+dipasang sebagai lapis ketiga. Semuanya publik dan tanpa API key.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from ..utils.http import HttpError, get_json
-from . import bybit
+from . import bybit, options
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +84,11 @@ def fetch_funding_rate(symbol: str) -> Optional[float]:
         return float(data["lastFundingRate"])
     except (HttpError, KeyError, ValueError, TypeError) as exc:
         log.warning("Funding rate Binance gagal (%s), coba Bybit", _ringkas(exc))
-        return bybit.fetch_funding_rate(symbol)
+        nilai = bybit.fetch_funding_rate(symbol)
+        if nilai is None:
+            log.warning("Bybit juga gagal, coba Deribit")
+            nilai = options.perp_funding_rate()
+        return nilai
 
 
 def fetch_open_interest(symbol: str) -> Optional[float]:
@@ -93,7 +98,11 @@ def fetch_open_interest(symbol: str) -> Optional[float]:
         return float(data["openInterest"])
     except (HttpError, KeyError, ValueError, TypeError) as exc:
         log.warning("Open interest Binance gagal (%s), coba Bybit", _ringkas(exc))
-        return bybit.fetch_open_interest(symbol)
+        nilai = bybit.fetch_open_interest(symbol)
+        if nilai is None:
+            log.warning("Bybit juga gagal, coba Deribit")
+            nilai = options.perp_open_interest()
+        return nilai
 
 
 def fetch_open_interest_history(symbol: str, period: str = "1d", limit: int = 30) -> List[Dict[str, Any]]:
