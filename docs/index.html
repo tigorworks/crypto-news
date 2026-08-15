@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ringkasan Pasar Bitcoin</title>
+<meta name="description" content="Ringkasan harian pasar Bitcoin: harga, teknikal, posisi pasar, makro, dan berita. Informasional, bukan saran investasi.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%82%BF%3C/text%3E%3C/svg%3E">
+
+<!-- Terapkan tema SEBELUM render supaya tidak ada kedipan (flash) -->
+<script>
+  (function () {
+    try {
+      var simpan = localStorage.getItem('theme');
+      var gelap = simpan ? simpan === 'dark'
+                         : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (gelap) document.documentElement.classList.add('dark');
+    } catch (e) { /* localStorage diblokir: pakai tema terang */ }
+  })();
+</script>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+<script src="app.js"></script>
+
+<style>
+  [x-cloak] { display: none !important; }
+</style>
+</head>
+
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 antialiased transition-colors">
+<div x-data="briefApp()" x-init="mulai()" x-cloak class="min-h-screen flex flex-col">
+
+  <!-- ================= HEADER ================= -->
+  <header class="sticky top-0 z-30 backdrop-blur bg-white/85 dark:bg-slate-900/85 border-b border-slate-200 dark:border-slate-700">
+    <div class="max-w-6xl mx-auto px-4 py-3">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h1 class="text-lg sm:text-xl font-bold flex items-center gap-2">
+            <i data-lucide="bitcoin" class="w-5 h-5 text-amber-500 shrink-0"></i>
+            <span class="truncate">Ringkasan Pasar Bitcoin</span>
+          </h1>
+
+          <!-- Waktu update terakhir, sengaja dibuat mencolok -->
+          <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span class="text-slate-500 dark:text-slate-400">Terakhir diperbarui:</span>
+            <span class="font-semibold text-slate-900 dark:text-white" x-text="data?.generated_at_wib || '—'"></span>
+            <span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  x-text="waktuRelatif"></span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <!-- Badge kualitas data -->
+          <template x-if="data">
+            <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2 sm:px-2.5 py-1 rounded-full border"
+                  :class="kelasKualitas"
+                  :title="'Sumber gagal: ' + (data.data_quality.failed_sources.join(', ') || 'tidak ada')">
+              <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="kelasTitikKualitas"></span>
+              <span class="hidden sm:inline">Data</span>
+              <span x-text="data.data_quality.confidence"></span>
+              <span class="opacity-70 hidden sm:inline"
+                    x-text="data.data_quality.sources_ok + '/' + data.data_quality.sources_total"></span>
+            </span>
+          </template>
+
+          <button @click="gantiTema()" :title="gelap ? 'Mode terang' : 'Mode gelap'"
+                  class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+            <i :data-lucide="gelap ? 'sun' : 'moon'" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-5 space-y-5">
+
+    <!-- ================= MEMUAT / ERROR ================= -->
+    <template x-if="memuat">
+      <div class="flex items-center gap-3 justify-center py-16 text-slate-500">
+        <i data-lucide="loader-circle" class="w-5 h-5 animate-spin"></i>
+        <span>Memuat data…</span>
+      </div>
+    </template>
+
+    <template x-if="error">
+      <div class="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/25 p-6 text-center">
+        <i data-lucide="cloud-off" class="w-8 h-8 mx-auto text-amber-600 dark:text-amber-400"></i>
+        <h2 class="mt-3 font-semibold text-lg">Data belum bisa dimuat</h2>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300 max-w-md mx-auto" x-text="error"></p>
+        <p class="mt-2 text-sm text-slate-500">
+          Brief dibuat otomatis dua kali sehari. Kalau baru saja dipasang, tunggu jadwal berikutnya.
+        </p>
+        <button @click="muat()" class="mt-4 px-4 py-2 rounded-lg bg-slate-900 dark:bg-white dark:text-slate-900 text-white text-sm font-medium">
+          Coba lagi
+        </button>
+      </div>
+    </template>
+
+    <template x-if="data && !memuat">
+      <div class="space-y-5">
+
+        <!-- ================= HARGA ================= -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="lg:col-span-2 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="text-sm text-slate-500 dark:text-slate-400">Harga BTC/USD</div>
+                <div class="mt-1 flex items-baseline gap-3 flex-wrap">
+                  <span class="text-3xl sm:text-4xl font-bold tracking-tight" x-text="uang(data.price.last)"></span>
+                  <span class="text-lg font-semibold" :class="warnaAngka(data.price.change_24h_pct)"
+                        x-text="persen(data.price.change_24h_pct, 2)"></span>
+                </div>
+              </div>
+              <i data-lucide="trending-up" class="w-6 h-6 text-slate-300 dark:text-slate-600"></i>
+            </div>
+
+            <div class="mt-4 h-40"><canvas id="grafikHarga"></canvas></div>
+
+            <dl class="mt-4 grid grid-cols-3 gap-3 text-sm">
+              <div><dt class="text-slate-500 dark:text-slate-400">Tertinggi 24j</dt>
+                   <dd class="font-semibold" x-text="uang(data.price.high_24h)"></dd></div>
+              <div><dt class="text-slate-500 dark:text-slate-400">Terendah 24j</dt>
+                   <dd class="font-semibold" x-text="uang(data.price.low_24h)"></dd></div>
+              <div><dt class="text-slate-500 dark:text-slate-400">Volume 24j</dt>
+                   <dd class="font-semibold" x-text="ringkasUang(data.price.volume_24h)"></dd></div>
+            </dl>
+          </div>
+
+          <!-- Sentimen berita + level kunci -->
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-5 flex flex-col">
+            <div class="text-sm text-slate-500 dark:text-slate-400">Skor sentimen berita</div>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span class="text-3xl font-bold" :class="warnaAngka(data.aggregate.sentiment_score)"
+                    x-text="angka(data.aggregate.sentiment_score, 1)"></span>
+              <span class="text-sm text-slate-500">/ 100</span>
+            </div>
+            <div class="text-sm font-medium mt-0.5" x-text="data.aggregate.sentiment_label || '—'"></div>
+
+            <!-- Batang -100..+100 -->
+            <div class="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-700 relative overflow-hidden">
+              <div class="absolute top-0 bottom-0 w-px bg-slate-400 dark:bg-slate-500 left-1/2"></div>
+              <div class="absolute top-0 bottom-0 rounded-full transition-all"
+                   :class="data.aggregate.sentiment_score >= 0 ? 'bg-emerald-500' : 'bg-rose-500'"
+                   :style="gayaBatangSentimen"></div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-slate-500 dark:text-slate-400">Support terdekat</span>
+                <span class="font-semibold" x-text="uang(data.technical.key_levels.support?.[0])"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-500 dark:text-slate-400">Resistance terdekat</span>
+                <span class="font-semibold" x-text="uang(data.technical.key_levels.resistance?.[0])"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-500 dark:text-slate-400">Invalidasi naik</span>
+                <span class="font-semibold" x-text="uang(data.technical.key_levels.invalidasi_naik)"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-500 dark:text-slate-400">Invalidasi turun</span>
+                <span class="font-semibold" x-text="uang(data.technical.key_levels.invalidasi_turun)"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= TEKNIKAL ================= -->
+        <section class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl">
+          <div class="flex items-center justify-between gap-3 p-5 pb-3 flex-wrap">
+            <h2 class="font-semibold flex items-center gap-2">
+              <i data-lucide="activity" class="w-4 h-4 text-slate-400"></i> Analisa Teknikal
+            </h2>
+            <div class="flex gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-700/50">
+              <template x-for="tf in ['1d','4h','1h']" :key="tf">
+                <button @click="tabTf = tf"
+                        class="px-3 py-1 text-sm font-medium rounded-md transition"
+                        :class="tabTf === tf ? 'bg-white dark:bg-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'"
+                        x-text="tf.toUpperCase()"></button>
+              </template>
+            </div>
+          </div>
+
+          <template x-if="!tfAktif || !tfAktif.momentum">
+            <p class="px-5 pb-5 text-sm text-slate-500">Data timeframe ini tidak tersedia pada run terakhir.</p>
+          </template>
+
+          <template x-if="tfAktif && tfAktif.momentum">
+            <div class="px-5 pb-5 grid grid-cols-1 md:grid-cols-3 gap-5">
+
+              <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Tren</h3>
+                <dl class="space-y-1.5 text-sm">
+                  <template x-for="p in [20,50,100,200]" :key="p">
+                    <div class="flex justify-between items-center">
+                      <dt class="text-slate-500 dark:text-slate-400" x-text="'EMA ' + p"></dt>
+                      <dd class="flex items-center gap-2">
+                        <span x-text="uang(tfAktif.tren['ema'+p])"></span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                              :class="tfAktif.tren.posisi?.['ema'+p] === 'di_atas'
+                                      ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                                      : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'"
+                              x-text="tfAktif.tren.posisi?.['ema'+p] === 'di_atas' ? 'harga di atas' : 'harga di bawah'"></span>
+                      </dd>
+                    </div>
+                  </template>
+                  <div class="flex justify-between pt-1">
+                    <dt class="text-slate-500 dark:text-slate-400">Struktur</dt>
+                    <dd class="font-medium" x-text="tfAktif.tren.struktur"></dd>
+                  </div>
+                  <template x-if="tfAktif.tren.cross_50_200">
+                    <div class="flex justify-between">
+                      <dt class="text-slate-500 dark:text-slate-400">Persilangan EMA</dt>
+                      <dd class="font-medium" x-text="tfAktif.tren.cross_50_200 === 'golden_cross' ? 'Golden cross' : 'Death cross'"></dd>
+                    </div>
+                  </template>
+                </dl>
+              </div>
+
+              <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Momentum</h3>
+                <dl class="space-y-1.5 text-sm">
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">RSI (14)</dt>
+                    <dd class="font-medium"><span x-text="angka(tfAktif.momentum.rsi, 1)"></span>
+                      <span class="text-slate-400 text-xs" x-text="'· ' + labelZona(tfAktif.momentum.rsi_zona)"></span></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">MACD</dt>
+                    <dd x-text="angka(tfAktif.momentum.macd, 1)"></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Histogram</dt>
+                    <dd><span x-text="angka(tfAktif.momentum.macd_histogram, 1)"></span>
+                      <span class="text-slate-400 text-xs" x-text="'· ' + tfAktif.momentum.macd_arah"></span></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Stoch RSI %K</dt>
+                    <dd x-text="angka(tfAktif.momentum.stoch_rsi_k, 1)"></dd></div>
+                  <template x-if="tfAktif.momentum.divergensi_rsi">
+                    <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Divergensi RSI</dt>
+                      <dd class="font-medium" x-text="'terdeteksi (' + tfAktif.momentum.divergensi_rsi + ')'"></dd></div>
+                  </template>
+                </dl>
+              </div>
+
+              <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Volatilitas &amp; Volume</h3>
+                <dl class="space-y-1.5 text-sm">
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Bollinger atas</dt>
+                    <dd x-text="uang(tfAktif.volatilitas.bb_atas)"></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Bollinger bawah</dt>
+                    <dd x-text="uang(tfAktif.volatilitas.bb_bawah)"></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Bandwidth</dt>
+                    <dd><span x-text="angka(tfAktif.volatilitas.bb_bandwidth, 2) + '%'"></span>
+                      <template x-if="tfAktif.volatilitas.bb_squeeze">
+                        <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700">menyempit</span>
+                      </template></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">ATR (14)</dt>
+                    <dd><span x-text="uang(tfAktif.volatilitas.atr)"></span>
+                      <span class="text-slate-400 text-xs" x-text="'· ' + angka(tfAktif.volatilitas.atr_pct, 2) + '%'"></span></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Volume vs rata²</dt>
+                    <dd x-text="tfAktif.volume.rasio_vs_rata ? angka(tfAktif.volume.rasio_vs_rata, 2) + '×' : '—'"></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">OBV</dt>
+                    <dd x-text="tfAktif.volume.obv_arah"></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">VWAP harian</dt>
+                    <dd x-text="uang(tfAktif.volume.vwap_harian)"></dd></div>
+                </dl>
+              </div>
+
+              <!-- Level -->
+              <div class="md:col-span-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Level pada timeframe ini</h3>
+                <div class="flex flex-wrap gap-2 text-sm">
+                  <template x-for="lv in (tfAktif.level.support || [])" :key="'s'+lv">
+                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
+                      <span class="text-slate-400 text-xs">S</span> <span x-text="uang(lv)"></span></span>
+                  </template>
+                  <template x-for="lv in (tfAktif.level.resistance || [])" :key="'r'+lv">
+                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
+                      <span class="text-slate-400 text-xs">R</span> <span x-text="uang(lv)"></span></span>
+                  </template>
+                  <template x-if="tfAktif.level.pivot?.pivot">
+                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
+                      <span class="text-slate-400 text-xs">Pivot</span> <span x-text="uang(tfAktif.level.pivot.pivot)"></span></span>
+                  </template>
+                  <template x-if="tfAktif.level.fib_618">
+                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
+                      <span class="text-slate-400 text-xs">Fib 0,618</span> <span x-text="uang(tfAktif.level.fib_618)"></span></span>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+        </section>
+
+        <!-- ================= POSISI PASAR + MAKRO ================= -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+            <h2 class="font-semibold flex items-center gap-2 mb-4">
+              <i data-lucide="waves" class="w-4 h-4 text-slate-400"></i> Posisi Pasar
+            </h2>
+
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div><div class="text-slate-500 dark:text-slate-400">Funding rate</div>
+                <div class="font-semibold text-base" :class="warnaAngka(data.market.funding_rate)"
+                     x-text="data.market.funding_rate === null ? '—' : persen(data.market.funding_rate * 100, 4)"></div></div>
+              <div><div class="text-slate-500 dark:text-slate-400">Open interest</div>
+                <div class="font-semibold text-base">
+                  <span x-text="data.market.open_interest === null ? '—' : angka(data.market.open_interest, 0) + ' BTC'"></span>
+                  <template x-if="data.technical.oi_change_pct !== null && data.technical.oi_change_pct !== undefined">
+                    <span class="text-xs font-normal" :class="warnaAngka(data.technical.oi_change_pct)"
+                          x-text="' ' + persen(data.technical.oi_change_pct, 1)"></span>
+                  </template>
+                </div></div>
+              <div><div class="text-slate-500 dark:text-slate-400">Arus ETF harian</div>
+                <div class="font-semibold text-base"
+                     :class="data.market.etf_flow_usd === null ? '' : warnaAngka(data.market.etf_flow_usd)"
+                     x-text="data.market.etf_flow_usd === null ? 'tidak tersedia' : ringkasUang(data.market.etf_flow_usd, true)"></div></div>
+              <div><div class="text-slate-500 dark:text-slate-400">Hashrate</div>
+                <div class="font-semibold text-base" x-text="data.market.hashrate ? angka(data.market.hashrate, 0) + ' EH/s' : '—'"></div></div>
+            </div>
+
+            <!-- Gauge Fear & Greed -->
+            <template x-if="data.market.fear_greed">
+              <div class="mt-5 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-slate-500 dark:text-slate-400">Fear &amp; Greed Index</span>
+                  <span class="font-semibold">
+                    <span x-text="data.market.fear_greed.value"></span>
+                    <span class="text-slate-400 font-normal" x-text="'· ' + data.market.fear_greed.label"></span>
+                  </span>
+                </div>
+                <div class="mt-2 h-2.5 rounded-full relative"
+                     style="background:linear-gradient(90deg,#f43f5e 0%,#f59e0b 35%,#a3a3a3 50%,#84cc16 70%,#10b981 100%)">
+                  <div class="absolute -top-1 w-1 h-[18px] bg-slate-900 dark:bg-white rounded-full ring-2 ring-white dark:ring-slate-800 transition-all"
+                       :style="'left: calc(' + data.market.fear_greed.value + '% - 2px)'"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                  <span>Takut</span><span>Netral</span><span>Serakah</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- Interpretasi OI (hasil kode, bukan AI) -->
+            <template x-if="data.technical.oi_price_interpretasi">
+              <p class="mt-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed"
+                 x-text="data.technical.oi_price_interpretasi"></p>
+            </template>
+          </div>
+
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+            <h2 class="font-semibold flex items-center gap-2 mb-4">
+              <i data-lucide="globe" class="w-4 h-4 text-slate-400"></i> Makro
+            </h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <template x-for="m in daftarMakro" :key="m.kunci">
+                <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/40">
+                  <div class="text-xs text-slate-500 dark:text-slate-400" x-text="m.label"></div>
+                  <div class="font-semibold mt-0.5" x-text="m.nilai"></div>
+                  <div class="text-xs" :class="warnaAngka(m.perubahan)" x-text="m.perubahan === null ? '' : persen(m.perubahan, 2)"></div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= ANALISA AI ================= -->
+        <!-- Area ini SENGAJA dibedakan: border indigo, latar berbeda, badge AI. -->
+        <section class="rounded-xl border-2 border-indigo-300 dark:border-indigo-600/70 bg-indigo-50/60 dark:bg-indigo-950/30 p-5">
+          <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 class="font-semibold flex items-center gap-2">
+                <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white">
+                  <i data-lucide="sparkles" class="w-3 h-3"></i> AI
+                </span>
+                Analisa AI
+              </h2>
+              <p class="mt-1.5 text-xs text-indigo-900/70 dark:text-indigo-200/70 max-w-2xl">
+                Bagian ini dihasilkan oleh AI dan dapat mengandung kesalahan. Data mentah di atas tidak dihasilkan AI.
+              </p>
+            </div>
+            <template x-if="data.ai.model_used">
+              <span class="text-[11px] text-indigo-900/60 dark:text-indigo-200/60" x-text="'Model: ' + data.ai.model_used"></span>
+            </template>
+          </div>
+
+          <!-- Critic gagal: sembunyikan narasi, tampilkan peringatan -->
+          <template x-if="data.ai.critic && data.ai.critic.passed === false">
+            <div class="mt-4 rounded-lg border border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 p-4">
+              <div class="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-200">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i> Analisa AI ditahan
+              </div>
+              <p class="mt-1 text-sm text-amber-800/80 dark:text-amber-200/80">
+                Narasi tidak lolos pemeriksaan otomatis, jadi tidak ditampilkan. Data mentah di atas tetap valid.
+              </p>
+              <ul class="mt-2 space-y-1 text-xs text-amber-900/70 dark:text-amber-200/70 list-disc list-inside">
+                <template x-for="(k, i) in (data.ai.critic.corrections || [])" :key="i">
+                  <li><span class="font-medium" x-text="k.jenis"></span><span x-text="': ' + k.alasan"></span></li>
+                </template>
+              </ul>
+            </div>
+          </template>
+
+          <template x-if="data.ai.critic?.passed !== false && data.ai.narrative">
+            <div class="mt-4 space-y-3 text-[15px] leading-relaxed text-slate-800 dark:text-slate-100">
+              <template x-for="(p, i) in paragrafNarasi" :key="i">
+                <p x-text="p"></p>
+              </template>
+            </div>
+          </template>
+
+          <template x-if="data.ai.critic?.passed !== false && !data.ai.narrative">
+            <p class="mt-4 text-sm text-slate-600 dark:text-slate-300">
+              Analisa AI tidak tersedia pada run ini.
+            </p>
+          </template>
+
+          <!-- Tema & pergeseran narasi (juga hasil AI) -->
+          <template x-if="data.aggregate.dominant_themes?.length || data.aggregate.narrative_shift">
+            <div class="mt-4 pt-4 border-t border-indigo-200 dark:border-indigo-700/50 space-y-2">
+              <template x-if="data.aggregate.dominant_themes?.length">
+                <div class="flex items-center gap-2 flex-wrap text-sm">
+                  <span class="text-indigo-900/60 dark:text-indigo-200/60">Tema dominan:</span>
+                  <template x-for="t in data.aggregate.dominant_themes" :key="t">
+                    <span class="px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200 text-xs" x-text="t"></span>
+                  </template>
+                </div>
+              </template>
+              <template x-if="data.aggregate.narrative_shift">
+                <p class="text-sm text-slate-700 dark:text-slate-300">
+                  <span class="text-indigo-900/60 dark:text-indigo-200/60">Pergeseran fokus: </span>
+                  <span x-text="data.aggregate.narrative_shift"></span>
+                </p>
+              </template>
+            </div>
+          </template>
+        </section>
+
+        <!-- ================= SINYAL BERTENTANGAN ================= -->
+        <template x-if="data.conflicts?.length">
+          <section class="rounded-xl border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-5">
+            <h2 class="font-semibold flex items-center gap-2 text-amber-900 dark:text-amber-200">
+              <i data-lucide="triangle-alert" class="w-4 h-4"></i> Sinyal Bertentangan
+            </h2>
+            <ul class="mt-3 space-y-2 text-sm text-amber-900/85 dark:text-amber-100/85">
+              <template x-for="(c, i) in data.conflicts" :key="i">
+                <li class="flex gap-2">
+                  <span class="text-amber-500 shrink-0">•</span>
+                  <span x-text="typeof c === 'string' ? c : c.keterangan"></span>
+                </li>
+              </template>
+            </ul>
+          </section>
+        </template>
+
+        <!-- ================= BERITA ================= -->
+        <section class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="font-semibold flex items-center gap-2">
+              <i data-lucide="newspaper" class="w-4 h-4 text-slate-400"></i> Berita
+              <span class="text-sm font-normal text-slate-400" x-text="'(' + beritaTersaring.length + ')'"></span>
+            </h2>
+            <div class="flex gap-2 flex-wrap">
+              <select x-model="filterKategori"
+                      class="text-sm px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700">
+                <option value="">Semua kategori</option>
+                <template x-for="k in kategoriTersedia" :key="k">
+                  <option :value="k" x-text="k"></option>
+                </template>
+              </select>
+              <select x-model="filterSentimen"
+                      class="text-sm px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700">
+                <option value="">Semua sentimen</option>
+                <option value="bullish">bullish</option>
+                <option value="bearish">bearish</option>
+                <option value="netral">netral</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Penanda: chip sentimen/kekuatan/mekanisme berasal dari AI -->
+          <p class="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <span class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-600 text-white shrink-0">
+              <i data-lucide="sparkles" class="w-2.5 h-2.5"></i> AI
+            </span>
+            Judul, sumber, dan waktu berasal dari sumber berita. Label sentimen, kekuatan, kategori, dan mekanisme dihasilkan AI.
+          </p>
+
+          <template x-if="!beritaTersaring.length">
+            <p class="mt-4 text-sm text-slate-500">Tidak ada berita yang cocok dengan filter ini.</p>
+          </template>
+
+          <ul class="mt-4 space-y-3">
+            <template x-for="n in beritaTersaring" :key="n.id">
+              <li class="p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition">
+                <div class="flex items-start justify-between gap-3">
+                  <a :href="n.url" target="_blank" rel="noopener noreferrer"
+                     class="font-medium hover:underline leading-snug" x-text="n.judul"></a>
+                  <span class="text-xs text-slate-400 whitespace-nowrap shrink-0" x-text="waktuSingkat(n.waktu_utc)"></span>
+                </div>
+
+                <div class="mt-1.5 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 flex-wrap">
+                  <span x-text="n.sumber"></span>
+                  <template x-if="n.jumlah_konfirmasi > 1">
+                    <span x-text="'· ' + n.jumlah_konfirmasi + ' outlet'"></span>
+                  </template>
+                  <template x-if="n.reaksi_harga_1j !== null && n.reaksi_harga_1j !== undefined">
+                    <span :class="warnaAngka(n.reaksi_harga_1j)" x-text="'· reaksi 1j ' + persen(n.reaksi_harga_1j, 2)"></span>
+                  </template>
+                </div>
+
+                <!-- Chip hasil AI, diberi ring indigo supaya beda dari data mentah -->
+                <div class="mt-2.5 flex flex-wrap gap-1.5 items-center">
+                  <template x-if="n.sentimen">
+                    <span class="text-[11px] px-2 py-0.5 rounded-full ring-1 ring-indigo-300 dark:ring-indigo-600/70"
+                          :class="kelasSentimen(n.sentimen)" x-text="n.sentimen"></span>
+                  </template>
+                  <template x-if="n.kekuatan">
+                    <span class="text-[11px] px-2 py-0.5 rounded-full ring-1 ring-indigo-300 dark:ring-indigo-600/70 bg-slate-100 dark:bg-slate-700"
+                          x-text="'kekuatan ' + n.kekuatan"></span>
+                  </template>
+                  <template x-if="n.kategori">
+                    <span class="text-[11px] px-2 py-0.5 rounded-full ring-1 ring-indigo-300 dark:ring-indigo-600/70 bg-slate-100 dark:bg-slate-700"
+                          x-text="n.kategori"></span>
+                  </template>
+                  <template x-if="n.status_kepastian">
+                    <span class="text-[11px] px-2 py-0.5 rounded-full ring-1 ring-indigo-300 dark:ring-indigo-600/70 bg-slate-100 dark:bg-slate-700"
+                          x-text="n.status_kepastian.replace('_', ' ')"></span>
+                  </template>
+                  <template x-if="n.sudah_priced_in">
+                    <span class="text-[11px] px-2 py-0.5 rounded-full ring-1 ring-indigo-300 dark:ring-indigo-600/70 bg-slate-100 dark:bg-slate-700"
+                          x-text="'priced in: ' + n.sudah_priced_in"></span>
+                  </template>
+                </div>
+
+                <template x-if="n.mekanisme">
+                  <div class="mt-2.5 pl-3 border-l-2 border-indigo-300 dark:border-indigo-600/70">
+                    <div class="flex items-center gap-1 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 mb-0.5">
+                      <i data-lucide="sparkles" class="w-2.5 h-2.5"></i> AI · MEKANISME
+                    </div>
+                    <p class="text-sm text-slate-600 dark:text-slate-300" x-text="n.mekanisme"></p>
+                  </div>
+                </template>
+              </li>
+            </template>
+          </ul>
+        </section>
+
+        <!-- ================= KALENDER + PERUBAHAN ================= -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+            <h2 class="font-semibold flex items-center gap-2 mb-3">
+              <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i> Agenda 7 Hari
+            </h2>
+            <template x-if="!data.calendar?.length">
+              <p class="text-sm text-slate-500">Tidak ada agenda besar dalam 7 hari ke depan.</p>
+            </template>
+            <ul class="space-y-2.5">
+              <template x-for="(a, i) in (data.calendar || [])" :key="i">
+                <li class="flex items-start justify-between gap-3 text-sm">
+                  <div>
+                    <div class="font-medium">
+                      <span x-text="a.nama"></span>
+                      <template x-if="a.perkiraan">
+                        <span class="text-[10px] text-slate-400 ml-1" title="Tanggal perkiraan dari pola rilis bulanan">perkiraan</span>
+                      </template>
+                    </div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400"
+                         x-text="a.hari + ', ' + a.waktu_wib"></div>
+                  </div>
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 whitespace-nowrap shrink-0"
+                        x-text="hitungMundur(a.jam_lagi)"></span>
+                </li>
+              </template>
+            </ul>
+          </div>
+
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+            <h2 class="font-semibold flex items-center gap-2 mb-3">
+              <i data-lucide="git-compare-arrows" class="w-4 h-4 text-slate-400"></i> Perubahan vs Brief Sebelumnya
+            </h2>
+            <template x-if="!data.diff_vs_previous?.tersedia">
+              <p class="text-sm text-slate-500" x-text="data.diff_vs_previous?.alasan || 'Belum ada pembanding.'"></p>
+            </template>
+            <template x-if="data.diff_vs_previous?.tersedia">
+              <div>
+                <p class="text-xs text-slate-400 mb-2" x-text="'Dibandingkan dengan brief ' + data.diff_vs_previous.dibanding"></p>
+                <ul class="space-y-1.5 text-sm">
+                  <template x-for="(b, i) in (data.diff_vs_previous.ringkasan || [])" :key="i">
+                    <li class="flex gap-2"><span class="text-slate-300 dark:text-slate-600">•</span><span x-text="b"></span></li>
+                  </template>
+                </ul>
+                <template x-if="!data.diff_vs_previous.ringkasan?.length">
+                  <p class="text-sm text-slate-500">Tidak ada perubahan berarti.</p>
+                </template>
+              </div>
+            </template>
+          </div>
+        </section>
+
+        <!-- ================= ARSIP ================= -->
+        <section class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="font-semibold flex items-center gap-2">
+              <i data-lucide="archive" class="w-4 h-4 text-slate-400"></i> Arsip
+            </h2>
+            <div class="flex items-center gap-2">
+              <select x-model="arsipDipilih" @change="bukaArsip()"
+                      class="text-sm px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 max-w-[240px]">
+                <option value="">Brief terbaru</option>
+                <template x-for="it in daftarArsip" :key="it.file">
+                  <option :value="it.file" x-text="it.waktu_wib + ' · ' + uang(it.harga)"></option>
+                </template>
+              </select>
+              <template x-if="arsipDipilih">
+                <button @click="arsipDipilih=''; bukaArsip()"
+                        class="text-sm px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600">Kembali</button>
+              </template>
+            </div>
+          </div>
+          <template x-if="arsipDipilih">
+            <p class="mt-3 text-sm text-amber-700 dark:text-amber-300">
+              Kamu sedang melihat arsip lama, bukan data terbaru.
+            </p>
+          </template>
+          <template x-if="!daftarArsip.length">
+            <p class="mt-3 text-sm text-slate-500">Belum ada arsip tersimpan.</p>
+          </template>
+        </section>
+
+      </div>
+    </template>
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="border-t border-slate-200 dark:border-slate-700 mt-6">
+    <div class="max-w-6xl mx-auto px-4 py-6 text-sm text-slate-500 dark:text-slate-400 space-y-2">
+      <p class="flex items-start gap-2">
+        <i data-lucide="info" class="w-4 h-4 mt-0.5 shrink-0"></i>
+        <span x-text="data?.disclaimer || 'Konten ini bersifat informasional dan bukan saran investasi.'"></span>
+      </p>
+      <p class="text-xs">
+        Data dihimpun otomatis dari Binance/CoinGecko, mempool.space, alternative.me, Farside, Yahoo Finance, dan feed berita publik.
+        Bagian bertanda <span class="inline-flex items-center gap-0.5 text-[10px] font-bold px-1 py-px rounded bg-indigo-600 text-white">✦ AI</span>
+        dihasilkan model bahasa dan dapat keliru.
+      </p>
+      <p class="flex gap-4 pt-1">
+        <a href="https://github.com/tigorworks/crypto-news" target="_blank" rel="noopener noreferrer"
+           class="hover:text-slate-800 dark:hover:text-slate-200 underline underline-offset-2">Repositori</a>
+        <a href="data/index.json" target="_blank" rel="noopener noreferrer"
+           class="hover:text-slate-800 dark:hover:text-slate-200 underline underline-offset-2">Indeks arsip (JSON)</a>
+        <a href="data/latest.json" target="_blank" rel="noopener noreferrer"
+           class="hover:text-slate-800 dark:hover:text-slate-200 underline underline-offset-2">Data mentah</a>
+      </p>
+    </div>
+  </footer>
+</div>
+</body>
+</html>
