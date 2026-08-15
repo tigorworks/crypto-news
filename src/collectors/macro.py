@@ -17,6 +17,9 @@ TICKERS = {
     "nasdaq": "^IXIC",
     "sp500": "^GSPC",
     "vix": "^VIX",
+    # Yen sering jadi rantai transmisi tersendiri: BOJ mengetatkan -> yen
+    # menguat -> carry trade dolar-yen dilepas -> aset berisiko tertekan.
+    "usdjpy": "JPY=X",
 }
 
 FRED_URL = "https://api.stlouisfed.org/fred/series/observations"

@@ -48,7 +48,8 @@ Tidak ada satu pun angka di output yang dihitung oleh LLM. Prinsipnya tegas: **k
 - **Pembacaan teknikal** — kondisi candle harian: struktur & tren, momentum & volume, di mana indikator saling menguatkan, di mana saling bertentangan, dan apa yang membatalkan pembacaannya.
 - **Sinyal palsu & pemain besar** — divergensi posisi top trader versus ritel, ditambah pola candle yang sering menandai pergerakan tidak tulus.
 - **Pernyataan tokoh berpengaruh** — ucapan pejabat dan tokoh yang berpotensi menggerakkan pasar, lengkap dengan status keasliannya.
-- **Pandangan ke depan** — skenario menguat/melemah beserta pemicunya, faktor geopolitik, keputusan besar yang dipantau, dan risiko utama.
+- **Makro & geopolitik** — DXY, yield UST 10Y, minyak, emas, VIX, dan **USD/JPY** ditelusuri rantai transmisinya ke BTC (dolar menguat menekan aset berisiko; yen menguat tajam mengindikasikan pelepasan carry trade dolar-yen). Ini bukan bagian terpisah — prompt sintesis dan outlook diwajibkan menimbang data makro ini, bukan cuma berita dan harga.
+- **Pandangan ke depan** — skenario menguat/melemah beserta pemicunya, faktor geopolitik, keputusan besar yang dipantau (FOMC, rilis data ekonomi dari `agenda_mendatang`), dan risiko utama.
 
 ### Kenapa hanya candle harian
 
@@ -64,10 +65,6 @@ Candle 1H tetap diambil, tapi untuk satu keperluan saja: mengukur reaksi harga s
 Feed sumbernya berbahasa Inggris. Judul dan ringkasan diterjemahkan pada langkah klasifikasi yang memang sudah membaca tiap artikel — jadi tidak ada panggilan LLM tambahan, dan biayanya nyaris tidak berubah. Judul aslinya tetap ditampilkan kecil di bawah terjemahan, karena artikel yang dibuka tetap berbahasa Inggris dan pembaca perlu bisa mencocokkannya.
 
 Nama diri, nama lembaga, dan istilah pasar yang memang dipakai apa adanya di Indonesia (Bitcoin, ETF, Fed, SEC, futures) tidak ikut diterjemahkan.
-
-### Grafik candle
-
-Grafik harga memakai widget **TradingView** (`BINANCE:BTCUSDT`, interval harian, zona waktu Jakarta) alih-alih grafik garis dari data sendiri. Alasannya: candle sungguhan yang bisa di-zoom lebih berguna daripada garis penutupan 60 hari, dan datanya selalu terkini walau brief-nya dibuat pagi tadi. Temanya ikut tema halaman. Kalau skripnya gagal dimuat, area grafik menampilkan pesan pengganti — tidak ada angka di halaman yang bergantung padanya.
 
 ### Deteksi sinyal palsu
 
@@ -204,7 +201,6 @@ Halaman dirancang mobile-first dan diuji di lebar 360px, 390px, dan 430px:
 - **Ukuran teks minimal 11px** di ponsel; ukuran yang lebih kecil hanya dipakai mulai breakpoint `sm`
 - **Nav lompat** khusus ponsel di bawah header — halaman ini panjang, jadi ada baris pintasan yang bisa digulir ke samping menuju tiap bagian
 - **Daftar panjang dipaginasi** 3 baris per halaman — berita dan pernyataan tokoh berbagi satu bagian dengan dua tab, jadi halaman tidak memanjang dan bagian di bawahnya tetap terjangkau
-- Grafik candle TradingView dipendekkan jadi 260px di ponsel
 - Tabel indikator dan grid makro menyusun ulang jadi satu kolom
 
 ---
@@ -463,8 +459,8 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 - Di web, bagian AI diberi border indigo, latar berbeda, badge `✦ AI`, dan keterangan bahwa isinya dapat keliru.
 - Chip hasil AI di kartu berita (sentimen, kekuatan, kategori, mekanisme) diberi ring indigo.
 - Di Telegram, blok AI dipisah garis dan ditandai `✦ ANALISA AI`.
-- Kalau critic menemukan angka karangan, web menampilkan banner peringatan dan Telegram menyebut bagian mana yang ditahan.
-- Kalau critic cuma menandai kalimat bernada anjuran, analisanya tetap tampil disertai keterangan terbuka — di web sebagai panel yang bisa dibuka berisi kalimat yang ditandai, di Telegram sebagai satu baris catatan.
+- Kalau critic menemukan angka karangan, bagian yang bersangkutan sengaja **tidak** diberi banner atau penjelasan teknis ke pembaca — brief ini untuk pemakaian pribadi, dan membeberkan istilah internal critic (`angka_karangan`, dst) cuma mengganggu tanpa berguna. Bagian yang lolos tetap tampil; kalau semua bagian tertahan, muncul pesan generik "Analisa AI tidak tersedia pada run ini" — sama seperti run yang memang tidak menjalankan LLM sama sekali.
+- Kalau critic cuma menandai kalimat bernada anjuran, analisanya tetap tampil disertai keterangan terbuka — di web sebagai panel yang bisa dibuka berisi kalimat yang ditandai, di Telegram sebagai satu baris catatan. Ini beda dari poin di atas: di sini isinya tetap ditampilkan, cuma diberi konteks.
 - Nama model LLM tidak ditampilkan di halaman. Yang perlu diketahui pembaca adalah bagian mana yang dihasilkan AI, bukan model mana yang menuliskannya.
 
 ---
@@ -483,8 +479,7 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 | Bagian pernyataan kosong | Wajar kalau memang tidak ada pernyataan relevan dalam 48 jam. Kalau selalu kosong, cek `sumber_gagal` di log — Truth Social memang sering memblokir IP data center. |
 | Log penuh "HTTP 451 restricted location" | Normal di GitHub Actions. Binance menolak IP runner yang berbasis AS — pembatasan wilayah permanen. Harga otomatis pindah ke CoinGecko, funding/OI ke Bybit. |
 | Divergensi whale kosong | Urutan sumbernya Binance → OKX → Bybit. Dua yang pertama memisahkan "top trader" dari "seluruh akun"; Bybit hanya punya rasio agregat, jadi kalau sampai jatuh ke Bybit hanya sisi ritel yang pulih dan divergensi memang tidak bisa dihitung. |
-| Analisa AI ditahan | Hanya terjadi kalau ada angka yang benar-benar tidak ada di data — dan itu pun sudah diperiksa ulang oleh kode lebih dulu. Kalimat bernada anjuran tidak lagi menahan apa pun, cuma ditandai. |
-| Grafik candle kosong | Skrip TradingView tidak bisa dimuat (jaringan atau pemblokir iklan). Area grafik menampilkan pesan pengganti; seluruh angka di halaman tetap akurat karena tidak bergantung pada widget itu. |
+| Sebagian analisa AI kosong tanpa keterangan | Disengaja — kalau critic menemukan angka karangan, bagian itu ditahan secara senyap tanpa banner atau penjelasan teknis ke pembaca. Cek `ai.bagian_ditahan` dan `ai.critic.corrections` di `latest.json` kalau ingin tahu alasannya. Kalimat bernada anjuran tidak lagi menahan apa pun, cuma ditandai. |
 | Step AI gagal dengan "terpotong di batas max_tokens" | Naikkan `max_tokens` step tersebut di `src/analysis/news_analysis.py`. Balasan yang terpotong ditolak sengaja, karena JSON separuh jadi lebih berbahaya daripada tidak ada hasil. |
 | Brief terbit tanpa bagian AI | `OPENROUTER_API_KEY` kosong, nama model masih placeholder, atau budget per run tercapai. Cek `data_quality.catatan`. |
 | Telegram tidak masuk | Pastikan sudah mengirim pesan pertama ke bot, dan `TELEGRAM_CHAT_ID` benar (ID grup diawali minus). |

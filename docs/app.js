@@ -1,6 +1,5 @@
 /* Ringkasan Pasar Bitcoin — logika halaman.
- * Tanpa build step: Alpine.js untuk state, TradingView untuk grafik candle,
- * Lucide untuk ikon.
+ * Tanpa build step: Alpine.js untuk state, Chart.js untuk grafik, Lucide untuk ikon.
  */
 
 const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -11,6 +10,7 @@ const BULAN_SINGKAT_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
 const LABEL_MAKRO = {
   dxy: 'DXY', ust10y: 'Yield UST 10Y', wti: 'Minyak WTI',
   gold: 'Emas', nasdaq: 'Nasdaq', sp500: 'S&P 500', vix: 'VIX',
+  usdjpy: 'USD/JPY',
 };
 
 /* Geser Date ke WIB supaya getter lokal (getHours dsb) membaca nilai WIB.
@@ -44,6 +44,7 @@ function briefApp() {
     halamanBerita: 1,
     halamanPernyataan: 1,
     perHalaman: 3,
+    grafik: null,
     _jam: null,
     _detak: 0,          // dinaikkan tiap menit supaya waktu relatif ikut menyegar
 
@@ -113,46 +114,66 @@ function briefApp() {
     },
 
     // ---------------------------------------------------------------
-    // Grafik candlestick (TradingView)
+    // Grafik harga
     // ---------------------------------------------------------------
-    /* Grafik garis dari price_series diganti widget TradingView: candle
-       sungguhan, bisa di-zoom, dan intervalnya bisa diubah pembaca sendiri.
-       Kalau skripnya gagal dimuat (jaringan diblokir, pemblokir iklan), area
-       grafik dibiarkan menampilkan pesan pengganti — bukan kotak kosong. */
     gambarGrafik() {
-      const wadah = document.getElementById('grafikTV');
-      if (!wadah) return;
+      const kanvas = document.getElementById('grafikHarga');
+      if (!kanvas || !this.data || !window.Chart) return;
 
-      if (!window.TradingView || !window.TradingView.widget) {
-        wadah.innerHTML =
-          '<div class="h-full flex items-center justify-center text-sm text-slate-400 text-center px-4">'
-          + 'Grafik TradingView tidak bisa dimuat. Angka harga di samping tetap akurat.'
-          + '</div>';
-        return;
-      }
+      const deret = this.data.price_series || [];
+      if (this.grafik) { this.grafik.destroy(); this.grafik = null; }
+      if (!deret.length) return;
 
-      wadah.innerHTML = '';
-      try {
-        new window.TradingView.widget({
-          container_id: 'grafikTV',
-          symbol: 'BINANCE:BTCUSDT',
-          interval: 'D',              // brief harian, jadi candle harian
-          timezone: 'Asia/Jakarta',
-          theme: this.gelap ? 'dark' : 'light',
-          style: '1',                 // 1 = candlestick
-          locale: 'id',
-          autosize: true,
-          hide_side_toolbar: true,
-          hide_legend: false,
-          allow_symbol_change: false,
-          save_image: false,
-          withdateranges: true,
-        });
-      } catch (e) {
-        wadah.innerHTML =
-          '<div class="h-full flex items-center justify-center text-sm text-slate-400">'
-          + 'Grafik gagal ditampilkan.</div>';
-      }
+      const naik = deret[deret.length - 1].c >= deret[0].c;
+      const warna = naik ? '#10b981' : '#f43f5e';
+      const kisi = this.gelap ? 'rgba(148,163,184,0.15)' : 'rgba(100,116,139,0.15)';
+      const teks = this.gelap ? '#94a3b8' : '#64748b';
+
+      const isian = kanvas.getContext('2d').createLinearGradient(0, 0, 0, 160);
+      isian.addColorStop(0, naik ? 'rgba(16,185,129,0.25)' : 'rgba(244,63,94,0.25)');
+      isian.addColorStop(1, 'rgba(0,0,0,0)');
+
+      this.grafik = new Chart(kanvas, {
+        type: 'line',
+        data: {
+          labels: deret.map((d) => this.tanggalSingkat(d.t)),
+          datasets: [{
+            data: deret.map((d) => d.c),
+            borderColor: warna,
+            backgroundColor: isian,
+            borderWidth: 2,
+            fill: true,
+            tension: 0.25,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            pointHoverBackgroundColor: warna,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `$${formatAngka(ctx.parsed.y, 0)}`,
+              },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: teks, maxTicksLimit: 6, font: { size: 10 } } },
+            y: {
+              grid: { color: kisi },
+              ticks: {
+                color: teks,
+                font: { size: 10 },
+                callback: (v) => `$${formatAngka(v, 0)}`,
+              },
+            },
+          },
+        },
+      });
     },
 
     // ---------------------------------------------------------------
@@ -173,6 +194,15 @@ function briefApp() {
       if (abs >= 1e6) return `${tanda}$${formatAngka(abs / 1e6, 1)} jt`;
       if (abs >= 1e3) return `${tanda}$${formatAngka(abs / 1e3, 1)} rb`;
       return `${tanda}$${formatAngka(abs, 0)}`;
+    },
+
+    /* Funding rate kerap sangat kecil; dibulatkan biasa bisa tampil "0,0000%"
+       yang kelihatan seperti bug padahal angkanya memang benar. */
+    tekstFunding(nilai) {
+      if (nilai === null || nilai === undefined) return '—';
+      const persenNilai = nilai * 100;
+      if (Math.abs(persenNilai) < 0.00005) return 'mendekati 0% (netral)';
+      return this.persen(persenNilai, 4);
     },
 
     persen(nilai, desimal = 2) {
@@ -385,6 +415,21 @@ function briefApp() {
 
     get adaBagianDitahan() {
       return (this.data?.ai?.bagian_ditahan || []).length > 0;
+    },
+
+    /* True kalau ADA sesuatu yang bisa ditampilkan di bagian analisa AI —
+       dipakai untuk fallback "tidak tersedia" yang independen dari alasan
+       penahanannya. Pembaca tidak perlu tahu ITU KENAPA kosong, cukup tahu
+       BAHWA kosong. */
+    get adaKontenAiTampil() {
+      const ai = this.data?.ai;
+      if (!ai) return false;
+      return (
+        (this.bagianAiTampil('narasi') && (this.adaBagianTerstruktur || ai.narrative)) ||
+        (this.bagianAiTampil('teknikal') && !!ai.teknikal) ||
+        (this.bagianAiTampil('whale') && !!ai.whale) ||
+        (this.bagianAiTampil('outlook') && !!ai.outlook)
+      );
     },
 
     /* Kalimat yang menyerempet anjuran tindakan tidak lagi menahan analisa —
@@ -602,6 +647,7 @@ function briefApp() {
         if (nilai !== null && nilai !== undefined) {
           if (kunci === 'ust10y') tampil = `${formatAngka(nilai, 2)}%`;
           else if (kunci === 'wti' || kunci === 'gold') tampil = `$${formatAngka(nilai, 2)}`;
+          else if (kunci === 'usdjpy') tampil = `¥${formatAngka(nilai, 2)}`;
           else tampil = formatAngka(nilai, 2);
         }
         return {

@@ -148,8 +148,16 @@ def _blok_pasar(brief: Dict[str, Any]) -> List[str]:
     potongan = []
     funding = market.get("funding_rate")
     if funding is not None:
-        sisi = "pemegang long yang membayar" if funding > 0 else "pemegang short yang membayar"
-        potongan.append(f"Funding {_persen(funding * 100, 3)} ({sisi})")
+        persen_funding = funding * 100
+        # Funding rate kerap sangat kecil (mendekati 0,0001%). Dibulatkan ke 3
+        # desimal, itu tampil sebagai "0,000%" — angka yang benar tapi
+        # kelihatan seperti bug. Di bawah ambang itu, tulis apa adanya:
+        # mendekati nol, dan sisi pembayarnya memang tidak berarti apa-apa.
+        if round(abs(persen_funding), 3) < 0.001:
+            potongan.append("Funding mendekati 0% (netral, tidak ada tekanan dominan)")
+        else:
+            sisi = "pemegang long yang membayar" if funding > 0 else "pemegang short yang membayar"
+            potongan.append(f"Funding {_persen(persen_funding, 3)} ({sisi})")
     if teknikal.get("oi_change_pct") is not None:
         arah = "naik" if teknikal["oi_change_pct"] > 0 else "turun"
         potongan.append(f"OI {arah} {_angka(abs(teknikal['oi_change_pct']), 1)}%")
@@ -183,6 +191,8 @@ def _blok_makro(brief: Dict[str, Any]) -> List[str]:
         potongan.append(f"WTI ${_angka(macro['wti'], 1)}")
     if macro.get("vix") is not None:
         potongan.append(f"VIX {_angka(macro['vix'], 1)}")
+    if macro.get("usdjpy") is not None:
+        potongan.append(f"USD/JPY {_angka(macro['usdjpy'], 1)}")
     if not potongan:
         return []
     return ["", "🌍 <b>Makro</b>", " · ".join(potongan)]
@@ -384,22 +394,12 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     critic = ai.get("critic") or {}
 
     baris = ["", PEMISAH]
-    ditahan = ai.get("bagian_ditahan") or []
-    tersisa = any([
-        ai.get("narrative"), (ai.get("teknikal") or {}).get("ringkasan"),
-        (ai.get("whale") or {}).get("ringkasan"), (ai.get("outlook") or {}).get("ringkasan"),
-    ])
 
-    # Kalau critic hanya menolak sebagian, bagian yang lolos tetap dikirim —
-    # menahan semuanya berarti membuang analisa yang tidak bermasalah.
-    if not critic.get("passed", True) and not tersisa:
-        baris.append(
-            "⚠️ Analisa AI ditahan: pemeriksa fakta menemukan angka yang tidak "
-            "ada di data. Data mentah di atas tetap valid."
-        )
-        baris.append(PEMISAH)
-        return baris
-
+    # Bagian yang ditahan critic (kalau ada) sengaja TIDAK diberi tahu ke
+    # pembaca — brief ini untuk pemakaian pribadi, dan membeberkan alasan
+    # teknis critic ("angka_karangan", dst) cuma mengganggu tanpa berguna.
+    # Bagian yang lolos tetap dikirim; kalau semuanya tertahan, pesan di
+    # bawah ("tidak tersedia") yang tampil — sama seperti run tanpa analisa.
     narasi = (ai.get("narrative_singkat") or "").strip()
     teknikal_ai = (ai.get("teknikal") or {}).get("ringkasan") or ""
     whale_ai = ai.get("whale") or {}
@@ -487,11 +487,6 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
             _potong("; ".join(bagian["katalis_berikutnya"][:3]), 250)))
 
     baris.append("")
-    if ditahan:
-        baris.append(
-            "⚠️ <i>Bagian berikut ditahan karena memuat angka yang tidak ada di "
-            "data: " + esc(", ".join(ditahan)) + ".</i>"
-        )
     # Kalimat bernada anjuran TIDAK menahan analisa — cuma diberi keterangan,
     # karena keputusannya tetap di tangan pembaca.
     if ai.get("tanda_editorial"):
