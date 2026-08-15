@@ -113,6 +113,13 @@ def _konteks_llm(
         "berita": [
             {
                 "judul": b.get("judul"),
+                # Sebelumnya hanya judul yang dikirim. Model lalu mengarang
+                # detail (persentase, nilai dolar, nama entitas) yang
+                # kedengarannya masuk akal untuk judul itu tapi tidak pernah
+                # ada di data — critic menangkapnya sebagai pengetahuan_luar.
+                # Ringkasan aslinya sudah ada sejak langkah klasifikasi;
+                # sekadar tidak pernah diteruskan ke sini.
+                "ringkasan": b.get("ringkasan_id") or (b.get("ringkasan") or "")[:280],
                 "sumber": b.get("sumber"),
                 "kategori": b.get("kategori"),
                 "sentimen": b.get("sentimen"),

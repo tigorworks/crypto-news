@@ -26,7 +26,7 @@
     theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } }
   };
 </script>
-<script src="https://s3.tradingview.com/tv.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
 <script src="app.js"></script>
@@ -51,9 +51,6 @@
     .tab-isi { flex: 1 1 0%; justify-content: center; }
   }
 
-  /* Grafik TradingView: lebih pendek di ponsel supaya tidak menelan layar. */
-  #grafikTV { height: 340px; }
-  @media (max-width: 640px) { #grafikTV { height: 260px; } }
 </style>
 </head>
 
@@ -158,11 +155,7 @@
               <i data-lucide="trending-up" class="w-6 h-6 text-slate-300 dark:text-slate-600"></i>
             </div>
 
-            <!-- Grafik candlestick TradingView. Datanya langsung dari
-                 TradingView, jadi selalu terkini walau brief dibuat pagi tadi. -->
-            <div class="mt-4 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
-              <div id="grafikTV"></div>
-            </div>
+            <div class="mt-4 h-40"><canvas id="grafikHarga"></canvas></div>
 
             <template x-if="data.tautan_luar?.length">
               <div class="mt-4 flex flex-wrap gap-2">
@@ -354,7 +347,7 @@
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div><div class="text-slate-500 dark:text-slate-400">Funding rate</div>
                 <div class="font-semibold text-base" :class="warnaAngka(data.market.funding_rate)"
-                     x-text="data.market.funding_rate === null ? '—' : persen(data.market.funding_rate * 100, 4)"></div></div>
+                     x-text="tekstFunding(data.market.funding_rate)"></div></div>
               <div><div class="text-slate-500 dark:text-slate-400">Open interest</div>
                 <div class="font-semibold text-base">
                   <span x-text="data.market.open_interest === null ? '—' : angka(data.market.open_interest, 0) + ' BTC'"></span>
@@ -601,23 +594,11 @@
             </div>
           </div>
 
-          <!-- Kesalahan fakta di seluruh bagian: narasi tidak ditampilkan -->
-          <template x-if="data.ai.critic && data.ai.critic.passed === false && !adaBagianDitahan">
-            <div class="mt-4 rounded-lg border border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 p-4">
-              <div class="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-200">
-                <i data-lucide="shield-alert" class="w-4 h-4"></i> Analisa AI ditahan
-              </div>
-              <p class="mt-1 text-sm text-amber-800/80 dark:text-amber-200/80">
-                Pemeriksa fakta menemukan angka yang tidak ada di data sumber, jadi narasinya tidak ditampilkan.
-                Data mentah di atas tetap valid.
-              </p>
-              <ul class="mt-2 space-y-1 text-xs text-amber-900/70 dark:text-amber-200/70 list-disc list-inside">
-                <template x-for="(k, i) in (data.ai.critic.corrections || []).filter(c => c.keparahan === 'fatal')" :key="i">
-                  <li><span class="font-medium" x-text="k.jenis"></span><span x-text="': ' + k.alasan"></span></li>
-                </template>
-              </ul>
-            </div>
-          </template>
+          <!-- Bagian yang ditahan critic (kalau ada) sengaja tidak diberi tahu
+               ke pembaca — brief ini untuk pemakaian pribadi, dan membeberkan
+               alasan teknis critic cuma mengganggu tanpa berguna. Bagian yang
+               lolos tetap tampil di bawah; kalau semuanya tertahan, fallback
+               "tidak tersedia" di paling bawah bagian ini yang muncul. -->
 
           <!-- Kalimat bernada anjuran: DITANDAI, bukan ditahan. Keputusannya
                tetap di tangan pembaca, jadi analisanya tidak dibuang. -->
@@ -869,7 +850,7 @@
             </div>
           </template>
 
-          <template x-if="bagianAiTampil('narasi') && !data.ai.narrative">
+          <template x-if="!adaKontenAiTampil">
             <p class="mt-4 text-sm text-slate-600 dark:text-slate-300">
               Analisa AI tidak tersedia pada run ini.
             </p>
@@ -1238,7 +1219,7 @@
       </p>
       <p class="text-xs">
         Data dihimpun otomatis dari Binance/CoinGecko/OKX, Deribit, Coin Metrics, mempool.space, alternative.me,
-        Farside, Yahoo Finance, dan feed berita publik. Grafik candle disediakan TradingView.
+        Farside, Yahoo Finance, dan feed berita publik.
         Bagian bertanda <span class="inline-flex items-center gap-0.5 text-[11px] sm:text-[10px] font-bold px-1 py-px rounded bg-indigo-600 text-white">✦ AI</span>
         dihasilkan model bahasa dan dapat keliru.
       </p>
