@@ -44,6 +44,14 @@ def _persen(value: Optional[float], desimal: int = 2) -> str:
     return f"{tanda}{_angka(value, desimal)}%"
 
 
+def _potong(teks: str, maks: int) -> str:
+    """Potong di batas kata supaya kalimat tidak terputus di tengah."""
+    teks = (teks or "").strip()
+    if len(teks) <= maks:
+        return teks
+    return teks[:maks].rsplit(" ", 1)[0] + "…"
+
+
 def _blok_harga(brief: Dict[str, Any]) -> List[str]:
     price = brief.get("price") or {}
     levels = (brief.get("technical") or {}).get("key_levels") or {}
@@ -178,6 +186,42 @@ def _blok_agenda(brief: Dict[str, Any], maks: int = 3) -> List[str]:
     return baris
 
 
+def _blok_whale(brief: Dict[str, Any]) -> List[str]:
+    """Posisi whale vs ritel — angka mentah, belum ditafsirkan AI."""
+    whale = brief.get("whale") or {}
+    if whale.get("whale_long_pct") is None and whale.get("ritel_long_pct") is None:
+        return []
+
+    baris = ["", "🐋 <b>Posisi Besar vs Ritel</b>"]
+    potongan = []
+    if whale.get("whale_long_pct") is not None:
+        potongan.append(f"Whale {_angka(whale['whale_long_pct'], 1)}% long")
+    if whale.get("ritel_long_pct") is not None:
+        potongan.append(f"Ritel {_angka(whale['ritel_long_pct'], 1)}% long")
+    if potongan:
+        baris.append(" · ".join(potongan))
+
+    label = {
+        "whale_distribusi": "Whale lebih defensif dari ritel",
+        "whale_akumulasi": "Whale lebih agresif dari ritel",
+        "selaras": "Posisi whale dan ritel selaras",
+    }.get(whale.get("divergensi_label"))
+    if label:
+        baris.append(label)
+    return baris
+
+
+def _blok_sinyal_palsu(brief: Dict[str, Any], maks: int = 2) -> List[str]:
+    """Pola manipulasi yang terdeteksi kode (bukan AI)."""
+    sinyal = (brief.get("technical") or {}).get("sinyal_palsu") or []
+    if not sinyal:
+        return []
+    baris = ["", "🎭 <b>Sinyal Perlu Diwaspadai</b>"]
+    for s in sinyal[:maks]:
+        baris.append(f"• {esc(s.get('keterangan', ''))}")
+    return baris
+
+
 def _blok_ai(brief: Dict[str, Any]) -> List[str]:
     ai = brief.get("ai") or {}
     critic = ai.get("critic") or {}
@@ -189,14 +233,44 @@ def _blok_ai(brief: Dict[str, Any]) -> List[str]:
         return baris
 
     narasi = (ai.get("narrative_singkat") or "").strip()
-    if not narasi:
+    teknikal_ai = (ai.get("teknikal") or {}).get("ringkasan") or ""
+    whale_ai = ai.get("whale") or {}
+    outlook_ai = (ai.get("outlook") or {}).get("ringkasan") or ""
+
+    if not any([narasi, teknikal_ai, whale_ai.get("ringkasan"), outlook_ai]):
         baris.append("✦ <b>ANALISA AI</b>")
         baris.append("<i>Analisa AI tidak tersedia pada run ini.</i>")
         baris.append(PEMISAH)
         return baris
 
     baris.append("✦ <b>ANALISA AI</b>")
-    baris.append(esc(narasi))
+    if narasi:
+        baris.append(esc(narasi))
+
+    # Penyebab pergerakan — inti dari pertanyaan "kenapa naik/turun".
+    penyebab = ai.get("penyebab_pergerakan") or []
+    if penyebab:
+        baris.append("")
+        baris.append("<b>Penyebab utama:</b>")
+        for p in penyebab[:3]:
+            panah = {"naik": "↑", "turun": "↓"}.get(p.get("arah"), "·")
+            baris.append(f"{panah} {esc(p.get('faktor', ''))}")
+
+    if teknikal_ai:
+        baris.append("")
+        baris.append("<b>Teknikal:</b> " + esc(_potong(teknikal_ai, 300)))
+
+    if whale_ai.get("ringkasan"):
+        waspada = whale_ai.get("tingkat_kewaspadaan")
+        tanda = "⚠️ " if waspada == "tinggi" else ""
+        baris.append("")
+        baris.append(f"<b>Whale:</b> {tanda}" + esc(_potong(whale_ai["ringkasan"], 300)))
+
+    if outlook_ai:
+        baris.append("")
+        baris.append("<b>Ke depan:</b> " + esc(_potong(outlook_ai, 300)))
+
+    baris.append("")
     baris.append("<i>Dihasilkan AI, dapat keliru.</i>")
     baris.append(PEMISAH)
     return baris
@@ -235,16 +309,47 @@ def render(brief: Dict[str, Any], site_url: str = "") -> str:
         + _blok_pasar(brief)
         + _blok_makro(brief)
     )
-    ekor = _blok_agenda(brief) + _blok_ai(brief) + _blok_penutup(brief, site_url)
+    blok_ai = _blok_ai(brief)
+    penutup = _blok_penutup(brief, site_url)
 
-    # Bagian berita adalah satu-satunya yang boleh dipangkas.
-    for jumlah_berita in (5, 3, 2, 1, 0):
-        pesan = "\n".join(kepala + inti + _blok_berita(brief, jumlah_berita) + ekor)
+    # Tangga degradasi: yang dikorbankan lebih dulu adalah yang paling mudah
+    # dibaca ulang di web. Blok AI dipertahankan sampai langkah terakhir
+    # karena justru itu isi utama brief ini.
+    tangga = [
+        (5, True, True, True),
+        (3, True, True, True),
+        (2, True, True, True),
+        (1, True, True, True),
+        (0, True, True, True),
+        (0, False, True, True),   # buang sinyal palsu
+        (0, False, False, True),  # buang blok whale
+        (0, False, False, False), # buang agenda
+    ]
+
+    for jumlah_berita, pakai_sinyal, pakai_whale, pakai_agenda in tangga:
+        bagian = kepala + inti
+        if pakai_whale:
+            bagian += _blok_whale(brief)
+        if pakai_sinyal:
+            bagian += _blok_sinyal_palsu(brief)
+        bagian += _blok_berita(brief, jumlah_berita)
+        if pakai_agenda:
+            bagian += _blok_agenda(brief)
+        bagian += blok_ai + penutup
+
+        pesan = "\n".join(bagian)
         if len(pesan) <= BATAS_KARAKTER:
             return pesan
 
-    # Kalau tanpa berita pun masih kepanjangan, potong keras di batas aman.
-    pesan = "\n".join(kepala + inti + ekor)
+    # Terakhir: pangkas isi blok AI sendiri, sisakan kepala + harga + penutup.
+    dasar = "\n".join(kepala + _blok_harga(brief))
+    sisa = BATAS_KARAKTER - len(dasar) - len("\n".join(penutup)) - 120
+    ai_teks = "\n".join(blok_ai)
+    if sisa > 200:
+        ai_teks = ai_teks[:sisa].rsplit("\n", 1)[0] + f"\n…\n{PEMISAH}"
+    else:
+        ai_teks = ""
+    pesan = "\n".join([dasar, ai_teks] + penutup)
     if len(pesan) > BATAS_KARAKTER:
         pesan = pesan[: BATAS_KARAKTER - 60].rsplit("\n", 1)[0] + "\n\n…\n<i>Pesan dipotong.</i>"
     return pesan

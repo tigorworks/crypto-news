@@ -15,28 +15,44 @@ llm:
   #   filter    -> model paling murah (tugasnya cuma memberi skor 0-100)
   #   classify  -> model kecil tapi patuh JSON
   #   mechanism -> model menengah (butuh penalaran sebab-akibat)
-  #   synthesis -> model kuat (menulis narasi panjang)
+  #   technical -> model menengah/kuat (MENAFSIRKAN indikator, bukan menghitung)
+  #   whale     -> model menengah/kuat (membaca posisi whale vs ritel)
+  #   synthesis -> model kuat (menulis analisa panjang bersebab-akibat)
+  #   outlook   -> model kuat (pandangan ke depan: teknikal+makro+geopolitik)
   #   critic    -> model kuat dari KELUARGA BERBEDA dengan synthesis,
   #                supaya bias model tidak saling menutupi
   filter:    ["ISI-MODEL-MURAH", "ISI-MODEL-CADANGAN"]
   classify:  ["ISI-MODEL-KECIL", "ISI-MODEL-CADANGAN"]
   mechanism: ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
+  technical: ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
+  whale:     ["ISI-MODEL-MENENGAH", "ISI-MODEL-CADANGAN"]
   synthesis: ["ISI-MODEL-KUAT", "ISI-MODEL-CADANGAN"]
+  outlook:   ["ISI-MODEL-KUAT", "ISI-MODEL-CADANGAN"]
   critic:    ["ISI-MODEL-KUAT-KELUARGA-LAIN", "ISI-MODEL-CADANGAN"]
-  max_cost_usd_per_run: 0.15
+  # Rantai analisa sekarang 8 langkah dengan keluaran naratif panjang, jadi
+  # batasnya dinaikkan dari 0.15. Naikkan lagi kalau memakai model mahal.
+  max_cost_usd_per_run: 0.40
 
 news:
-  max_fetch: 120
+  # Dinaikkan dari 120 karena feed makro/geopolitik ikut masuk.
+  max_fetch: 160
   max_after_filter: 25
   max_deep_analysis: 10
   max_age_hours: 36
   min_relevance: 40
   feeds:
+    # Kripto
     - https://www.coindesk.com/arc/outboundfeeds/rss/
     - https://cointelegraph.com/rss
     - https://decrypt.co/feed
     - https://bitcoinmagazine.com/feed
     - https://www.theblock.co/rss.xml
+    # Makro & geopolitik — dibutuhkan analisa outlook. Sebagian besar isinya
+    # tidak relevan bagi BTC dan memang akan dibuang oleh langkah filter;
+    # yang dicari adalah kebijakan bank sentral, sanksi, dan guncangan global.
+    - https://www.cnbc.com/id/20910258/device/rss/rss.html
+    - https://feeds.bbci.co.uk/news/business/rss.xml
+    - https://feeds.bbci.co.uk/news/world/rss.xml
 
 # Tier kredibilitas sumber untuk pembobotan skor sentimen.
 # tier 1 = 1.0, tier 2 = 0.7, tier 3 = 0.4 (default tier 3 kalau tidak terdaftar)
@@ -47,6 +63,8 @@ source_tiers:
   ft.com: 1
   apnews.com: 1
   cnbc.com: 1
+  bbc.co.uk: 1
+  bbc.com: 1
   coindesk.com: 2
   theblock.co: 2
   cointelegraph.com: 2

@@ -208,6 +208,48 @@ function briefApp() {
       return 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300';
     },
 
+    kelasKeyakinan(tingkat) {
+      if (tingkat === 'tinggi') return 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900';
+      if (tingkat === 'sedang') return 'bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200';
+      return 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400';
+    },
+
+    kelasWaspada(tingkat) {
+      if (tingkat === 'tinggi') return 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300';
+      if (tingkat === 'sedang') return 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
+      return 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
+    },
+
+    panahArah(arah) {
+      return { naik: '↑', turun: '↓' }[arah] || '·';
+    },
+
+    warnaArah(arah) {
+      if (arah === 'naik') return 'text-emerald-600 dark:text-emerald-400';
+      if (arah === 'turun') return 'text-rose-600 dark:text-rose-400';
+      return 'text-slate-400';
+    },
+
+    labelDivergensi(label) {
+      return {
+        whale_distribusi: 'Whale lebih defensif dari ritel',
+        whale_akumulasi: 'Whale lebih agresif dari ritel',
+        selaras: 'Posisi whale dan ritel selaras',
+      }[label] || label || '—';
+    },
+
+    labelPola(jenis) {
+      return {
+        sapuan_likuiditas_atas: 'Sapuan likuiditas di atas',
+        sapuan_likuiditas_bawah: 'Sapuan likuiditas di bawah',
+        penolakan_atas: 'Penolakan di area atas',
+        penolakan_bawah: 'Penolakan di area bawah',
+        absorpsi_volume: 'Absorpsi volume',
+        breakout_volume_lemah: 'Breakout dengan volume lemah',
+        posisi_padat: 'Posisi derivatif padat',
+      }[jenis] || (jenis || '').replace(/_/g, ' ');
+    },
+
     labelZona(zona) {
       return { jenuh_beli: 'jenuh beli', jenuh_jual: 'jenuh jual', netral: 'netral' }[zona] || zona || '';
     },
@@ -293,6 +335,32 @@ function briefApp() {
         if (this.filterSentimen && n.sentimen !== this.filterSentimen) return false;
         return true;
       });
+    },
+
+    get adaDataWhale() {
+      const w = this.data?.whale;
+      return !!(w && (w.whale_long_pct !== null && w.whale_long_pct !== undefined));
+    },
+
+    get barisPosisi() {
+      const w = this.data?.whale || {};
+      const baris = [];
+      if (w.whale_long_pct !== null && w.whale_long_pct !== undefined) {
+        baris.push({ label: 'Top trader (pemain besar)', long: w.whale_long_pct, short: w.whale_short_pct });
+      }
+      if (w.ritel_long_pct !== null && w.ritel_long_pct !== undefined) {
+        baris.push({ label: 'Seluruh akun (ritel)', long: w.ritel_long_pct, short: w.ritel_short_pct });
+      }
+      return baris;
+    },
+
+    get skenarioOutlook() {
+      const o = this.data?.ai?.outlook;
+      if (!o) return [];
+      return [
+        { nama: 'Skenario menguat', data: o.skenario_naik || { pemicu: [] }, panah: '↑', warna: 'text-emerald-600 dark:text-emerald-400' },
+        { nama: 'Skenario melemah', data: o.skenario_turun || { pemicu: [] }, panah: '↓', warna: 'text-rose-600 dark:text-rose-400' },
+      ].filter((s) => s.data.pemicu?.length || s.data.kondisi);
     },
 
     get daftarMakro() {
