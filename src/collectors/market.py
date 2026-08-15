@@ -101,7 +101,10 @@ def _etf_flow() -> Dict[str, Any]:
     Cloudflare, dan permintaan dengan User-Agent skrip dari IP pusat data
     ditolak 403 — itu yang membuat sumber ini gagal terus di produksi.
     """
-    html = get_text(FARSIDE_URL, timeout=45, headers=HEADER_BROWSER)
+    # Timeout pendek dan TANPA retry. Ini scrape pihak ketiga yang boleh gagal,
+    # dan kalau koneksinya menggantung (bukan ditolak) retry default membuat
+    # satu sumber opsional menahan seluruh pipeline sampai ~2 menit.
+    html = get_text(FARSIDE_URL, timeout=20, retries=0, headers=HEADER_BROWSER)
     rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL | re.IGNORECASE)
 
     for row in reversed(rows):

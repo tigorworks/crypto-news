@@ -80,7 +80,10 @@ def _ambil(kandidat: List[Tuple[str, Dict[str, Any]]], nama: str) -> List[List[A
     """Coba tiap kandidat endpoint sampai ada yang memberi data."""
     for path, params in kandidat:
         try:
-            resp = get_json(BASE + path, params=params, timeout=25)
+            # Cepat gagal: ini penjajakan beberapa kandidat URL, jadi kandidat
+            # yang buntu harus segera menyerah. Dengan retry default, enam
+            # kandidat yang menggantung bisa menahan pipeline bermenit-menit.
+            resp = get_json(BASE + path, params=params, timeout=10, retries=0)
         except (HttpError, ValueError) as exc:
             log.debug("OKX %s (%s) gagal: %s", nama, path, exc)
             continue
