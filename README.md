@@ -12,27 +12,52 @@ Seluruh teks yang dilihat pengguna berbahasa Indonesia. Sifatnya informasional �
 ## Cara Kerja
 
 ```
-Binance/CoinGecko ─┐
+Binance/CoinGecko ─┐   (harga, klines, funding, OI)
+Binance Futures    │   (posisi whale vs ritel)
 mempool.space      ├─→ pipeline Python ─→ docs/data/latest.json ─→ GitHub Pages
 alternative.me     │        │
 Farside (ETF)      │        └──────────→ Telegram
 Yahoo Finance      │
-RSS berita ────────┘
+RSS kripto+makro ──┘
 ```
 
-Pipeline berjalan berurutan dalam 16 langkah (lihat `src/main.py`). Hanya langkah pertama — pengambilan harga — yang fatal. Sumber lain boleh gagal; kegagalannya dicatat di `data_quality.failed_sources` dan pipeline tetap menghasilkan brief.
+Pipeline berjalan berurutan dalam 18 langkah (lihat `src/main.py`). Hanya langkah pertama — pengambilan harga — yang fatal. Sumber lain boleh gagal; kegagalannya dicatat di `data_quality.failed_sources` dan pipeline tetap menghasilkan brief.
 
 **Pemisahan tanggung jawab yang dipegang ketat:**
 
 | Dikerjakan kode | Dikerjakan LLM |
 |---|---|
-| Seluruh indikator teknikal | Menilai relevansi berita |
-| Skor sentimen agregat | Klasifikasi berita (kategori, sentimen, kekuatan) |
+| Menghitung seluruh indikator teknikal | **Menafsirkan** indikator itu |
+| Mendeteksi pola sapuan likuiditas, absorpsi, breakout lemah | Menjelaskan arti pola tersebut |
+| Menghitung rasio posisi whale vs ritel | Membaca apa arti divergensinya |
+| Skor sentimen agregat | Menilai relevansi & mengklasifikasi berita |
 | Reaksi harga vs berita | Menjelaskan mekanisme transmisi ke harga |
-| Deteksi sinyal bertentangan | Menulis narasi ringkasan |
-| Semua persentase dan perbandingan | Memeriksa narasi (critic) |
+| Semua persentase dan perbandingan | Menulis narasi, outlook, dan critic |
 
-Tidak ada satu pun angka di output yang dihitung oleh LLM.
+Tidak ada satu pun angka di output yang dihitung oleh LLM. Prinsipnya tegas: **kode menghitung, LLM menafsirkan.** Model bahasa tidak bisa diandalkan untuk aritmatika 250 candle, jadi semua angka dihitung lebih dulu lalu dikirim jadi ke model.
+
+### Yang dianalisa
+
+- **Kenapa harga bergerak** — narasi 6–9 paragraf yang mengurai sebab pergerakan, plus daftar `penyebab_pergerakan` terurut lengkap dengan tingkat keyakinan dan dasar datanya. Kalau penyebabnya tidak jelas, model diwajibkan mengatakan begitu.
+- **Pembacaan teknikal** — kondisi tiap timeframe, di mana 1D/4H/1H saling menguatkan, di mana saling bertentangan, dan apa yang membatalkan pembacaannya.
+- **Sinyal palsu & pemain besar** — divergensi posisi top trader versus ritel, ditambah pola candle yang sering menandai pergerakan tidak tulus.
+- **Pandangan ke depan** — skenario menguat/melemah beserta pemicunya, faktor geopolitik, keputusan besar yang dipantau, dan risiko utama.
+
+### Deteksi sinyal palsu
+
+Kode mendeteksi pola berikut dari geometri candle dan volume, lalu LLM menafsirkannya:
+
+| Pola | Artinya |
+|---|---|
+| Sapuan likuiditas | Harga menembus swing lalu ditutup kembali — level dipicu tanpa diikuti |
+| Penolakan atas/bawah | Wick jauh lebih panjang dari badan candle — ada penyerapan di area itu |
+| Absorpsi volume | Volume besar tapi harga hampir tidak bergerak |
+| Breakout volume lemah | Tertinggi baru dengan volume lebih kecil dari puncak sebelumnya |
+| Posisi derivatif padat | Funding ekstrem berbarengan dengan open interest naik |
+
+Ditambah divergensi posisi: Binance memisahkan statistik *top trader* (proksi pemain besar) dari *seluruh akun* (didominasi ritel). Ketika whale net short sementara ritel net long, itu pola distribusi klasik — dan sebaliknya untuk akumulasi.
+
+Semua ini disajikan sebagai **petunjuk probabilistik, bukan bukti**. Prompt secara eksplisit melarang model mengarang cerita manipulasi dari sinyal yang tipis, dan setiap temuan wajib menyertakan tingkat keyakinan.
 
 ---
 
@@ -62,7 +87,7 @@ Untuk mengirim ke grup: tambahkan bot ke grup, kirim satu pesan di grup, lalu ul
 ### 3. Ambil API key OpenRouter
 
 1. Daftar di [openrouter.ai](https://openrouter.ai), buka **Keys**, buat key baru.
-2. Isi saldo secukupnya. Dengan `max_cost_usd_per_run: 0.15` dan dua run per hari, biaya maksimal sekitar **$9/bulan** — biasanya jauh di bawah itu.
+2. Isi saldo secukupnya. Rantai analisa kini 8 langkah dengan keluaran naratif panjang, jadi batas bawaannya `max_cost_usd_per_run: 0.40`. Dengan dua run per hari, itu berarti **maksimal sekitar $24/bulan** — biasanya jauh di bawah itu karena batas ini adalah plafon, bukan tarif tetap. Turunkan angkanya kalau mau lebih hemat; langkah yang kena batas akan dilewati dan brief tetap terbit.
 
 ### 4. Isi nama model di `config.yaml`
 
@@ -73,7 +98,10 @@ Bagian `llm` sengaja diisi placeholder (`ISI-MODEL-...`) karena katalog OpenRout
 | `filter` | paling murah | tugasnya hanya memberi skor 0–100 |
 | `classify` | kecil tapi patuh JSON | keluarannya terstruktur, bukan naratif |
 | `mechanism` | menengah | butuh penalaran sebab-akibat |
-| `synthesis` | kuat | menulis narasi panjang berbahasa Indonesia |
+| `technical` | menengah–kuat | menafsirkan indikator lintas timeframe |
+| `whale` | menengah–kuat | membaca divergensi posisi dan pola manipulasi |
+| `synthesis` | kuat | menulis analisa panjang berbahasa Indonesia |
+| `outlook` | kuat | menggabungkan teknikal, makro, dan geopolitik |
 | `critic` | kuat, **keluarga berbeda** dari `synthesis` | model yang sama cenderung tidak menemukan kesalahannya sendiri |
 
 Tiap step berupa array — model kedua dipakai otomatis oleh OpenRouter kalau yang pertama error atau kena rate limit.
@@ -143,23 +171,25 @@ Catatan penting:
 
 ```
 src/
-├── main.py                 # orkestrator 16 langkah
+├── main.py                 # orkestrator 18 langkah
 ├── config.py               # baca env + config.yaml
 ├── collectors/
 │   ├── binance.py          # harga, klines, funding, OI (+ fallback CoinGecko)
 │   ├── market.py           # fear & greed, on-chain, arus ETF
 │   ├── macro.py            # yfinance: DXY, yield, minyak, indeks (+ FRED opsional)
 │   ├── news.py             # RSS + dedup + skor prioritas
+│   ├── whale.py            # posisi top trader vs ritel, aliran taker
 │   └── calendar.py         # agenda ekonomi 7 hari
 ├── analysis/
-│   ├── technical.py        # indikator — murni kode, TANPA LLM
+│   ├── technical.py        # indikator + deteksi sinyal palsu — murni kode
 │   ├── llm.py              # klien OpenRouter + budget + logging biaya
-│   └── news_analysis.py    # rangkaian 5 panggilan LLM
+│   └── news_analysis.py    # rangkaian 8 panggilan LLM
 ├── output/
 │   ├── builder.py          # susun brief.json, diff, arsip
 │   └── telegram.py         # render + kirim
 └── utils/
     ├── http.py             # retry + backoff + timeout
+    ├── format.py           # angka gaya Indonesia
     └── timezone.py         # helper WIB + format tanggal Indonesia
 
 docs/                       # GitHub Pages
@@ -180,7 +210,8 @@ docs/                       # GitHub Pages
 - **Kredensial hanya lewat environment variable.** Tidak ada key di kode maupun di JSON keluaran.
 - **JSON keluaran tidak memuat prompt atau API key** — repo kemungkinan publik.
 - **Telegram dikirim sebelum operasi file/commit**, supaya kegagalan git tidak membatalkan notifikasi.
-- **Critic memeriksa narasi** terhadap data mentah. Kalau menemukan angka karangan atau saran investasi, narasi ditahan dan tidak dikirim.
+- **Critic memeriksa SELURUH bagian naratif** (narasi, teknikal, whale, outlook) terhadap data mentah. Kalau menemukan angka karangan, saran investasi, target harga, atau klaim dari pengetahuan luar, seluruh bagian AI ditahan.
+- **Skenario ditulis kondisional**, merujuk level yang dihitung kode ("selama bertahan di atas X, kondisi Y cenderung berlanjut"). Target harga dan ajakan transaksi tetap dilarang, dan critic secara khusus diminta membedakan keduanya.
 - **Setiap panggilan LLM dicatat** (model, token, biaya, durasi) ke stdout agar terlihat di log Actions.
 
 ## Pelabelan AI
@@ -201,6 +232,7 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 |---|---|
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |
 | `failed_sources` memuat `etf_flow` | Struktur tabel Farside berubah. Tidak fatal — kolom ETF akan tampil "tidak tersedia". |
+| Bagian whale kosong | Binance Futures memblokir IP runner. Tidak fatal — kartu posisi whale disembunyikan dan `failed_sources` memuat `whale`. |
 | Brief terbit tanpa bagian AI | `OPENROUTER_API_KEY` kosong, nama model masih placeholder, atau budget per run tercapai. Cek `data_quality.catatan`. |
 | Telegram tidak masuk | Pastikan sudah mengirim pesan pertama ke bot, dan `TELEGRAM_CHAT_ID` benar (ID grup diawali minus). |
 | Halaman Pages kosong | GitHub Pages belum diarahkan ke folder `/docs`, atau `latest.json` belum pernah dibuat. |

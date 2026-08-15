@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
+from ..utils.format import angka_id, persen_id
+
 log = logging.getLogger(__name__)
 
 EMA_PERIODS = (20, 50, 100, 200)
@@ -412,10 +414,146 @@ def key_levels(per_tf: Dict[str, Dict[str, Any]], price: float, atr_1d: Optional
     }
 
 
+def deteksi_sinyal_palsu(
+    klines: List[Dict[str, Any]],
+    funding_rate: Optional[float] = None,
+    oi_change_pct: Optional[float] = None,
+    window: int = 5,
+    lookback: int = 40,
+) -> List[Dict[str, Any]]:
+    """Deteksi pola yang sering menandai pergerakan tidak tulus.
+
+    Semua deteksi di sini murni geometri candle dan volume — tidak ada
+    penilaian LLM. Yang dikembalikan adalah fakta terukur; penafsirannya
+    diserahkan ke langkah berikutnya.
+
+    Perlu ditegaskan: pola-pola ini adalah petunjuk, bukan bukti. Wick panjang
+    bisa muncul dari likuiditas tipis biasa, bukan hanya dari perburuan stop.
+    """
+    df = _to_frame(klines)
+    if df.empty or len(df) < lookback:
+        return []
+
+    sinyal: List[Dict[str, Any]] = []
+    tail = df.tail(lookback).reset_index(drop=True)
+    high, low, close, open_, vol = (
+        tail["high"].values, tail["low"].values, tail["close"].values,
+        tail["open"].values, tail["volume"].values,
+    )
+    vol_rata = float(np.mean(vol[:-1])) if len(vol) > 1 else 0.0
+
+    # -- 1. Sapuan likuiditas (stop hunt) --------------------------------
+    # Candle menembus swing sebelumnya lalu ditutup kembali di dalam rentang:
+    # level dipicu, tapi harga tidak mau bertahan di sana.
+    swing_high = float(np.max(high[:-window])) if len(high) > window else None
+    swing_low = float(np.min(low[:-window])) if len(low) > window else None
+
+    for i in range(len(tail) - window, len(tail)):
+        if swing_high and high[i] > swing_high and close[i] < swing_high:
+            sinyal.append({
+                "jenis": "sapuan_likuiditas_atas",
+                "arah": "bearish",
+                "keterangan": (
+                    f"Harga menembus swing high {angka_id(swing_high)} hingga {angka_id(high[i])} "
+                    f"lalu ditutup kembali di {angka_id(close[i])} — level dipicu tanpa diikuti."
+                ),
+                "kekuatan": 4 if vol[i] > vol_rata * 1.5 else 3,
+            })
+            break
+
+    for i in range(len(tail) - window, len(tail)):
+        if swing_low and low[i] < swing_low and close[i] > swing_low:
+            sinyal.append({
+                "jenis": "sapuan_likuiditas_bawah",
+                "arah": "bullish",
+                "keterangan": (
+                    f"Harga menembus swing low {angka_id(swing_low)} hingga {angka_id(low[i])} "
+                    f"lalu ditutup kembali di {angka_id(close[i])} — stop dipanen lalu harga pulih."
+                ),
+                "kekuatan": 4 if vol[i] > vol_rata * 1.5 else 3,
+            })
+            break
+
+    # -- 2. Wick dominan pada candle terakhir ----------------------------
+    body = abs(close[-1] - open_[-1])
+    wick_atas = high[-1] - max(close[-1], open_[-1])
+    wick_bawah = min(close[-1], open_[-1]) - low[-1]
+    rentang = high[-1] - low[-1]
+    if rentang > 0 and body > 0:
+        if wick_atas > body * 2 and wick_atas / rentang > 0.5:
+            sinyal.append({
+                "jenis": "penolakan_atas",
+                "arah": "bearish",
+                "keterangan": (
+                    f"Wick atas {angka_id(wick_atas)} berbanding badan candle {angka_id(body)} — "
+                    "penjual menyerap kenaikan di area itu."
+                ),
+                "kekuatan": 3,
+            })
+        if wick_bawah > body * 2 and wick_bawah / rentang > 0.5:
+            sinyal.append({
+                "jenis": "penolakan_bawah",
+                "arah": "bullish",
+                "keterangan": (
+                    f"Wick bawah {angka_id(wick_bawah)} berbanding badan candle {angka_id(body)} — "
+                    "pembeli menyerap tekanan jual di area itu."
+                ),
+                "kekuatan": 3,
+            })
+
+    # -- 3. Volume besar tanpa perpindahan harga (absorpsi) --------------
+    if vol_rata > 0 and vol[-1] > vol_rata * 2.5:
+        gerak_pct = abs(close[-1] - open_[-1]) / open_[-1] * 100 if open_[-1] else 0
+        if gerak_pct < 0.3:
+            sinyal.append({
+                "jenis": "absorpsi_volume",
+                "arah": "netral",
+                "keterangan": (
+                    f"Volume {angka_id(vol[-1] / vol_rata, 1)}× rata-rata tapi harga hanya bergerak "
+                    f"{persen_id(gerak_pct)} — ada pihak besar menyerap order di harga ini."
+                ),
+                "kekuatan": 4,
+            })
+
+    # -- 4. Breakout dengan volume menurun -------------------------------
+    # Harga membuat tertinggi baru, tapi volumenya lebih kecil dari puncak
+    # sebelumnya: partisipasi tidak mengonfirmasi pergerakan.
+    idx_tertinggi_lama = int(np.argmax(high[:-window])) if len(high) > window else None
+    if idx_tertinggi_lama is not None and high[-1] > high[idx_tertinggi_lama]:
+        if vol[-1] < vol[idx_tertinggi_lama] * 0.7:
+            sinyal.append({
+                "jenis": "breakout_volume_lemah",
+                "arah": "bearish",
+                "keterangan": (
+                    f"Tertinggi baru {angka_id(high[-1])} terbentuk dengan volume hanya "
+                    f"{persen_id(vol[-1] / vol[idx_tertinggi_lama] * 100, 0)} dari volume di puncak sebelumnya."
+                ),
+                "kekuatan": 3,
+            })
+
+    # -- 5. Funding ekstrem + OI naik ------------------------------------
+    if funding_rate is not None and abs(funding_rate) > 0.0005:
+        arah_posisi = "long" if funding_rate > 0 else "short"
+        if oi_change_pct is not None and oi_change_pct > 0:
+            sinyal.append({
+                "jenis": "posisi_padat",
+                "arah": "bearish" if funding_rate > 0 else "bullish",
+                "keterangan": (
+                    f"Funding {persen_id(funding_rate * 100, 3)} per 8 jam dengan open interest naik "
+                    f"{persen_id(oi_change_pct, 1)} — posisi {arah_posisi} menumpuk dan mahal untuk "
+                    "dipertahankan."
+                ),
+                "kekuatan": 4,
+            })
+
+    return sinyal
+
+
 def analyze(
     klines_per_tf: Dict[str, List[Dict[str, Any]]],
     price: Dict[str, Any],
     oi_history: Optional[List[Dict[str, Any]]] = None,
+    funding_rate: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Analisa lengkap semua timeframe + level kunci + sinyal OI."""
     result: Dict[str, Any] = {}
@@ -434,5 +572,25 @@ def analyze(
     result["oi_price_signal"] = oi_signal["sinyal"]
     result["oi_price_interpretasi"] = oi_signal["interpretasi"]
     result["oi_change_pct"] = oi_signal["oi_change_pct"]
+
+    # Sinyal palsu dicari di 4H (cukup halus untuk menangkap sapuan likuiditas,
+    # cukup kasar untuk tidak kebanjiran derau seperti di 1H).
+    sinyal_palsu: List[Dict[str, Any]] = []
+    for tf in ("4h", "1h"):
+        for s in deteksi_sinyal_palsu(
+            klines_per_tf.get(tf, []), funding_rate, oi_signal["oi_change_pct"]
+        ):
+            s["timeframe"] = tf
+            sinyal_palsu.append(s)
+    # Funding/OI tidak bergantung timeframe — cukup laporkan sekali.
+    terlihat = set()
+    unik = []
+    for s in sinyal_palsu:
+        kunci = (s["jenis"], s["keterangan"])
+        if kunci in terlihat:
+            continue
+        terlihat.add(kunci)
+        unik.append(s)
+    result["sinyal_palsu"] = unik
 
     return result

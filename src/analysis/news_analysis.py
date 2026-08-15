@@ -1,7 +1,12 @@
-"""Rangkaian panggilan LLM: filter -> klasifikasi -> mekanisme -> sintesis -> critic.
+"""Rangkaian panggilan LLM untuk analisa brief.
+
+Urutannya:
+    filter -> klasifikasi -> mekanisme -> interpretasi teknikal -> analisa whale
+    -> sintesis -> outlook -> critic
 
 Ini workflow deterministik, bukan agent. LLM tidak memilih langkah maupun tool;
-seluruh urutan, batasan, dan perhitungan angka ditentukan kode di sini.
+seluruh urutan, batasan, dan perhitungan angka ditentukan kode di sini. Model
+hanya MENAFSIRKAN angka yang sudah jadi — tidak pernah menghitungnya.
 """
 
 from __future__ import annotations
@@ -13,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from dateutil import parser as date_parser
 
+from ..utils.format import persen_id
 from ..utils.timezone import now_utc, to_utc
 from .llm import BudgetExceeded, LLMClient, LLMError
 
@@ -321,7 +327,7 @@ def cross_check(
                     "tipe": "anomali_reaksi",
                     "keterangan": (
                         f"Berita {a['sentimen']} berkekuatan {a['kekuatan']} "
-                        f"(\"{a['judul'][:80]}\") diikuti pergerakan harga {reaksi:+.2f}% "
+                        f"(\"{a['judul'][:80]}\") diikuti pergerakan harga {persen_id(reaksi, 2, pakai_tanda=True)} "
                         "pada jam berikutnya — berlawanan arah."
                     ),
                 }
@@ -339,7 +345,7 @@ def cross_check(
                     "tipe": "risiko_long_squeeze",
                     "keterangan": (
                         f"Ada {len(bullish_kuat)} berita bullish kuat sementara funding rate "
-                        f"sudah tinggi ({funding_rate * 100:.3f}% per 8 jam). Posisi long padat "
+                        f"sudah tinggi ({persen_id(funding_rate * 100, 3)} per 8 jam). Posisi long padat "
                         "membuat pasar rentan terhadap pembalikan tajam."
                     ),
                 }
@@ -438,25 +444,295 @@ def tema_dominan(articles: List[Dict[str, Any]], top_n: int = 3) -> List[str]:
 
 
 # --------------------------------------------------------------------------
+# LLM — interpretasi teknikal
+# --------------------------------------------------------------------------
+def interpretasi_teknikal(
+    client: LLMClient, models: List[str], teknikal: Dict[str, Any], harga: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """Tafsirkan indikator yang SUDAH dihitung kode.
+
+    Model tidak pernah diminta menghitung apa pun. Semua angka dikirim jadi,
+    dan prompt melarangnya menurunkan angka baru — kalau model butuh angka
+    yang tidak ada, jawabannya harus null.
+    """
+    system = (
+        "Kamu analis teknikal Bitcoin. Kamu menerima indikator yang SUDAH dihitung "
+        "secara terprogram dari data candle asli. Tugasmu MENAFSIRKAN, bukan menghitung.\n\n"
+        "DILARANG KERAS menghitung, memperkirakan, atau menyebut angka yang tidak ada "
+        "dalam data yang diberikan. Kalau sebuah angka tidak tersedia, katakan tidak "
+        "tersedia — jangan mengarang.\n\n"
+        "Yang harus kamu jelaskan:\n"
+        "  - Apa yang sedang diberitahukan struktur harga di ketiga timeframe\n"
+        "  - Di mana timeframe saling MENGUATKAN dan di mana saling BERTENTANGAN\n"
+        "  - Apa arti kondisi momentum dan volatilitas saat ini\n"
+        "  - Apakah volume mengonfirmasi pergerakan harga atau tidak\n"
+        "  - Kondisi konkret apa yang akan MEMBATALKAN pembacaan ini\n\n"
+        "Balas objek JSON:\n"
+        "  ringkasan: 2-3 kalimat inti kondisi teknikal\n"
+        "  per_timeframe: {\"1d\": \"...\", \"4h\": \"...\", \"1h\": \"...\"} — 2-3 kalimat tiap timeframe\n"
+        "  konfluensi: array string, hal yang saling menguatkan antar timeframe\n"
+        "  kontradiksi: array string, sinyal yang saling bertentangan\n"
+        "  kualitas_tren: salah satu dari \"kuat\", \"melemah\", \"tidak_jelas\", \"berbalik\"\n"
+        "  pembatalan: string, kondisi harga yang membatalkan pembacaan di atas\n\n"
+        "Tulis untuk pembaca yang paham dasar trading tapi bukan ahli. Jelaskan "
+        "istilah teknis secara singkat saat pertama muncul.\n\n" + ATURAN_DASAR
+    )
+    konteks = {"harga_terkini": harga, "indikator_terhitung": teknikal}
+
+    try:
+        hasil = client.chat_json(
+            models,
+            system,
+            "Tafsirkan kondisi teknikal berikut:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
+            step="technical",
+            temperature=0.3,
+            max_tokens=2500,
+        )
+    except (LLMError, BudgetExceeded) as exc:
+        log.warning("Interpretasi teknikal gagal: %s", exc)
+        return None
+
+    if not isinstance(hasil, dict) or not hasil.get("ringkasan"):
+        return None
+
+    per_tf = hasil.get("per_timeframe")
+    kualitas = hasil.get("kualitas_tren")
+    return {
+        "ringkasan": str(hasil["ringkasan"]).strip(),
+        "per_timeframe": {
+            k: str(v)[:800] for k, v in per_tf.items() if isinstance(v, str)
+        } if isinstance(per_tf, dict) else {},
+        "konfluensi": [str(x)[:250] for x in (hasil.get("konfluensi") or [])[:6]],
+        "kontradiksi": [str(x)[:250] for x in (hasil.get("kontradiksi") or [])[:6]],
+        "kualitas_tren": kualitas if kualitas in ("kuat", "melemah", "tidak_jelas", "berbalik") else None,
+        "pembatalan": str(hasil["pembatalan"])[:400] if hasil.get("pembatalan") else "",
+    }
+
+
+# --------------------------------------------------------------------------
+# LLM — analisa whale & sinyal palsu
+# --------------------------------------------------------------------------
+def analisa_whale(
+    client: LLMClient,
+    models: List[str],
+    posisi: Dict[str, Any],
+    sinyal_palsu: List[Dict[str, Any]],
+    teknikal: Dict[str, Any],
+    harga: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Tafsirkan posisi whale vs ritel dan pola candle yang mencurigakan."""
+    if not posisi.get("whale_long_pct") and not sinyal_palsu:
+        return None
+
+    system = (
+        "Kamu analis mikrostruktur pasar. Kamu menilai apakah pergerakan harga "
+        "belakangan ini tulus atau kemungkinan hasil rekayasa pemain besar.\n\n"
+        "Data yang kamu terima:\n"
+        "  - posisi_whale: statistik posisi top trader Binance (proksi pemain besar)\n"
+        "  - posisi_ritel: statistik seluruh akun (didominasi ritel)\n"
+        "  - divergensi: selisih persentase long whale dikurangi long ritel, dalam poin persen\n"
+        "  - sinyal_terdeteksi: pola candle dan volume yang sudah dideteksi kode\n\n"
+        "Prinsip pembacaan:\n"
+        "  - Whale net short sementara ritel net long = pola distribusi klasik\n"
+        "  - Whale net long sementara ritel net short = pola akumulasi\n"
+        "  - Sapuan likuiditas = level dipicu lalu harga tidak bertahan; sering "
+        "    berarti likuidasi dipanen, bukan arah baru\n"
+        "  - Volume besar tanpa perpindahan harga = ada pihak menyerap order\n"
+        "  - Breakout dengan volume menurun = partisipasi tidak mengonfirmasi\n\n"
+        "JUJUR soal ketidakpastian. Pola-pola ini adalah petunjuk probabilistik, "
+        "bukan bukti manipulasi. Kalau datanya lemah atau ambigu, katakan begitu. "
+        "JANGAN mengarang cerita konspirasi dari sinyal yang tipis.\n\n"
+        "Balas objek JSON:\n"
+        "  ringkasan: 2-4 kalimat kondisi posisi pemain besar vs ritel\n"
+        "  sinyal_palsu: array objek {\"pola\": \"...\", \"arti\": \"...\", \"keyakinan\": \"tinggi|sedang|rendah\"}\n"
+        "  posisi_whale_vs_ritel: string, satu kalimat kesimpulan\n"
+        "  tingkat_kewaspadaan: salah satu dari \"tinggi\", \"sedang\", \"rendah\"\n"
+        "  catatan: string, hal yang perlu diperhatikan pembaca (boleh null)\n\n"
+        + ATURAN_DASAR
+    )
+    konteks = {
+        "harga_terkini": harga,
+        "posisi_whale": {
+            "whale_long_pct": posisi.get("whale_long_pct"),
+            "whale_short_pct": posisi.get("whale_short_pct"),
+            "whale_tren_long_poin_persen": posisi.get("whale_tren_long_pp"),
+        },
+        "posisi_ritel": {
+            "ritel_long_pct": posisi.get("ritel_long_pct"),
+            "ritel_short_pct": posisi.get("ritel_short_pct"),
+            "ritel_tren_long_poin_persen": posisi.get("ritel_tren_long_pp"),
+        },
+        "divergensi_poin_persen": posisi.get("divergensi"),
+        "divergensi_label": posisi.get("divergensi_label"),
+        "aliran_taker": {
+            "buy_sell_ratio": posisi.get("taker_buy_sell_ratio"),
+            "tren": posisi.get("taker_tren"),
+        },
+        "funding_dan_oi": {
+            "sinyal_oi": teknikal.get("oi_price_signal"),
+            "perubahan_oi_pct": teknikal.get("oi_change_pct"),
+        },
+        "sinyal_terdeteksi": sinyal_palsu,
+    }
+
+    try:
+        hasil = client.chat_json(
+            models,
+            system,
+            "Analisa kondisi berikut:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
+            step="whale",
+            temperature=0.3,
+            max_tokens=2000,
+        )
+    except (LLMError, BudgetExceeded) as exc:
+        log.warning("Analisa whale gagal: %s", exc)
+        return None
+
+    if not isinstance(hasil, dict) or not hasil.get("ringkasan"):
+        return None
+
+    daftar = []
+    for s in (hasil.get("sinyal_palsu") or [])[:6]:
+        if not isinstance(s, dict):
+            continue
+        keyakinan = s.get("keyakinan")
+        daftar.append({
+            "pola": str(s.get("pola", ""))[:120],
+            "arti": str(s.get("arti", ""))[:400],
+            "keyakinan": keyakinan if keyakinan in ("tinggi", "sedang", "rendah") else "rendah",
+        })
+
+    waspada = hasil.get("tingkat_kewaspadaan")
+    return {
+        "ringkasan": str(hasil["ringkasan"]).strip(),
+        "sinyal_palsu": daftar,
+        "posisi_whale_vs_ritel": str(hasil.get("posisi_whale_vs_ritel", ""))[:400],
+        "tingkat_kewaspadaan": waspada if waspada in ("tinggi", "sedang", "rendah") else "rendah",
+        "catatan": str(hasil["catatan"])[:400] if hasil.get("catatan") else "",
+    }
+
+
+# --------------------------------------------------------------------------
+# LLM — outlook ke depan
+# --------------------------------------------------------------------------
+def outlook(
+    client: LLMClient, models: List[str], konteks: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """Analisa ke depan: teknikal + makro + geopolitik + agenda.
+
+    Skenario ditulis KONDISIONAL terhadap level yang sudah dihitung kode
+    ("kalau bertahan di atas X, kondisi Y menguat"), bukan sebagai ramalan
+    harga. Target harga dan ajakan transaksi tetap dilarang.
+    """
+    system = (
+        "Kamu analis pasar yang menyusun pandangan ke depan untuk Bitcoin.\n\n"
+        "Susun analisa forward-looking yang menggabungkan: kondisi teknikal, situasi "
+        "makro, faktor geopolitik, agenda ekonomi yang akan datang, dan keputusan besar "
+        "yang sedang berlangsung (regulasi, kebijakan bank sentral, arus institusional).\n\n"
+        "CARA MENULIS SKENARIO — penting:\n"
+        "  - Skenario ditulis KONDISIONAL terhadap level yang ADA di data: "
+        "\"selama bertahan di atas [level dari data], kondisi X cenderung berlanjut\"\n"
+        "  - DILARANG menyebut target harga, proyeksi angka, atau ramalan arah\n"
+        "  - DILARANG menyarankan pembaca membeli, menjual, menunggu, atau masuk posisi\n"
+        "  - Yang kamu jelaskan adalah FAKTOR dan KONDISI, bukan apa yang harus dilakukan\n\n"
+        "Balas objek JSON:\n"
+        "  ringkasan: 2-3 kalimat pandangan umum ke depan\n"
+        "  skenario_naik: {\"pemicu\": [array faktor], \"kondisi\": \"level/kondisi dari data yang harus bertahan\"}\n"
+        "  skenario_turun: {\"pemicu\": [array faktor], \"kondisi\": \"level/kondisi dari data yang harus bertahan\"}\n"
+        "  faktor_geopolitik: array string, isu geopolitik yang relevan bagi BTC (array kosong kalau tidak ada di data)\n"
+        "  keputusan_besar: array objek {\"apa\": \"...\", \"kapan\": \"...\", \"kenapa_penting\": \"...\"}\n"
+        "  risiko_utama: array string, hal yang paling bisa mengubah gambaran\n"
+        "  horizon: string, rentang waktu yang dibahas (contoh \"1-2 minggu ke depan\")\n\n"
+        "Kalau data yang tersedia tidak mendukung suatu bagian, isi array kosong. "
+        "JANGAN mengisi dengan pengetahuan umum dari masa pelatihanmu — pembaca "
+        "mengira semua yang kamu tulis berasal dari data hari ini.\n\n" + ATURAN_DASAR
+    )
+    try:
+        hasil = client.chat_json(
+            models,
+            system,
+            "Data terkini:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
+            step="outlook",
+            temperature=0.4,
+            max_tokens=3000,
+        )
+    except (LLMError, BudgetExceeded) as exc:
+        log.warning("Analisa outlook gagal: %s", exc)
+        return None
+
+    if not isinstance(hasil, dict) or not hasil.get("ringkasan"):
+        return None
+
+    def skenario(kunci: str) -> Dict[str, Any]:
+        s = hasil.get(kunci)
+        if not isinstance(s, dict):
+            return {"pemicu": [], "kondisi": ""}
+        pemicu = s.get("pemicu")
+        return {
+            "pemicu": [str(p)[:250] for p in pemicu[:5]] if isinstance(pemicu, list) else [],
+            "kondisi": str(s.get("kondisi", ""))[:300],
+        }
+
+    keputusan = []
+    for k in (hasil.get("keputusan_besar") or [])[:6]:
+        if not isinstance(k, dict):
+            continue
+        keputusan.append({
+            "apa": str(k.get("apa", ""))[:200],
+            "kapan": str(k.get("kapan", ""))[:100],
+            "kenapa_penting": str(k.get("kenapa_penting", ""))[:400],
+        })
+
+    return {
+        "ringkasan": str(hasil["ringkasan"]).strip(),
+        "skenario_naik": skenario("skenario_naik"),
+        "skenario_turun": skenario("skenario_turun"),
+        "faktor_geopolitik": [str(x)[:300] for x in (hasil.get("faktor_geopolitik") or [])[:6]],
+        "keputusan_besar": keputusan,
+        "risiko_utama": [str(x)[:300] for x in (hasil.get("risiko_utama") or [])[:6]],
+        "horizon": str(hasil.get("horizon", ""))[:100],
+    }
+
+
+# --------------------------------------------------------------------------
 # LLM #4 — sintesis narasi
 # --------------------------------------------------------------------------
 def sintesis(
     client: LLMClient, models: List[str], konteks: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
     system = (
-        "Kamu penulis ringkasan pasar Bitcoin untuk pembaca Indonesia.\n\n"
-        "Tulis narasi 3-5 paragraf yang MENJELASKAN kondisi pasar hari ini berdasarkan "
-        "data yang diberikan. Rangkai teknikal, posisi pasar, makro, dan berita menjadi "
-        "satu cerita yang nyambung. Sebutkan angka konkret dari data, jangan mengarang "
-        "angka baru. Kalau ada sinyal yang bertentangan, sebut terus terang.\n\n"
+        "Kamu penulis analisa pasar Bitcoin untuk pembaca Indonesia.\n\n"
+        "Tulis analisa MENDALAM 6-9 paragraf. Ini bukan ringkasan singkat — pembaca "
+        "ingin MENGERTI apa yang terjadi dan MENGAPA.\n\n"
+        "Struktur yang harus kamu ikuti:\n"
+        "  1. Apa yang terjadi pada harga (arah, besaran, dari data)\n"
+        "  2. MENGAPA — ini bagian terpenting. Kalau pasar turun, jelaskan apa yang "
+        "     menyebabkannya; kalau naik, jelaskan pendorongnya. Rangkai dari berita, "
+        "     makro, posisi derivatif, dan aliran dana yang ada di data. Bedakan sebab "
+        "     yang DIDUKUNG data dari yang sekadar bertepatan waktu.\n"
+        "  3. Apa kata struktur teknikal terhadap cerita itu — apakah menguatkan atau "
+        "     justru bertentangan\n"
+        "  4. Apa yang dilakukan pemain besar versus ritel, kalau datanya tersedia\n"
+        "  5. Konteks makro dan geopolitik yang membingkai semuanya\n"
+        "  6. Apa yang berubah dibanding brief sebelumnya\n\n"
+        "ATURAN SEBAB-AKIBAT (kritikal):\n"
+        "  - Setiap klaim sebab harus bisa ditelusuri ke item di data yang diberikan\n"
+        "  - Kalau penyebabnya tidak jelas, TULIS BEGITU: \"pergerakan ini tidak punya "
+        "    pemicu tunggal yang jelas di data hari ini\"\n"
+        "  - Korelasi bukan sebab-akibat. Jangan menyimpulkan A menyebabkan B hanya "
+        "    karena keduanya terjadi bersamaan\n"
+        "  - Sebutkan angka konkret dari data. JANGAN mengarang angka baru\n\n"
         "Balas objek JSON dengan field:\n"
-        "  narrative: string, 3-5 paragraf dipisah \\n\\n, bahasa Indonesia\n"
+        "  narrative: string, 6-9 paragraf dipisah \\n\\n, bahasa Indonesia\n"
+        "  penyebab_pergerakan: array objek {\"faktor\": \"...\", \"arah\": \"naik|turun|netral\", "
+        "\"keyakinan\": \"tinggi|sedang|rendah\", \"dasar\": \"data apa yang mendukung\"}, "
+        "urut dari yang paling berpengaruh, maksimal 5\n"
         "  dominant_themes: array 2-3 string pendek\n"
-        "  narrative_shift: string, apa yang berubah dibanding brief sebelumnya (null kalau tidak ada data pembanding)\n"
+        "  narrative_shift: string, apa yang berubah dibanding brief sebelumnya (null kalau tidak ada pembanding)\n"
         "  conflicts: array string, sinyal yang saling bertentangan (array kosong kalau tidak ada)\n\n"
-        "Nada tulisan: tenang, deskriptif, tidak mengajak transaksi. "
-        "Jangan menulis kalimat yang menyarankan pembaca membeli, menjual, atau menunggu "
-        "harga tertentu.\n\n" + ATURAN_DASAR
+        "Nada tulisan: tenang, deskriptif, tidak mengajak transaksi. Jangan menulis "
+        "kalimat yang menyarankan pembaca membeli, menjual, atau menunggu harga tertentu.\n\n"
+        + ATURAN_DASAR
     )
     try:
         hasil = client.chat_json(
@@ -465,7 +741,7 @@ def sintesis(
             "Data hari ini:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
             step="synthesis",
             temperature=0.4,
-            max_tokens=2500,
+            max_tokens=4000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Sintesis narasi gagal: %s", exc)
@@ -477,8 +753,23 @@ def sintesis(
 
     themes = hasil.get("dominant_themes")
     conflicts = hasil.get("conflicts")
+
+    penyebab = []
+    for p in (hasil.get("penyebab_pergerakan") or [])[:5]:
+        if not isinstance(p, dict):
+            continue
+        arah = p.get("arah")
+        keyakinan = p.get("keyakinan")
+        penyebab.append({
+            "faktor": str(p.get("faktor", ""))[:200],
+            "arah": arah if arah in ("naik", "turun", "netral") else "netral",
+            "keyakinan": keyakinan if keyakinan in ("tinggi", "sedang", "rendah") else "rendah",
+            "dasar": str(p.get("dasar", ""))[:300],
+        })
+
     return {
         "narrative": str(hasil["narrative"]).strip(),
+        "penyebab_pergerakan": penyebab,
         "dominant_themes": [str(t)[:60] for t in themes[:3]] if isinstance(themes, list) else [],
         "narrative_shift": str(hasil["narrative_shift"])[:500] if hasil.get("narrative_shift") else "",
         "conflicts": [str(c)[:300] for c in conflicts[:5]] if isinstance(conflicts, list) else [],
@@ -489,26 +780,43 @@ def sintesis(
 # LLM #5 — critic
 # --------------------------------------------------------------------------
 def critic(
-    client: LLMClient, models: List[str], narasi: str, data_mentah: Dict[str, Any]
+    client: LLMClient, models: List[str], teks_ai: Dict[str, str], data_mentah: Dict[str, Any]
 ) -> Dict[str, Any]:
+    """Periksa SELURUH keluaran naratif AI terhadap data mentah sumbernya."""
     system = (
-        "Kamu pemeriksa fakta yang ketat. Kamu diberi sebuah narasi pasar dan data mentah "
-        "yang menjadi sumbernya. Periksa narasi terhadap data.\n\n"
-        "Cari tiga jenis masalah:\n"
-        "  1. angka_karangan: angka di narasi yang tidak ada di data mentah\n"
+        "Kamu pemeriksa fakta yang ketat. Kamu diberi beberapa bagian teks analisa "
+        "pasar beserta data mentah yang menjadi sumbernya. Periksa setiap bagian "
+        "terhadap data.\n\n"
+        "Cari empat jenis masalah:\n"
+        "  1. angka_karangan: angka di teks yang tidak ada di data mentah\n"
         "  2. sebab_akibat: klaim sebab-akibat yang tidak didukung data\n"
-        "  3. saran_investasi: rekomendasi beli/jual, target harga, atau ajakan transaksi\n\n"
+        "  3. saran_investasi: rekomendasi beli/jual, target harga, atau ajakan transaksi\n"
+        "  4. pengetahuan_luar: klaim faktual tentang peristiwa yang tidak ada di data "
+        "     (model mengarang dari ingatan masa pelatihannya)\n\n"
+        "PEMBEDAAN PENTING — jangan salah menandai:\n"
+        "  - BOLEH: skenario kondisional yang merujuk level dari data, misalnya "
+        "    \"selama bertahan di atas 116.500, kondisi X cenderung berlanjut\". "
+        "    Level itu ADA di data, dan kalimatnya menjelaskan kondisi, bukan menyuruh.\n"
+        "  - TIDAK BOLEH: target harga (\"menuju 130.000\"), ramalan arah "
+        "    (\"akan naik minggu depan\"), atau ajakan (\"saatnya akumulasi\").\n"
+        "  - BOLEH: menyatakan ketidakpastian (\"penyebabnya tidak jelas dari data hari ini\").\n"
+        "  - BOLEH: menyebut pola whale sebagai kemungkinan berkeyakinan rendah, "
+        "    selama tidak dinyatakan sebagai fakta pasti.\n\n"
         "Kategori keparahan:\n"
-        "  fatal  = angka karangan, atau saran investasi apa pun\n"
+        "  fatal  = angka karangan, saran investasi, target harga, atau pengetahuan luar "
+        "           yang disajikan sebagai fakta\n"
         "  minor  = klaim sebab-akibat yang terlalu percaya diri tapi tidak menyesatkan\n\n"
         "Balas objek JSON:\n"
         "  {\"passed\": bool, \"corrections\": [{\"jenis\": \"...\", \"keparahan\": \"fatal|minor\", "
-        "\"kutipan\": \"...\", \"alasan\": \"...\"}]}\n\n"
+        "\"bagian\": \"nama bagian yang bermasalah\", \"kutipan\": \"...\", \"alasan\": \"...\"}]}\n\n"
         "passed bernilai false HANYA kalau ada koreksi berkeparahan fatal.\n"
-        "Kalau narasi bersih, balas {\"passed\": true, \"corrections\": []}.\n\n" + ATURAN_DASAR
+        "Kalau semua bagian bersih, balas {\"passed\": true, \"corrections\": []}.\n\n" + ATURAN_DASAR
+    )
+    bagian = "\n\n".join(
+        f"=== BAGIAN: {nama} ===\n{isi}" for nama, isi in teks_ai.items() if isi
     )
     user = (
-        "NARASI YANG DIPERIKSA:\n" + narasi + "\n\n"
+        "TEKS YANG DIPERIKSA:\n" + bagian + "\n\n"
         "DATA MENTAH SUMBERNYA:\n" + json.dumps(data_mentah, ensure_ascii=False, default=str)
     )
 
@@ -533,6 +841,7 @@ def critic(
             {
                 "jenis": str(c.get("jenis", ""))[:60],
                 "keparahan": keparahan if keparahan in ("fatal", "minor") else "minor",
+                "bagian": str(c.get("bagian", ""))[:60],
                 "kutipan": str(c.get("kutipan", ""))[:200],
                 "alasan": str(c.get("alasan", ""))[:300],
             }

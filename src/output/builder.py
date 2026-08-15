@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 from dateutil import parser as date_parser
 
 from ..config import ARCHIVE_DIR, DATA_DIR
+from ..utils.format import angka_id
 from ..utils.timezone import (
     format_wib,
     format_wib_singkat,
@@ -29,7 +30,7 @@ DISCLAIMER = "Konten ini bersifat informasional dan bukan saran investasi."
 # Semua sumber yang dihitung dalam skor kualitas data.
 SUMBER_DIPANTAU = [
     "price", "technical", "funding_oi", "fear_greed",
-    "onchain", "etf_flow", "macro", "news",
+    "onchain", "etf_flow", "macro", "news", "whale",
 ]
 
 
@@ -155,19 +156,19 @@ def ringkas_diff(diff: Dict[str, Any]) -> List[str]:
     harga = diff.get("harga")
     if harga and harga.get("selisih_pct"):
         arah = "naik" if harga["selisih"] > 0 else "turun"
-        baris.append(f"Harga {arah} {abs(harga['selisih_pct']):.2f}% sejak brief sebelumnya.")
+        baris.append(f"Harga {arah} {angka_id(abs(harga['selisih_pct']), 2)}% sejak brief sebelumnya.")
 
     sentimen = diff.get("sentimen")
     if sentimen and sentimen["selisih"]:
         arah = "menguat" if sentimen["selisih"] > 0 else "melemah"
         baris.append(
-            f"Skor sentimen berita {arah} dari {sentimen['sebelumnya']:.0f} ke {sentimen['sekarang']:.0f}."
+            f"Skor sentimen berita {arah} dari {angka_id(sentimen['sebelumnya'])} ke {angka_id(sentimen['sekarang'])}."
         )
 
     fg = diff.get("fear_greed")
     if fg and fg["selisih"]:
         arah = "naik" if fg["selisih"] > 0 else "turun"
-        baris.append(f"Fear & Greed {arah} {abs(fg['selisih']):.0f} poin ke {fg['sekarang']:.0f}.")
+        baris.append(f"Fear & Greed {arah} {angka_id(abs(fg['selisih']))} poin ke {angka_id(fg['sekarang'])}.")
 
     if diff.get("tema_baru"):
         baris.append("Tema baru muncul: " + ", ".join(diff["tema_baru"]) + ".")
@@ -219,6 +220,7 @@ def build_brief(
     technical: Dict[str, Any],
     market: Dict[str, Any],
     macro: Dict[str, Any],
+    whale: Dict[str, Any],
     news: List[Dict[str, Any]],
     aggregate: Dict[str, Any],
     calendar: List[Dict[str, Any]],
@@ -241,6 +243,7 @@ def build_brief(
         "technical": technical,
         "market": market,
         "macro": macro,
+        "whale": whale,
         "news": bersihkan_berita(news),
         "aggregate": aggregate,
         "calendar": calendar,
