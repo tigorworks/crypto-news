@@ -201,6 +201,7 @@ Kesembilan step sudah terisi model yang wajar sebagai titik awal, jadi bisa lang
 |---|---|---|---|
 | `filter` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | murah, tugasnya cuma skor 0–100 |
 | `classify` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | patuh JSON, keluaran pendek |
+| `format` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | menata tampilan pesan Telegram |
 | `mechanism` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | butuh penalaran sebab-akibat |
 | `statements` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | menyaring pernyataan dari derau |
 | `technical` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menafsirkan indikator lintas timeframe |
@@ -271,6 +272,27 @@ Lihat hasilnya:
 python -m http.server 8000 --directory docs
 # buka http://localhost:8000
 ```
+
+---
+
+## Tampilan Pesan Telegram
+
+Pesan dirakit kode, lalu ditata ulang oleh LLM murah supaya enak dibaca — harga dan analisa AI ditonjolkan, emoji ditambahkan, alurnya dirapikan. Dimatikan lewat `telegram.rapikan_dengan_llm: false`.
+
+**Perapi tidak dipercaya begitu saja.** Memberi LLM kebebasan menulis ulang pesan berarti membuka jalan bagi angka karangan lewat pintu belakang — persis hal yang dijaga ketat oleh critic. Karena itu hasilnya diperiksa kode sebelum dikirim:
+
+| Pemeriksaan | Kalau gagal |
+|---|---|
+| Setiap angka di hasil harus sudah ada di pesan asli | tolak |
+| Hanya tag HTML yang didukung Telegram (`<b> <i> <u> <s> <code> <a>`) | tolak |
+| Penanda `ANALISA AI` dan disclaimer masih ada | tolak |
+| Panjang di bawah 4096 karakter | tolak |
+
+Ditolak berarti pesan asli yang dikirim. Tampilan yang kurang cantik jauh lebih baik daripada angka yang salah.
+
+Perapi boleh memformat ulang gaya penulisan angka (`63.042` ↔ `63,042`) karena angkanya dinormalkan dulu sebelum dibandingkan — yang dilarang adalah memunculkan angka yang tidak ada.
+
+Pesan dasarnya dirender dengan batas 3400 karakter saat perapi aktif, menyisakan ruang untuk emoji dan jeda baris. Tanpa ruang itu hasil rapinya selalu melewati batas dan selalu ditolak.
 
 ---
 
