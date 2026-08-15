@@ -190,6 +190,50 @@ def _ringkasan_opsi() -> Dict[str, Any]:
     }
 
 
+def perp_funding_rate() -> Optional[float]:
+    """Funding rate perpetual Deribit, dinormalkan ke basis 8 jam.
+
+    Sumber ketiga setelah Binance dan Bybit. Keduanya memblokir IP runner
+    GitHub Actions — Binance dengan 451, Bybit lewat CloudFront — sementara
+    Deribit terbukti tetap bisa diakses.
+    """
+    try:
+        data = get_json(
+            f"{BASE}/ticker", params={"instrument_name": "BTC-PERPETUAL"}, timeout=30
+        )
+        hasil = data.get("result") or {}
+        # funding_8h sudah dalam basis 8 jam, sama seperti Binance dan Bybit.
+        nilai = hasil.get("funding_8h")
+        if nilai is None:
+            nilai = hasil.get("current_funding")
+        return float(nilai) if nilai is not None else None
+    except (HttpError, ValueError, KeyError, TypeError) as exc:
+        log.warning("Funding perpetual Deribit gagal: %s", exc)
+        return None
+
+
+def perp_open_interest() -> Optional[float]:
+    """Open interest perpetual Deribit, dikonversi ke BTC.
+
+    Deribit melaporkan OI perpetual dalam USD, sedangkan Binance dan Bybit
+    dalam BTC. Dibagi index price supaya satuannya seragam — kalau tidak,
+    perbandingan antar run bisa melompat drastis saat sumbernya berganti.
+    """
+    try:
+        data = get_json(
+            f"{BASE}/ticker", params={"instrument_name": "BTC-PERPETUAL"}, timeout=30
+        )
+        hasil = data.get("result") or {}
+        oi_usd = hasil.get("open_interest")
+        index = hasil.get("index_price")
+        if oi_usd is None or not index:
+            return None
+        return round(float(oi_usd) / float(index), 2)
+    except (HttpError, ValueError, KeyError, TypeError, ZeroDivisionError) as exc:
+        log.warning("Open interest perpetual Deribit gagal: %s", exc)
+        return None
+
+
 def collect() -> Dict[str, Any]:
     """Kumpulkan data opsi. Boleh gagal sebagian."""
     data: Dict[str, Any] = {}

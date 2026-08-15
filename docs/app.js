@@ -39,8 +39,9 @@ function briefApp() {
     filterSentimen: '',
     daftarArsip: [],
     arsipDipilih: '',
-    semuaBerita: false,
     semuaPernyataan: false,
+    halamanBerita: 1,
+    perHalaman: 3,
     grafik: null,
     _jam: null,
     _detak: 0,          // dinaikkan tiap menit supaya waktu relatif ikut menyegar
@@ -334,6 +335,28 @@ function briefApp() {
       return this.data?.technical?.[this.tabTf] || null;
     },
 
+    /* Bagian analis sesuai struktur laporan harian: temuan, penyebab, data
+       pendukung, peta level, sisi lawan, katalis, kesimpulan. */
+    get bagianAnalis() {
+      const b = this.data?.ai?.bagian || {};
+      const urutan = [
+        ['posisi_harga', 'Posisi harga', 'teks'],
+        ['penyebab', 'Penyebab', 'teks'],
+        ['data_pendukung', 'Data pendukung', 'daftar'],
+        ['peta_level', 'Peta level', 'teks'],
+        ['yang_diwaspadai', 'Yang perlu diwaspadai', 'teks'],
+        ['katalis_berikutnya', 'Katalis berikutnya', 'daftar'],
+        ['kesimpulan', 'Kesimpulan', 'teks'],
+      ];
+      return urutan
+        .filter(([k, , tipe]) => (tipe === 'daftar' ? (b[k] || []).length : !!b[k]))
+        .map(([kunci, label, tipe]) => ({ kunci, label, tipe, nilai: b[kunci] }));
+    },
+
+    get adaBagianTerstruktur() {
+      return this.bagianAnalis.length > 0;
+    },
+
     get paragrafNarasi() {
       const teks = this.data?.ai?.narrative || '';
       return teks.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
@@ -346,11 +369,31 @@ function briefApp() {
     },
 
     get beritaTersaring() {
-      return (this.data?.news || []).filter((n) => {
+      const hasil = (this.data?.news || []).filter((n) => {
         if (this.filterKategori && n.kategori !== this.filterKategori) return false;
         if (this.filterSentimen && n.sentimen !== this.filterSentimen) return false;
         return true;
       });
+      // Halaman aktif bisa melewati ujung daftar setelah filter dipersempit.
+      const maks = Math.max(1, Math.ceil(hasil.length / this.perHalaman));
+      if (this.halamanBerita > maks) this.halamanBerita = 1;
+      return hasil;
+    },
+
+    /* Critic bisa menahan sebagian saja. Bagian yang tidak ditandai tetap
+       ditampilkan — menyembunyikan semuanya membuang analisa yang lolos. */
+    bagianAiTampil(nama) {
+      const ai = this.data?.ai;
+      if (!ai) return false;
+      const ditahan = ai.bagian_ditahan || [];
+      if (ditahan.includes(nama)) return false;
+      // Tanpa daftar eksplisit, critic gagal berarti semuanya ditahan.
+      if (!ditahan.length && ai.critic && ai.critic.passed === false) return false;
+      return true;
+    },
+
+    get adaBagianDitahan() {
+      return (this.data?.ai?.bagian_ditahan || []).length > 0;
     },
 
     get adaDataInstitusional() {
@@ -506,14 +549,29 @@ function briefApp() {
       return typeof window !== 'undefined' && window.innerWidth < 640;
     },
 
+    /* Berita dipaginasi 3 baris per halaman, bukan digulung habis: daftar
+       panjang membuat bagian di bawahnya sulit dijangkau. */
+    get totalHalamanBerita() {
+      return Math.max(1, Math.ceil(this.beritaTersaring.length / this.perHalaman));
+    },
+
     get beritaTampil() {
-      const semua = this.beritaTersaring;
-      if (this.semuaBerita || !this.layarSempit) return semua;
-      return semua.slice(0, 4);
+      const mulai = (this.halamanBerita - 1) * this.perHalaman;
+      return this.beritaTersaring.slice(mulai, mulai + this.perHalaman);
+    },
+
+    gantiHalamanBerita(arah) {
+      const tujuan = this.halamanBerita + arah;
+      if (tujuan < 1 || tujuan > this.totalHalamanBerita) return;
+      this.halamanBerita = tujuan;
+      // Ikon Lucide perlu digambar ulang untuk baris yang baru muncul.
+      if (this.$nextTick) this.$nextTick(() => this.gambarIkon());
     },
 
     get pernyataanTampil() {
-      const semua = this.data?.statements || [];
+      const semua = (this.data?.statements || []).filter(
+        (s) => s.tokoh && !['tidak disebutkan', 'tidak diketahui'].includes(String(s.tokoh).toLowerCase())
+      );
       if (this.semuaPernyataan || !this.layarSempit) return semua;
       return semua.slice(0, 3);
     },

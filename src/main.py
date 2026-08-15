@@ -88,8 +88,13 @@ def _konteks_llm(
     """
     return {
         "harga": price,
+        # SELURUH timeframe dikirim. Sebelumnya 1H dihilangkan, padahal
+        # langkah interpretasi teknikal menerimanya dan menulis angka 1H di
+        # narasinya — critic lalu tidak bisa memverifikasi angka itu dan
+        # menandainya sebagai karangan.
         "teknikal_1d": teknikal.get("1d"),
         "teknikal_4h": teknikal.get("4h"),
+        "teknikal_1h": teknikal.get("1h"),
         "level_kunci": teknikal.get("key_levels"),
         "sinyal_oi": {
             "sinyal": teknikal.get("oi_price_signal"),
@@ -358,8 +363,10 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     # -- 12-15. Rangkaian LLM analitis -------------------------------------
     ai: Dict[str, Any] = {
         "narrative": "",
+        "bagian": {},
         "narrative_singkat": "",
         "penyebab_pergerakan": [],
+        "bagian_ditahan": [],
         "teknikal": None,
         "whale": None,
         "outlook": None,
@@ -422,14 +429,51 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
 
         if any(teks_diperiksa.values()):
             log.info("[19/21] LLM critic")
-            hasil_critic = news_analysis.critic(
-                client, cfg.llm_models("critic"), teks_diperiksa, konteks
+            # Critic memeriksa dengan data yang PERSIS SAMA dengan yang
+            # dipakai synthesis. Kalau critic melihat lebih sedikit, angka
+            # yang sah akan divonis karangan.
+            #
+            # Modelnya juga disaring agar tidak sekeluarga dengan model yang
+            # BENAR-BENAR melayani synthesis — config boleh mendaftarkan
+            # cadangan yang bertumpang tindih, yang penting hasil akhirnya
+            # tetap diperiksa pihak yang berbeda.
+            model_critic = news_analysis.pilih_model_critic(
+                cfg.llm_models("critic"), client.model_terpakai("synthesis")
             )
+            hasil_critic = news_analysis.critic(
+                client, model_critic, teks_diperiksa, konteks_sintesis
+            )
+
+            # Satu putaran perbaikan sebelum menyerah. Menahan seluruh analisa
+            # karena beberapa kalimat bermasalah membuang juga bagian yang
+            # benar — dan tokennya sudah telanjur dibayar.
+            if not hasil_critic["passed"] and hasil_sintesis:
+                log.info("[19b/21] Critic menolak; mencoba satu putaran revisi")
+                narasi_revisi = news_analysis.revisi_narasi(
+                    client,
+                    cfg.llm_models("synthesis"),
+                    hasil_sintesis["narrative"],
+                    hasil_critic["corrections"],
+                    konteks_sintesis,
+                )
+                if narasi_revisi:
+                    hasil_sintesis["narrative"] = narasi_revisi
+                    teks_diperiksa["narasi_utama"] = narasi_revisi
+                    hasil_critic = news_analysis.critic(
+                        client, model_critic, teks_diperiksa, konteks_sintesis
+                    )
+                    if hasil_critic["passed"]:
+                        log.info("Revisi lolos pemeriksaan critic")
+                        catatan.append("Narasi AI melewati satu putaran revisi otomatis.")
+                    else:
+                        log.warning("Revisi masih belum lolos critic")
+
             ai["critic"] = hasil_critic
 
             if hasil_critic["passed"]:
                 if hasil_sintesis:
                     ai["narrative"] = hasil_sintesis["narrative"]
+                    ai["bagian"] = hasil_sintesis.get("bagian") or {}
                     ai["narrative_singkat"] = _ringkas_narasi(hasil_sintesis["narrative"])
                     ai["penyebab_pergerakan"] = hasil_sintesis["penyebab_pergerakan"]
                     if hasil_sintesis["dominant_themes"]:
@@ -443,8 +487,42 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
                 ai["whale"] = hasil_whale_ai
                 ai["outlook"] = hasil_outlook
             else:
-                catatan.append("Seluruh analisa AI ditahan karena tidak lolos pemeriksaan critic.")
-                log.warning("Analisa AI ditahan — brief dikirim tanpa bagian AI")
+                # Hanya bagian yang benar-benar ditandai fatal yang ditahan.
+                # Menahan semuanya berarti pembaca kehilangan analisa teknikal
+                # dan outlook yang mungkin sama sekali tidak bermasalah.
+                bermasalah = {
+                    c.get("bagian", "") for c in hasil_critic["corrections"]
+                    if c.get("keparahan") == "fatal"
+                }
+                peta = {
+                    "narasi_utama": "narasi",
+                    "interpretasi_teknikal": "teknikal",
+                    "analisa_whale": "whale",
+                    "outlook": "outlook",
+                    "outlook_skenario": "outlook",
+                }
+                ditahan = {peta.get(b) for b in bermasalah if peta.get(b)}
+                # Temuan tanpa nama bagian tidak bisa dilokalisasi; amannya
+                # menahan narasi utama saja.
+                if not ditahan:
+                    ditahan = {"narasi"}
+
+                if "narasi" not in ditahan and hasil_sintesis:
+                    ai["narrative"] = hasil_sintesis["narrative"]
+                    ai["bagian"] = hasil_sintesis.get("bagian") or {}
+                    ai["narrative_singkat"] = _ringkas_narasi(hasil_sintesis["narrative"])
+                    ai["penyebab_pergerakan"] = hasil_sintesis["penyebab_pergerakan"]
+                if "teknikal" not in ditahan:
+                    ai["teknikal"] = hasil_teknikal
+                if "whale" not in ditahan:
+                    ai["whale"] = hasil_whale_ai
+                if "outlook" not in ditahan:
+                    ai["outlook"] = hasil_outlook
+
+                ai["bagian_ditahan"] = sorted(ditahan)
+                pesan = "Bagian AI yang ditahan critic: " + ", ".join(sorted(ditahan))
+                catatan.append(pesan)
+                log.warning("%s (sisanya tetap dikirim)", pesan)
 
             ai["model_used"] = ", ".join(client.models_used) or None
             ai["generated_at"] = iso_utc(now_utc())

@@ -475,7 +475,9 @@ def analisa_pernyataan(
         "pernyataan, kebijakan, atau keputusan dari seorang tokoh?\n"
         "  - Artikel yang hanya MENYEBUT nama tokoh tanpa pernyataannya -> relevansi_btc 0\n"
         "  - Analisa jurnalis tentang tokoh, bukan ucapan tokohnya -> relevansi_btc 0\n"
-        "  - Berita lama yang diulang tanpa perkembangan baru -> relevansi_btc 0\n\n"
+        "  - Berita lama yang diulang tanpa perkembangan baru -> relevansi_btc 0\n"
+        "  - Pernyataan yang tidak jelas siapa yang mengucapkannya -> relevansi_btc 0, "
+        "karena pembaca tidak bisa menimbang bobotnya\n\n"
         "Kalau ADA pernyataannya, isi field berikut.\n\n"
         "Balas array JSON, satu objek per item:\n"
         "  id (string, sama persis dengan input)\n"
@@ -546,6 +548,14 @@ def analisa_pernyataan(
             relevansi = 0
         if relevansi < min_relevansi:
             continue
+
+        # Tanpa tokoh yang teridentifikasi, sebuah "pernyataan" tidak bisa
+        # ditimbang pembaca — siapa yang bicara menentukan bobotnya.
+        tokoh = analisa.get("tokoh") or k.get("tokoh")
+        if not tokoh or str(tokoh).strip().lower() in (
+            "", "tidak disebutkan", "tidak diketahui", "null", "none", "unknown"
+        ):
+            continue
         try:
             kekuatan = max(1, min(5, int(analisa.get("kekuatan"))))
         except (TypeError, ValueError):
@@ -553,7 +563,7 @@ def analisa_pernyataan(
 
         keluaran.append({
             "id": k["id"],
-            "tokoh": (str(analisa["tokoh"])[:80] if analisa.get("tokoh") else k.get("tokoh")),
+            "tokoh": str(tokoh)[:80],
             "kutipan": str(analisa["kutipan"])[:500] if analisa.get("kutipan") else None,
             "ringkasan": str(analisa.get("ringkasan_id", ""))[:400] or None,
             "topik": enum(analisa.get("topik"), TOPIK_PERNYATAAN),
@@ -831,6 +841,61 @@ def outlook(
     }
 
 
+def revisi_narasi(
+    client: LLMClient,
+    models: List[str],
+    narasi: str,
+    koreksi: List[Dict[str, Any]],
+    konteks: Dict[str, Any],
+) -> Optional[str]:
+    """Perbaiki narasi berdasarkan temuan critic, satu putaran saja.
+
+    Menahan seluruh analisa hanya karena beberapa kalimat bermasalah itu
+    merugikan pembaca: bagian yang benar ikut hilang. Memperbaiki jauh lebih
+    murah daripada kehilangan seluruh keluaran yang sudah dibayar.
+    """
+    if not narasi or not koreksi:
+        return None
+
+    daftar = "\n".join(
+        f"- [{k.get('keparahan')}] {k.get('jenis')}: \"{k.get('kutipan', '')}\" "
+        f"— {k.get('alasan', '')}"
+        for k in koreksi[:10]
+    )
+    system = (
+        "Kamu editor yang memperbaiki analisa pasar. Kamu menerima sebuah narasi, "
+        "daftar temuan pemeriksa fakta, dan data mentah sumbernya.\n\n"
+        "Perbaiki HANYA bagian yang bermasalah:\n"
+        "  - Angka yang tidak ada di data: hapus, atau ganti dengan angka yang "
+        "    benar-benar ada di data\n"
+        "  - Saran investasi atau target harga: tulis ulang jadi pernyataan "
+        "    kondisi, tanpa mengajak bertransaksi\n"
+        "  - Klaim sebab-akibat tanpa dukungan: turunkan jadi pengamatan, atau "
+        "    nyatakan terus terang bahwa penyebabnya tidak jelas dari data\n\n"
+        "Pertahankan struktur, panjang, gaya, dan seluruh bagian yang tidak "
+        "bermasalah PERSIS seperti aslinya. Jangan menulis ulang dari nol.\n\n"
+        "Balas objek JSON: {\"narrative\": \"teks yang sudah diperbaiki\"}\n\n"
+        + ATURAN_DASAR
+    )
+    user = (
+        "TEMUAN PEMERIKSA:\n" + daftar + "\n\n"
+        "NARASI YANG DIPERBAIKI:\n" + narasi + "\n\n"
+        "DATA MENTAH:\n" + json.dumps(konteks, ensure_ascii=False, default=str)
+    )
+    try:
+        hasil = client.chat_json(
+            models, system, user, step="revisi", temperature=0.2, max_tokens=10000
+        )
+    except (LLMError, BudgetExceeded) as exc:
+        log.warning("Revisi narasi gagal: %s", exc)
+        return None
+
+    if not isinstance(hasil, dict) or not hasil.get("narrative"):
+        log.warning("Revisi mengembalikan struktur tak terduga")
+        return None
+    return str(hasil["narrative"]).strip()
+
+
 # --------------------------------------------------------------------------
 # LLM #4 — sintesis narasi
 # --------------------------------------------------------------------------
@@ -838,37 +903,83 @@ def sintesis(
     client: LLMClient, models: List[str], konteks: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
     system = (
-        "Kamu penulis analisa pasar Bitcoin untuk pembaca Indonesia.\n\n"
-        "Tulis analisa MENDALAM 6-9 paragraf. Ini bukan ringkasan singkat — pembaca "
-        "ingin MENGERTI apa yang terjadi dan MENGAPA.\n\n"
-        "Struktur yang harus kamu ikuti:\n"
-        "  1. Apa yang terjadi pada harga (arah, besaran, dari data)\n"
-        "  2. MENGAPA — ini bagian terpenting. Kalau pasar turun, jelaskan apa yang "
-        "     menyebabkannya; kalau naik, jelaskan pendorongnya. Rangkai dari berita, "
-        "     makro, posisi derivatif, dan aliran dana yang ada di data. Bedakan sebab "
-        "     yang DIDUKUNG data dari yang sekadar bertepatan waktu.\n"
-        "  3. Apa kata struktur teknikal terhadap cerita itu — apakah menguatkan atau "
-        "     justru bertentangan\n"
-        "  4. Apa yang dilakukan pemain besar versus ritel, kalau datanya tersedia\n"
-        "  5. Konteks makro dan geopolitik yang membingkai semuanya\n"
-        "  6. Apa yang berubah dibanding brief sebelumnya\n\n"
-        "ATURAN SEBAB-AKIBAT (kritikal):\n"
-        "  - Setiap klaim sebab harus bisa ditelusuri ke item di data yang diberikan\n"
-        "  - Kalau penyebabnya tidak jelas, TULIS BEGITU: \"pergerakan ini tidak punya "
-        "    pemicu tunggal yang jelas di data hari ini\"\n"
-        "  - Korelasi bukan sebab-akibat. Jangan menyimpulkan A menyebabkan B hanya "
-        "    karena keduanya terjadi bersamaan\n"
-        "  - Sebutkan angka konkret dari data. JANGAN mengarang angka baru\n\n"
-        "Balas objek JSON dengan field:\n"
-        "  narrative: string, 6-9 paragraf dipisah \\n\\n, bahasa Indonesia\n"
-        "  penyebab_pergerakan: array objek {\"faktor\": \"...\", \"arah\": \"naik|turun|netral\", "
-        "\"keyakinan\": \"tinggi|sedang|rendah\", \"dasar\": \"data apa yang mendukung\"}, "
-        "urut dari yang paling berpengaruh, maksimal 5\n"
+        "PERAN\n"
+        "Kamu analis pasar crypto senior yang menulis untuk investor ritel serius. "
+        "Pembacamu bukan trader harian — mereka punya posisi jangka menengah dan "
+        "butuh memahami MENGAPA harga bergerak, bukan sekadar BAHWA harga bergerak.\n\n"
+        "Tugasmu bukan meramal harga. Tugasmu menjelaskan rantai sebab-akibat yang "
+        "menggerakkan pasar, memisahkan sinyal dari kebisingan, lalu menutup dengan "
+        "kesimpulan yang tenang.\n\n"
+
+        "PRINSIP INTI\n\n"
+        "1. Jelaskan rantai transmisi, bukan korelasi permukaan.\n"
+        "   Jangan berhenti di 'BTC turun karena sentimen negatif'. Telusuri:\n"
+        "   minyak naik -> ekspektasi inflasi naik -> peluang Fed menaikkan suku "
+        "bunga naik -> yield naik -> dolar menguat -> aset berisiko tertekan.\n"
+        "   Rantai yang perlu kamu kuasai: energi->inflasi->Fed->aset berisiko; "
+        "data tenaga kerja lemah->ekspektasi hike turun->BTC naik; saham AI/chip->"
+        "selera risiko->crypto; dolar menguat->BTC tertekan; arus ETF->permintaan "
+        "marginal->harga.\n\n"
+
+        "2. Angka spesifik, bukan kata sifat.\n"
+        "   Buruk: 'ETF mencatat inflow yang kuat'.\n"
+        "   Baik: 'ETF mencatat inflow $265,7 juta, hari positif pertama setelah "
+        "11 sesi jual berturut-turut'.\n"
+        "   Setiap klaim penting wajib berangka, dan angkanya HARUS dari data yang "
+        "diberikan.\n\n"
+
+        "3. Bedakan 'sudah tercermin di harga' dari 'kejutan'.\n"
+        "   Pasar bergerak pada selisih antara kenyataan dan ekspektasi, bukan pada "
+        "baik/buruknya berita. Berita buruk yang sudah diantisipasi sering direspons "
+        "kecil atau malah naik. Bandingkan aktual vs konsensus, bukan vs bulan lalu.\n\n"
+
+        "4. Bedakan pergerakan teknikal dari fundamental.\n"
+        "   KALAU TIDAK ADA KATALIS BERITA, KATAKAN BEGITU — jangan mengarang narasi. "
+        "Penyebab mekanis yang sering terjadi: short squeeze, likuidasi long "
+        "beruntun, tarikan ke max pain menjelang expiry opsi, pengurangan posisi "
+        "menjelang FOMC/CPI, pantulan oversold, rebalancing akhir bulan.\n"
+        "   Frasa yang berguna: 'Tidak ada katalis berita spesifik dalam 24 jam "
+        "terakhir; pergerakan ini konsisten dengan [mekanisme], bukan perubahan "
+        "fundamental.'\n\n"
+
+        "5. Selalu sajikan sisi lawan.\n"
+        "   Kalau nadanya condong menguat, sebutkan apa yang bisa membatalkannya. "
+        "Kalau melemah, sebutkan apa yang menahan penurunan.\n\n"
+
+        "STRUKTUR — isi setiap field ini:\n"
+        "  judul: temuan utama, BUKAN 'Update Harga BTC'. Mulai dari temuannya.\n"
+        "  posisi_harga: angka terkini, perubahan 24 jam, konteks jarak ke "
+        "support/resistance kunci (2-3 kalimat)\n"
+        "  penyebab: rantai sebab-akibat lengkap dengan angka pendukung. Kalau "
+        "penyebabnya teknikal, katakan itu teknikal. (2-4 paragraf)\n"
+        "  data_pendukung: array 2-4 poin berangka (arus ETF, likuidasi, on-chain, "
+        "posisi opsi, sentimen, premium Coinbase)\n"
+        "  peta_level: support & resistance konkret dari data, plus arti masing-"
+        "masing kalau ditembus (1-2 paragraf)\n"
+        "  yang_diwaspadai: argumen penyeimbang dan risiko yang belum tercermin di "
+        "harga (1-2 paragraf)\n"
+        "  katalis_berikutnya: array agenda dari data, sudah dalam WIB\n"
+        "  kesimpulan: 2-3 kalimat. Apa artinya. Seringkali kesimpulan terbaik "
+        "adalah 'belum ada yang perlu dilakukan'.\n"
+        "  penyebab_pergerakan: array objek {\"faktor\", \"arah\": naik|turun|netral, "
+        "\"keyakinan\": tinggi|sedang|rendah, \"dasar\": data pendukungnya}, "
+        "maksimal 5, urut dari yang paling berpengaruh\n"
         "  dominant_themes: array 2-3 string pendek\n"
-        "  narrative_shift: string, apa yang berubah dibanding brief sebelumnya (null kalau tidak ada pembanding)\n"
-        "  conflicts: array string, sinyal yang saling bertentangan (array kosong kalau tidak ada)\n\n"
-        "Nada tulisan: tenang, deskriptif, tidak mengajak transaksi. Jangan menulis "
-        "kalimat yang menyarankan pembaca membeli, menjual, atau menunggu harga tertentu.\n\n"
+        "  narrative_shift: apa yang berubah dibanding brief sebelumnya (null kalau "
+        "tidak ada pembanding)\n"
+        "  conflicts: array string sinyal yang saling bertentangan\n\n"
+        "Total panjang gabungan 400-700 kata.\n\n"
+
+        "NADA\n"
+        "Wajib: bahasa Indonesia jernih, jargon dijelaskan saat pertama muncul; "
+        "jujur saat data tidak ada ('saya belum menemukan katalis spesifik untuk "
+        "pergerakan ini' jauh lebih baik daripada mengarang); setiap probabilitas "
+        "disebut sebagai estimasi; tutup dengan sikap tenang.\n"
+        "Dilarang: kata hype ('meledak', 'roket', 'cuan besar', 'jangan sampai "
+        "ketinggalan'); prediksi harga sebagai kepastian; rekomendasi beli/jual "
+        "langsung; mengabaikan berita buruk demi narasi yang enak dibaca.\n"
+        "Hindari pembuka basi seperti 'Pasar crypto kembali bergejolak hari ini'. "
+        "Mulai langsung dari temuannya.\n\n"
         + ATURAN_DASAR
     )
     try:
@@ -884,70 +995,157 @@ def sintesis(
         log.warning("Sintesis narasi gagal: %s", exc)
         return None
 
-    if not isinstance(hasil, dict) or not hasil.get("narrative"):
+    if not isinstance(hasil, dict):
         log.warning("Sintesis mengembalikan struktur tak terduga")
         return None
 
-    themes = hasil.get("dominant_themes")
-    conflicts = hasil.get("conflicts")
+    def teks(kunci: str, batas: int = 4000) -> str:
+        nilai = hasil.get(kunci)
+        return str(nilai).strip()[:batas] if nilai else ""
+
+    def daftar(kunci: str, batas_item: int, batas_teks: int = 400) -> List[str]:
+        nilai = hasil.get(kunci)
+        if not isinstance(nilai, list):
+            return []
+        return [str(x)[:batas_teks] for x in nilai[:batas_item] if x]
+
+    bagian = {
+        "judul": teks("judul", 200),
+        "posisi_harga": teks("posisi_harga"),
+        "penyebab": teks("penyebab"),
+        "data_pendukung": daftar("data_pendukung", 4),
+        "peta_level": teks("peta_level"),
+        "yang_diwaspadai": teks("yang_diwaspadai"),
+        "katalis_berikutnya": daftar("katalis_berikutnya", 5),
+        "kesimpulan": teks("kesimpulan", 1000),
+    }
+
+    # Tanpa inti analisa, keluarannya tidak layak kirim.
+    if not (bagian["penyebab"] or bagian["posisi_harga"]):
+        log.warning("Sintesis tidak memuat bagian inti (penyebab/posisi harga)")
+        return None
+
+    # Narasi datar dirakit dari bagian-bagian di atas supaya konsumen lama
+    # (Telegram, arsip) tetap punya satu blok teks yang utuh dan berurutan.
+    potongan: List[str] = []
+    if bagian["posisi_harga"]:
+        potongan.append(bagian["posisi_harga"])
+    if bagian["penyebab"]:
+        potongan.append(bagian["penyebab"])
+    if bagian["data_pendukung"]:
+        potongan.append("Data pendukung: " + "; ".join(bagian["data_pendukung"]))
+    if bagian["peta_level"]:
+        potongan.append(bagian["peta_level"])
+    if bagian["yang_diwaspadai"]:
+        potongan.append("Yang perlu diwaspadai: " + bagian["yang_diwaspadai"])
+    if bagian["kesimpulan"]:
+        potongan.append(bagian["kesimpulan"])
+    narrative = "\n\n".join(potongan)
 
     penyebab = []
-    for p in (hasil.get("penyebab_pergerakan") or [])[:5]:
-        if not isinstance(p, dict):
+    for pp in (hasil.get("penyebab_pergerakan") or [])[:5]:
+        if not isinstance(pp, dict):
             continue
-        arah = p.get("arah")
-        keyakinan = p.get("keyakinan")
+        arah = pp.get("arah")
+        keyakinan = pp.get("keyakinan")
         penyebab.append({
-            "faktor": str(p.get("faktor", ""))[:200],
+            "faktor": str(pp.get("faktor", ""))[:200],
             "arah": arah if arah in ("naik", "turun", "netral") else "netral",
             "keyakinan": keyakinan if keyakinan in ("tinggi", "sedang", "rendah") else "rendah",
-            "dasar": str(p.get("dasar", ""))[:300],
+            "dasar": str(pp.get("dasar", ""))[:300],
         })
 
+    themes = hasil.get("dominant_themes")
+    conflicts = hasil.get("conflicts")
     return {
-        "narrative": str(hasil["narrative"]).strip(),
+        "narrative": narrative,
+        "bagian": bagian,
         "penyebab_pergerakan": penyebab,
         "dominant_themes": [str(t)[:60] for t in themes[:3]] if isinstance(themes, list) else [],
-        "narrative_shift": str(hasil["narrative_shift"])[:500] if hasil.get("narrative_shift") else "",
-        "conflicts": [str(c)[:300] for c in conflicts[:5]] if isinstance(conflicts, list) else [],
+        "narrative_shift": teks("narrative_shift", 500),
+        "conflicts": daftar("conflicts", 5, 300),
     }
 
 
 # --------------------------------------------------------------------------
 # LLM #5 — critic
 # --------------------------------------------------------------------------
+def pilih_model_critic(
+    models: List[str], model_synthesis: Optional[str]
+) -> List[str]:
+    """Saring model critic supaya tidak sekeluarga dengan synthesis.
+
+    Config boleh saja mendaftarkan cadangan yang sekeluarga dengan critic —
+    yang penting adalah model yang AKHIRNYA dipakai berbeda. Kalau synthesis
+    jatuh ke cadangannya, pilihan critic ikut digeser di sini.
+    """
+    if not model_synthesis:
+        return models
+    keluarga = model_synthesis.split("/")[0]
+    tersaring = [m for m in models if m.split("/")[0] != keluarga]
+    if not tersaring:
+        log.warning(
+            "Semua model critic sekeluarga dengan synthesis (%s); "
+            "pemeriksaan jadi kurang independen",
+            keluarga,
+        )
+        return models
+    if len(tersaring) < len(models):
+        log.info("Model critic disaring agar beda keluarga dari synthesis (%s)", keluarga)
+    return tersaring
+
+
 def critic(
     client: LLMClient, models: List[str], teks_ai: Dict[str, str], data_mentah: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Periksa SELURUH keluaran naratif AI terhadap data mentah sumbernya."""
     system = (
-        "Kamu pemeriksa fakta yang ketat. Kamu diberi beberapa bagian teks analisa "
-        "pasar beserta data mentah yang menjadi sumbernya. Periksa setiap bagian "
-        "terhadap data.\n\n"
-        "Cari empat jenis masalah:\n"
-        "  1. angka_karangan: angka di teks yang tidak ada di data mentah\n"
-        "  2. sebab_akibat: klaim sebab-akibat yang tidak didukung data\n"
-        "  3. saran_investasi: rekomendasi beli/jual, target harga, atau ajakan transaksi\n"
-        "  4. pengetahuan_luar: klaim faktual tentang peristiwa yang tidak ada di data "
-        "     (model mengarang dari ingatan masa pelatihannya)\n\n"
-        "PEMBEDAAN PENTING — jangan salah menandai:\n"
-        "  - BOLEH: skenario kondisional yang merujuk level dari data, misalnya "
-        "    \"selama bertahan di atas 116.500, kondisi X cenderung berlanjut\". "
-        "    Level itu ADA di data, dan kalimatnya menjelaskan kondisi, bukan menyuruh.\n"
-        "  - TIDAK BOLEH: target harga (\"menuju 130.000\"), ramalan arah "
-        "    (\"akan naik minggu depan\"), atau ajakan (\"saatnya akumulasi\").\n"
-        "  - BOLEH: menyatakan ketidakpastian (\"penyebabnya tidak jelas dari data hari ini\").\n"
-        "  - BOLEH: menyebut pola whale sebagai kemungkinan berkeyakinan rendah, "
-        "    selama tidak dinyatakan sebagai fakta pasti.\n\n"
-        "Kategori keparahan:\n"
-        "  fatal  = angka karangan, saran investasi, target harga, atau pengetahuan luar "
-        "           yang disajikan sebagai fakta\n"
-        "  minor  = klaim sebab-akibat yang terlalu percaya diri tapi tidak menyesatkan\n\n"
+        "Kamu pemeriksa fakta untuk laporan pasar. Kamu diberi beberapa bagian "
+        "teks analisa beserta data mentah yang menjadi sumbernya. Tugasmu "
+        "menemukan klaim yang TIDAK BISA didukung data itu.\n\n"
+
+        "YANG SAH DAN TIDAK BOLEH KAMU TANDAI:\n"
+        "  - Angka yang DITURUNKAN dari data: selisih, jumlah, rasio, persentase "
+        "    perubahan antara dua nilai yang ada. Kalau data memuat 100 dan 110, "
+        "    menulis 'naik 10%' itu benar, bukan karangan.\n"
+        "  - Pembulatan dan format berbeda: 4,21 vs 4.2 vs 4,2% adalah angka yang sama.\n"
+        "  - Angka yang muncul di BAGIAN MANA PUN dari data, termasuk di dalam "
+        "    objek interpretasi_teknikal, analisa_whale, teknikal_1h, teknikal_4h, "
+        "    opsi_deribit, valuasi_onchain, dan aliran_dana. Periksa SELURUH data "
+        "    sebelum menyimpulkan sebuah angka tidak ada.\n"
+        "  - Skenario kondisional yang merujuk level dari data: 'selama bertahan "
+        "    di atas 116.500, kondisi X cenderung berlanjut'.\n"
+        "  - Pernyataan ketidakpastian: 'penyebabnya tidak jelas dari data hari ini'.\n"
+        "  - Penyebutan pola sebagai kemungkinan berkeyakinan rendah.\n"
+        "  - Istilah teknis umum yang tidak memerlukan angka.\n\n"
+
+        "YANG HARUS KAMU TANDAI:\n"
+        "  1. angka_karangan: angka yang setelah kamu telusuri SELURUH data "
+        "     memang tidak ada dan tidak bisa diturunkan dari data\n"
+        "  2. sebab_akibat: klaim sebab-akibat tanpa dukungan sama sekali\n"
+        "  3. saran_investasi: rekomendasi beli/jual, target harga eksplisit "
+        "     ('menuju 130.000'), atau ajakan bertransaksi\n"
+        "  4. pengetahuan_luar: peristiwa konkret yang tidak ada di data sama sekali\n\n"
+
+        "KEPARAHAN — pakai dengan hemat:\n"
+        "  fatal = HANYA untuk saran investasi, target harga eksplisit, atau angka "
+        "          yang jelas-jelas karangan setelah kamu benar-benar mencarinya\n"
+        "  minor = semua sisanya, termasuk klaim yang terlalu percaya diri\n\n"
+        "KALAU RAGU, PILIH minor. Menahan seluruh analisa karena keraguan yang "
+        "tidak pasti jauh lebih merugikan pembaca daripada membiarkan satu "
+        "kalimat yang agak longgar lewat.\n\n"
+
+        "Untuk setiap temuan, WAJIB sebutkan di field `dicari_di` bagian data mana "
+        "yang sudah kamu periksa. Kalau kamu tidak bisa menyebutkannya, berarti "
+        "kamu belum benar-benar mencari — turunkan jadi minor.\n\n"
+
         "Balas objek JSON:\n"
-        "  {\"passed\": bool, \"corrections\": [{\"jenis\": \"...\", \"keparahan\": \"fatal|minor\", "
-        "\"bagian\": \"nama bagian yang bermasalah\", \"kutipan\": \"...\", \"alasan\": \"...\"}]}\n\n"
+        "  {\"passed\": bool, \"corrections\": [{\"jenis\": \"...\", "
+        "\"keparahan\": \"fatal|minor\", \"bagian\": \"nama bagian\", "
+        "\"kutipan\": \"...\", \"alasan\": \"...\", \"dicari_di\": \"...\"}]}\n\n"
         "passed bernilai false HANYA kalau ada koreksi berkeparahan fatal.\n"
-        "Kalau semua bagian bersih, balas {\"passed\": true, \"corrections\": []}.\n\n" + ATURAN_DASAR
+        "Kalau semua bersih, balas {\"passed\": true, \"corrections\": []}.\n\n"
+        + ATURAN_DASAR
     )
     bagian = "\n\n".join(
         f"=== BAGIAN: {nama} ===\n{isi}" for nama, isi in teks_ai.items() if isi
@@ -981,6 +1179,7 @@ def critic(
                 "bagian": str(c.get("bagian", ""))[:60],
                 "kutipan": str(c.get("kutipan", ""))[:200],
                 "alasan": str(c.get("alasan", ""))[:300],
+                "dicari_di": str(c.get("dicari_di", ""))[:200],
             }
         )
 
@@ -988,5 +1187,11 @@ def critic(
     passed = bool(hasil.get("passed", True)) and not ada_fatal
 
     if not passed:
-        log.warning("Critic menolak narasi: %d koreksi fatal", sum(c["keparahan"] == "fatal" for c in bersih))
+        fatal = [c for c in bersih if c["keparahan"] == "fatal"]
+        log.warning("Critic menolak narasi: %d koreksi fatal", len(fatal))
+        for c in fatal[:5]:
+            log.warning(
+                "  fatal [%s] %s | kutipan: %s | alasan: %s",
+                c.get("bagian") or "?", c["jenis"], c["kutipan"][:80], c["alasan"][:120],
+            )
     return {"passed": passed, "corrections": bersih, "dijalankan": True}

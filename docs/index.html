@@ -662,7 +662,7 @@
           </div>
 
           <!-- Critic gagal: sembunyikan narasi, tampilkan peringatan -->
-          <template x-if="data.ai.critic && data.ai.critic.passed === false">
+          <template x-if="data.ai.critic && data.ai.critic.passed === false && !adaBagianDitahan">
             <div class="mt-4 rounded-lg border border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 p-4">
               <div class="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-200">
                 <i data-lucide="shield-alert" class="w-4 h-4"></i> Analisa AI ditahan
@@ -678,7 +678,36 @@
             </div>
           </template>
 
-          <template x-if="data.ai.critic?.passed !== false && data.ai.narrative">
+          <template x-if="bagianAiTampil('narasi') && data.ai.bagian?.judul">
+            <h3 class="mt-4 text-lg font-bold leading-snug" x-text="data.ai.bagian.judul"></h3>
+          </template>
+
+          <template x-if="bagianAiTampil('narasi') && adaBagianTerstruktur">
+            <div class="mt-3 space-y-4 text-[15px] leading-relaxed text-slate-800 dark:text-slate-100">
+              <template x-for="b in bagianAnalis" :key="b.kunci">
+                <div>
+                  <h4 class="text-xs font-semibold uppercase tracking-wide text-indigo-900/60 dark:text-indigo-200/60 mb-1"
+                      x-text="b.label"></h4>
+                  <template x-if="b.tipe === 'teks'">
+                    <div class="space-y-2">
+                      <template x-for="(par, i) in b.nilai.split(/\n{2,}/)" :key="i">
+                        <p x-text="par"></p>
+                      </template>
+                    </div>
+                  </template>
+                  <template x-if="b.tipe === 'daftar'">
+                    <ul class="space-y-1">
+                      <template x-for="(item, i) in b.nilai" :key="i">
+                        <li class="flex gap-2"><span class="text-slate-300 dark:text-slate-600">•</span><span x-text="item"></span></li>
+                      </template>
+                    </ul>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <template x-if="bagianAiTampil('narasi') && !adaBagianTerstruktur && data.ai.narrative">
             <div class="mt-4 space-y-3 text-[15px] leading-relaxed text-slate-800 dark:text-slate-100">
               <template x-for="(p, i) in paragrafNarasi" :key="i">
                 <p x-text="p"></p>
@@ -687,7 +716,7 @@
           </template>
 
           <!-- Penyebab pergerakan -->
-          <template x-if="data.ai.critic?.passed !== false && data.ai.penyebab_pergerakan?.length">
+          <template x-if="bagianAiTampil('narasi') && data.ai.penyebab_pergerakan?.length">
             <div class="mt-5 pt-4 border-t border-indigo-200 dark:border-indigo-700/50">
               <h3 class="text-xs font-semibold uppercase tracking-wide text-indigo-900/60 dark:text-indigo-200/60 mb-2">
                 Penyebab pergerakan
@@ -712,7 +741,7 @@
           </template>
 
           <!-- Pembacaan teknikal oleh AI -->
-          <template x-if="data.ai.critic?.passed !== false && data.ai.teknikal">
+          <template x-if="bagianAiTampil('teknikal') && data.ai.teknikal">
             <div class="mt-5 pt-4 border-t border-indigo-200 dark:border-indigo-700/50">
               <h3 class="text-xs font-semibold uppercase tracking-wide text-indigo-900/60 dark:text-indigo-200/60 mb-2 flex items-center gap-2">
                 Pembacaan teknikal
@@ -768,7 +797,7 @@
           </template>
 
           <!-- Analisa whale & sinyal palsu -->
-          <template x-if="data.ai.critic?.passed !== false && data.ai.whale">
+          <template x-if="bagianAiTampil('whale') && data.ai.whale">
             <div class="mt-5 pt-4 border-t border-indigo-200 dark:border-indigo-700/50">
               <h3 class="text-xs font-semibold uppercase tracking-wide text-indigo-900/60 dark:text-indigo-200/60 mb-2 flex items-center gap-2">
                 Pemain besar &amp; sinyal palsu
@@ -804,7 +833,7 @@
           </template>
 
           <!-- Outlook ke depan -->
-          <template x-if="data.ai.critic?.passed !== false && data.ai.outlook">
+          <template x-if="bagianAiTampil('outlook') && data.ai.outlook">
             <div class="mt-5 pt-4 border-t border-indigo-200 dark:border-indigo-700/50">
               <h3 class="text-xs font-semibold uppercase tracking-wide text-indigo-900/60 dark:text-indigo-200/60 mb-2 flex items-center gap-2">
                 Pandangan ke depan
@@ -872,7 +901,7 @@
             </div>
           </template>
 
-          <template x-if="data.ai.critic?.passed !== false && !data.ai.narrative">
+          <template x-if="bagianAiTampil('narasi') && !data.ai.narrative">
             <p class="mt-4 text-sm text-slate-600 dark:text-slate-300">
               Analisa AI tidak tersedia pada run ini.
             </p>
@@ -1008,10 +1037,21 @@
             </template>
           </ul>
 
-          <template x-if="beritaTersaring.length > beritaTampil.length || semuaBerita">
-            <button @click="semuaBerita = !semuaBerita"
-                    class="mt-3 w-full sm:w-auto px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition"
-                    x-text="semuaBerita ? 'Tampilkan lebih sedikit' : ('Tampilkan semua ' + beritaTersaring.length + ' berita')"></button>
+          <template x-if="totalHalamanBerita > 1">
+            <div class="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+              <button @click="gantiHalamanBerita(-1)" :disabled="halamanBerita === 1"
+                      class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Sebelumnya</span>
+              </button>
+              <span class="text-sm text-slate-500 dark:text-slate-400 text-center"
+                    x-text="'Halaman ' + halamanBerita + ' dari ' + totalHalamanBerita + ' · ' + beritaTersaring.length + ' berita'"></span>
+              <button @click="gantiHalamanBerita(1)" :disabled="halamanBerita === totalHalamanBerita"
+                      class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                <span class="hidden sm:inline">Berikutnya</span>
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </button>
+            </div>
           </template>
         </section>
 

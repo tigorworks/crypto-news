@@ -66,6 +66,34 @@ Ditambah divergensi posisi: Binance memisahkan statistik *top trader* (proksi pe
 
 Semua ini disajikan sebagai **petunjuk probabilistik, bukan bukti**. Prompt secara eksplisit melarang model mengarang cerita manipulasi dari sinyal yang tipis, dan setiap temuan wajib menyertakan tingkat keyakinan.
 
+### Bentuk analisa harian
+
+Narasi AI mengikuti struktur laporan analis, bukan ringkasan bebas:
+
+| Bagian | Isinya |
+|---|---|
+| Judul | Temuan utamanya, bukan "Update Harga BTC" |
+| Posisi harga | Angka terkini, perubahan, jarak ke support/resistance |
+| Penyebab | Rantai sebab-akibat lengkap dengan angka. Kalau penyebabnya teknikal, dikatakan teknikal |
+| Data pendukung | 2–4 poin berangka |
+| Peta level | Support & resistance konkret, plus arti kalau ditembus |
+| Yang perlu diwaspadai | Argumen penyeimbang — wajib ada |
+| Katalis berikutnya | Agenda dalam WIB |
+| Kesimpulan | 2–3 kalimat; sering kali "belum ada yang perlu dilakukan" |
+
+Prompt-nya menuntut hal yang sering dilewatkan: menelusuri rantai transmisi alih-alih berhenti di korelasi permukaan, membedakan yang **sudah tercermin di harga** dari **kejutan**, dan mengakui terus terang saat pergerakan bersifat teknikal — *"Tidak ada katalis berita spesifik dalam 24 jam terakhir; pergerakan ini konsisten dengan [mekanisme], bukan perubahan fundamental."*
+
+Kata-kata hype dilarang, begitu pula prediksi harga sebagai kepastian dan rekomendasi beli/jual langsung.
+
+### Kalau critic menemukan masalah
+
+Critic memeriksa seluruh bagian naratif terhadap data mentah yang **persis sama** dengan yang dipakai penulisnya. Kalau ada temuan fatal:
+
+1. **Satu putaran revisi** — narasi dikirim balik beserta daftar temuan untuk diperbaiki, lalu diperiksa ulang.
+2. **Kalau masih gagal, hanya bagian bermasalah yang ditahan** — bukan seluruh analisa. Pembacaan teknikal, analisa whale, dan outlook tetap terkirim kalau tidak ikut ditandai.
+
+Bagian yang ditahan disebutkan terus terang di web dan Telegram, lengkap dengan namanya.
+
 ### Data tingkat institusional
 
 Sebagian besar dashboard kripto berhenti di harga, RSI, dan Fear & Greed — semuanya data retail. Yang berikut ini biasanya dijual berlangganan mahal, padahal tersedia gratis lewat API publik:
@@ -163,7 +191,7 @@ Untuk mengirim ke grup: tambahkan bot ke grup, kirim satu pesan di grup, lalu ul
 ### 3. Ambil API key OpenRouter
 
 1. Daftar di [openrouter.ai](https://openrouter.ai), buka **Keys**, buat key baru.
-2. Isi saldo secukupnya. `max_cost_usd_per_run: 0.25` adalah **plafon**, bukan tarif tetap — dengan model bawaan, satu run diperkirakan ~$0,08–0,12 (lihat tabel di langkah 4). Langkah yang kena batas dilewati dan brief tetap terbit.
+2. Isi saldo secukupnya. `max_cost_usd_per_run: 0.60` adalah **plafon**, bukan tarif tetap — satu run terukur ~$0,26 (lihat tabel di langkah 4). Langkah yang kena batas dilewati dan brief tetap terbit.
 
 ### 4. Model LLM di `config.yaml`
 
@@ -175,15 +203,17 @@ Kesembilan step sudah terisi model yang wajar sebagai titik awal, jadi bisa lang
 | `classify` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | patuh JSON, keluaran pendek |
 | `mechanism` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | butuh penalaran sebab-akibat |
 | `statements` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | menyaring pernyataan dari derau |
-| `technical` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | menafsirkan indikator lintas timeframe |
-| `whale` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | membaca divergensi posisi |
-| `synthesis` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | menulis analisa panjang |
-| `outlook` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | menggabungkan banyak sumber |
+| `technical` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menafsirkan indikator lintas timeframe |
+| `whale` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | membaca divergensi posisi |
+| `synthesis` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menulis analisa panjang |
+| `outlook` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menggabungkan banyak sumber |
 | `critic` | `openai/gpt-5.1` | `google/gemini-3.1-flash-lite-preview` | **beda keluarga** dari `synthesis` |
 
-Dengan kombinasi ini satu run diperkirakan **$0,08–0,12**, di bawah plafon `max_cost_usd_per_run: 0.25`. Satu run per hari berarti sekitar **$2,5–3,6 per bulan**.
+Satu run terukur di produksi sekitar **$0,26**, di bawah plafon `max_cost_usd_per_run: 0.60`. Satu run per hari berarti sekitar **$8 per bulan**.
 
-Step naratif memakai DeepSeek karena jauh lebih murah dari model kelas atas. Konsekuensinya jujur: prosa Indonesia panjang dari DeepSeek umumnya sedikit di bawah model premium. Kalau hasilnya terasa kurang, naikkan `synthesis` saja ke model yang lebih kuat — itu satu step yang paling terasa bedanya, dan biayanya tetap terkendali.
+Plafonnya diberi ruang lebih karena kalau critic menemukan masalah, sistem menjalankan satu putaran revisi. Tanpa ruang itu revisi akan terpotong budget dan analisanya hilang sama sekali.
+
+**Aturan keluarga model dijaga saat runtime.** Config boleh mendaftarkan cadangan yang bertumpang tindih — misalnya `synthesis` jatuh ke `openai/gpt-5.1` sementara `critic` juga OpenAI. Sebelum critic dijalankan, kode memeriksa model mana yang BENAR-BENAR melayani synthesis, lalu menyaring pilihan critic agar tetap beda keluarga.
 
 Entri kedua tiap baris adalah cadangan: OpenRouter otomatis memakainya kalau model pertama error, kena rate limit, atau kehabisan kapasitas.
 
@@ -375,6 +405,8 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 |---|---|
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |
 | `failed_sources` memuat `etf_flow` | Struktur tabel Farside berubah. Tidak fatal — kolom ETF akan tampil "tidak tersedia". |
+| Funding/OI kosong | Binance (451) dan Bybit (CloudFront) sama-sama memblokir IP runner AS. Deribit dipakai sebagai lapis ketiga. |
+| Sebagian metrik on-chain hilang | Tier gratis Coin Metrics tidak menyediakan semua metrik. Metrik yang ditolak dibuang otomatis lalu permintaan diulang — sisanya tetap didapat. |
 | Kartu opsi/valuasi/aliran kosong | Deribit, Coin Metrics, atau Coinbase sedang tidak terjangkau. Semuanya opsional — brief tetap terbit, dan sumber yang gagal tercatat di `failed_sources`. |
 | Bagian pernyataan kosong | Wajar kalau memang tidak ada pernyataan relevan dalam 48 jam. Kalau selalu kosong, cek `sumber_gagal` di log — Truth Social memang sering memblokir IP data center. |
 | Log penuh "HTTP 451 restricted location" | Normal di GitHub Actions. Binance menolak IP runner yang berbasis AS — pembatasan wilayah permanen. Harga otomatis pindah ke CoinGecko, funding/OI ke Bybit. |
