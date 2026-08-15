@@ -150,6 +150,19 @@ Tugas utama langkah LLM di sini adalah **membuang derau**: pencarian berita untu
 
 Daftar akun dan query bisa diubah di `config.yaml` bagian `statements` — menambah tokoh lain (misalnya ketua bank sentral) cukup menambah query, tanpa mengubah kode.
 
+### Tautan tambahan
+
+Tombol di kartu harga diatur lewat `tautan_luar` di `config.yaml` — label, URL, dan nama ikon [Lucide](https://lucide.dev/icons):
+
+```yaml
+tautan_luar:
+  - label: Arena Pertempuran BTC
+    url: https://tigorworks.github.io/crypto-battlefield/
+    ikon: swords
+```
+
+Kosongkan daftarnya kalau tidak ingin ada tombol.
+
 ---
 
 ## Tampilan Mobile
@@ -428,6 +441,8 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |
 | `failed_sources` memuat `etf_flow` | Struktur tabel Farside berubah. Tidak fatal — kolom ETF akan tampil "tidak tersedia". |
 | Funding/OI kosong | Binance (451) dan Bybit (CloudFront) sama-sama memblokir IP runner AS. Deribit dipakai sebagai lapis ketiga. |
+| Analisa bertanda "belum terverifikasi" | Critic gagal dijalankan pada run itu. Analisanya tetap dikirim supaya tidak hilang, tapi statusnya ditandai terus terang di web dan Telegram. |
+| Riwayat OI kosong | Tidak ada bursa yang menyediakannya dari IP runner. Perubahan OI diturunkan dari brief sebelumnya sebagai gantinya. |
 | Sebagian metrik on-chain hilang | Tier gratis Coin Metrics tidak menyediakan semua metrik. Metrik yang ditolak dibuang otomatis lalu permintaan diulang — sisanya tetap didapat. |
 | Kartu opsi/valuasi/aliran kosong | Deribit, Coin Metrics, atau Coinbase sedang tidak terjangkau. Semuanya opsional — brief tetap terbit, dan sumber yang gagal tercatat di `failed_sources`. |
 | Bagian pernyataan kosong | Wajar kalau memang tidak ada pernyataan relevan dalam 48 jam. Kalau selalu kosong, cek `sumber_gagal` di log — Truth Social memang sering memblokir IP data center. |

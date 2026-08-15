@@ -49,6 +49,7 @@ class Config:
     news: Dict[str, Any] = field(default_factory=dict)
     statements: Dict[str, Any] = field(default_factory=dict)
     telegram: Dict[str, Any] = field(default_factory=dict)
+    tautan_luar: List[Dict[str, Any]] = field(default_factory=list)
     source_tiers: Dict[str, int] = field(default_factory=dict)
     fomc_dates: List[str] = field(default_factory=list)
     archive_retention_days: int = 90
@@ -104,6 +105,7 @@ def load_config(path: Path = CONFIG_PATH) -> Config:
         news=raw.get("news", {}) or {},
         statements=raw.get("statements", {}) or {},
         telegram=raw.get("telegram", {}) or {},
+        tautan_luar=raw.get("tautan_luar", []) or [],
         source_tiers=raw.get("source_tiers", {}) or {},
         fomc_dates=[str(d) for d in (raw.get("fomc_dates") or [])],
         archive_retention_days=int(raw.get("archive_retention_days", 90)),

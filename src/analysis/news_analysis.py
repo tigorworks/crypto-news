@@ -1156,7 +1156,7 @@ def critic(
     )
 
     try:
-        hasil = client.chat_json(models, system, user, step="critic", temperature=0.0, max_tokens=3000)
+        hasil = client.chat_json(models, system, user, step="critic", temperature=0.0, max_tokens=6000)
     except (LLMError, BudgetExceeded) as exc:
         # Critic tidak jalan bukan berarti narasi salah, tapi juga belum terverifikasi.
         log.warning("Critic gagal dijalankan: %s", exc)

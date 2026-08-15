@@ -33,10 +33,61 @@ def _strip_fences(text: str) -> str:
     return text
 
 
+def _perbaiki_json(teks: str) -> str:
+    """Perbaiki kerusakan JSON yang lazim dari keluaran model.
+
+    Tiga kerusakan yang paling sering muncul dan bisa dipulihkan dengan aman:
+    koma menggantung sebelum penutup, string yang belum ditutup di ujung
+    balasan, dan kurung yang belum seimbang karena keluarannya terpotong.
+    Memulihkan sebagian temuan jauh lebih berguna daripada membuang seluruh
+    balasan yang tokennya sudah dibayar.
+    """
+    teks = teks.strip()
+
+    # String yang belum ditutup: hitung kutip ganda yang tidak di-escape.
+    kutip = len(re.findall(r'(?<!\\)"', teks))
+    if kutip % 2 == 1:
+        teks += '"'
+
+    # Koma menggantung sebelum } atau ]
+    teks = re.sub(r",\s*([}\]])", r"\1", teks)
+
+    # Seimbangkan kurung mengikuti urutan pembukaannya. Kutip di dalam string
+    # diabaikan supaya tanda kurung dalam teks tidak ikut terhitung.
+    tumpukan: List[str] = []
+    dalam_string = False
+    escape = False
+    for ch in teks:
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            dalam_string = not dalam_string
+            continue
+        if dalam_string:
+            continue
+        if ch in "{[":
+            tumpukan.append(ch)
+        elif ch in "}]":
+            if tumpukan:
+                tumpukan.pop()
+
+    if tumpukan:
+        teks += "".join("}" if ch == "{" else "]" for ch in reversed(tumpukan))
+        # Elemen terakhir bisa saja belum lengkap; koma menggantung dibersihkan lagi.
+        teks = re.sub(r",\s*([}\]])", r"\1", teks)
+
+    return teks
+
+
 def _extract_json(text: str) -> Any:
     """Parse JSON dari balasan model, seagresif yang diperlukan.
 
-    Urutan: parse apa adanya -> buang pagar -> ambil blok {...} / [...] terluar.
+    Urutan: parse apa adanya -> buang pagar -> ambil blok terluar ->
+    perbaiki kerusakan yang lazim.
     """
     candidates = [text, _strip_fences(text)]
     for candidate in candidates:
@@ -46,16 +97,38 @@ def _extract_json(text: str) -> Any:
             continue
 
     cleaned = _strip_fences(text)
-    for opener, closer in (("[", "]"), ("{", "}")):
+    potongan = []
+    # Urutan mengikuti kurung yang muncul lebih dulu di teks. Kalau balasan
+    # diawali '{' tapi memuat '[' di dalamnya, mencoba '[' lebih dulu akan
+    # menghasilkan list dari isi perutnya — bukan objek yang diminta.
+    pasangan = [("[", "]"), ("{", "}")]
+    posisi = {o: (cleaned.find(o) if cleaned.find(o) != -1 else len(cleaned)) for o, _ in pasangan}
+    pasangan.sort(key=lambda p: posisi[p[0]])
+    for opener, closer in pasangan:
         start = cleaned.find(opener)
         end = cleaned.rfind(closer)
         if start != -1 and end > start:
-            try:
-                return json.loads(cleaned[start : end + 1])
-            except json.JSONDecodeError:
-                continue
+            potongan.append(cleaned[start : end + 1])
+        elif start != -1:
+            # Penutup tidak ada sama sekali: balasan terpotong di tengah.
+            potongan.append(cleaned[start:])
 
-    raise LLMError(f"Balasan model bukan JSON valid: {text[:200]}")
+    for bagian in potongan:
+        try:
+            return json.loads(bagian)
+        except json.JSONDecodeError:
+            pass
+        try:
+            hasil = json.loads(_perbaiki_json(bagian))
+            log.warning("JSON model rusak tapi berhasil dipulihkan sebagian")
+            return hasil
+        except json.JSONDecodeError:
+            continue
+
+    # Balasan penuh dicatat di level debug supaya bisa didiagnosis tanpa
+    # membanjiri log biasa.
+    log.debug("Balasan yang gagal diparse:\n%s", text)
+    raise LLMError(f"Balasan model bukan JSON valid: {text[:300]}")
 
 
 class LLMClient:

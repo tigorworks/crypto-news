@@ -484,6 +484,8 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
             "⚠️ <i>Bagian berikut ditahan karena tidak lolos verifikasi: "
             + esc(", ".join(ditahan)) + ".</i>"
         )
+    if not critic.get("dijalankan", True):
+        baris.append("<i>⚠️ Belum sempat diverifikasi — pemeriksa fakta gagal dijalankan.</i>")
     baris.append("<i>Dihasilkan AI, dapat keliru.</i>")
     baris.append(PEMISAH)
     return baris

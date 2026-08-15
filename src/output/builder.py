@@ -233,6 +233,7 @@ def build_brief(
     ai: Dict[str, Any],
     data_quality: Dict[str, Any],
     price_series: Optional[List[Dict[str, Any]]] = None,
+    tautan_luar: Optional[List[Dict[str, Any]]] = None,
     previous: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     sekarang = now_utc()
@@ -259,6 +260,7 @@ def build_brief(
         "conflicts": conflicts,
         "diff_vs_previous": {},
         "ai": ai,
+        "tautan_luar": tautan_luar or [],
         "disclaimer": DISCLAIMER,
     }
 
