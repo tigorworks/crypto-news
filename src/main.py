@@ -29,8 +29,8 @@ from .collectors import (
     statements as statements_collector,
     whale,
 )
-from .config import Config, load_config
-from .output import builder, telegram
+from .config import Config, SUBSCRIBERS_PATH, load_config
+from .output import builder, subscribers, telegram
 from .utils.timezone import iso_utc, now_utc
 
 log = logging.getLogger("brief")
@@ -137,6 +137,61 @@ def _konteks_llm(
         "sinyal_bertentangan": conflicts,
         "perubahan_vs_sebelumnya": diff.get("ringkasan") if diff else None,
     }
+
+
+def _kumpulkan_penerima(cfg: Config, dry_run: bool, catatan: List[str]):
+    """Gabungkan penerima tetap dan pelanggan bot.
+
+    TELEGRAM_CHAT_ID boleh berisi beberapa ID dipisah koma. Pelanggan dari
+    perintah /start ditambahkan kalau fiturnya aktif dan kuncinya tersedia.
+    """
+    penerima: List[str] = []
+    if cfg.secrets.telegram_chat_id:
+        penerima.extend(
+            bagian.strip()
+            for bagian in cfg.secrets.telegram_chat_id.split(",")
+            if bagian.strip()
+        )
+
+    state = None
+    if not cfg.telegram.get("aktifkan_pelanggan", True):
+        pass
+    elif not cfg.secrets.telegram_subscriber_key:
+        pesan = (
+            "Fitur pelanggan dimatikan: TELEGRAM_SUBSCRIBER_KEY belum diisi. "
+            "Tanpa kunci itu daftar chat ID akan tersimpan sebagai teks biasa "
+            "di repo, jadi fiturnya sengaja tidak diaktifkan diam-diam."
+        )
+        log.warning(pesan)
+        catatan.append(pesan)
+    elif not cfg.secrets.telegram_token:
+        log.warning("TELEGRAM_TOKEN kosong; daftar pelanggan tidak bisa disinkronkan")
+    else:
+        state = subscribers.muat(SUBSCRIBERS_PATH, cfg.secrets.telegram_subscriber_key)
+        state, baru, keluar = subscribers.sinkronkan(cfg.secrets.telegram_token, state)
+
+        # Sapaan dikirim saat itu juga supaya pendaftar tahu statusnya
+        # sekarang, bukan menunggu brief berikutnya.
+        if not dry_run:
+            for chat_id in baru:
+                telegram.kirim(
+                    cfg.secrets.telegram_token, chat_id, subscribers.PESAN_SELAMAT_DATANG
+                )
+            for chat_id in keluar:
+                telegram.kirim(
+                    cfg.secrets.telegram_token, chat_id, subscribers.PESAN_BERHENTI
+                )
+            subscribers.simpan(
+                SUBSCRIBERS_PATH, cfg.secrets.telegram_subscriber_key, state
+            )
+
+        penerima.extend(subscribers.daftar_chat(state))
+
+    # Satu chat bisa muncul sebagai penerima tetap sekaligus pelanggan.
+    unik = list(dict.fromkeys(penerima))
+    if unik:
+        log.info("Penerima Telegram: %d chat", len(unik))
+    return unik, state
 
 
 def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
@@ -436,17 +491,35 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
 
     # -- 15. Kirim Telegram (SEBELUM tulis file) --------------------------
     pesan = telegram.render(brief, cfg.site_url)
+    penerima, state_pelanggan = _kumpulkan_penerima(cfg, dry_run, catatan)
+
     if dry_run:
-        log.info("[20/21] Dry-run: Telegram tidak dikirim. Pratinjau pesan:\n%s", pesan)
-    elif cfg.secrets.telegram_enabled:
-        log.info("[20/21] Kirim Telegram")
-        terkirim = telegram.kirim(
-            cfg.secrets.telegram_token, cfg.secrets.telegram_chat_id, pesan
+        log.info(
+            "[20/21] Dry-run: Telegram tidak dikirim ke %d penerima. Pratinjau pesan:\n%s",
+            len(penerima), pesan,
         )
-        if not terkirim:
-            log.error("Telegram gagal dikirim, pipeline tetap lanjut menulis file")
+    elif not cfg.secrets.telegram_token:
+        log.warning("[20/21] TELEGRAM_TOKEN kosong, pengiriman dilewati")
+    elif not penerima:
+        log.warning("[20/21] Tidak ada penerima; isi TELEGRAM_CHAT_ID atau aktifkan pelanggan")
     else:
-        log.warning("[20/21] TELEGRAM_TOKEN/CHAT_ID kosong, pengiriman dilewati")
+        log.info("[20/21] Kirim Telegram ke %d penerima", len(penerima))
+        hasil = telegram.broadcast(
+            cfg.secrets.telegram_token,
+            penerima,
+            pesan,
+            jeda=float(cfg.telegram.get("jeda_kirim_detik", 0.06)),
+        )
+        # Penerima yang memblokir bot dikeluarkan supaya daftar tidak menumpuk
+        # chat mati dan tiap run tidak membuang waktu mengirim ke sana.
+        if state_pelanggan is not None:
+            for chat_id in hasil["gugur"]:
+                subscribers.buang(state_pelanggan, chat_id)
+            subscribers.simpan(
+                SUBSCRIBERS_PATH, cfg.secrets.telegram_subscriber_key, state_pelanggan
+            )
+        if not hasil["berhasil"]:
+            log.error("Telegram gagal ke semua penerima, pipeline tetap lanjut menulis file")
 
     # -- 16. Tulis file ---------------------------------------------------
     if dry_run:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 from ..utils.http import HttpError, post_json
@@ -504,6 +505,79 @@ def render(brief: Dict[str, Any], site_url: str = "") -> str:
     if len(pesan) > BATAS_KARAKTER:
         pesan = pesan[: BATAS_KARAKTER - 60].rsplit("\n", 1)[0] + "\n\n…\n<i>Pesan dipotong.</i>"
     return pesan
+
+
+def broadcast(
+    token: str,
+    chat_ids: List[str],
+    pesan: str,
+    jeda: float = 0.06,
+) -> Dict[str, Any]:
+    """Kirim satu pesan ke banyak chat.
+
+    Kegagalan satu penerima tidak menghentikan sisanya. Penerima yang jelas
+    tidak valid lagi (memblokir bot, chat dihapus) dikembalikan lewat
+    `gugur` supaya pemanggil bisa mengeluarkannya dari daftar — kalau
+    dibiarkan, daftar akan terus menumpuk chat mati.
+    """
+    berhasil: List[str] = []
+    gagal: List[str] = []
+    gugur: List[str] = []
+
+    for i, chat_id in enumerate(chat_ids):
+        if i:
+            time.sleep(jeda)  # Telegram membatasi sekitar 30 pesan per detik
+        hasil = _kirim_satu(token, chat_id, pesan)
+        if hasil["ok"]:
+            berhasil.append(chat_id)
+        else:
+            gagal.append(chat_id)
+            if hasil["permanen"]:
+                gugur.append(chat_id)
+
+    log.info(
+        "Broadcast Telegram: %d berhasil, %d gagal (%d gugur permanen)",
+        len(berhasil), len(gagal), len(gugur),
+    )
+    return {"berhasil": berhasil, "gagal": gagal, "gugur": gugur}
+
+
+# Kode Telegram yang berarti penerima ini tidak akan pernah bisa dikirimi lagi.
+_ALASAN_PERMANEN = (
+    "bot was blocked by the user",
+    "user is deactivated",
+    "chat not found",
+    "bot was kicked",
+    "group chat was upgraded",
+    "peer_id_invalid",
+)
+
+
+def _kirim_satu(token: str, chat_id: str, pesan: str) -> Dict[str, Any]:
+    """Kirim ke satu chat. Return {ok, permanen}."""
+    try:
+        hasil = post_json(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            {
+                "chat_id": chat_id,
+                "text": pesan,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            },
+            timeout=30,
+            retries=1,
+        )
+        if hasil.get("ok"):
+            return {"ok": True, "permanen": False}
+        keterangan = str(hasil.get("description", "")).lower()
+        permanen = any(a in keterangan for a in _ALASAN_PERMANEN)
+        log.warning("Telegram menolak kirim ke %s: %s", chat_id, hasil.get("description"))
+        return {"ok": False, "permanen": permanen}
+    except HttpError as exc:
+        keterangan = str(exc).lower()
+        permanen = any(a in keterangan for a in _ALASAN_PERMANEN)
+        log.warning("Gagal kirim ke %s: %s", chat_id, str(exc)[:150])
+        return {"ok": False, "permanen": permanen}
 
 
 def kirim(token: str, chat_id: str, pesan: str) -> bool:
