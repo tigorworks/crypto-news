@@ -354,8 +354,12 @@ function briefApp() {
     },
 
     get adaDataWhale() {
+      // Saat Binance terblokir hanya sisi ritel yang pulih lewat Bybit —
+      // kartunya tetap berguna, jadi cukup salah satu sisi ada.
       const w = this.data?.whale;
-      return !!(w && (w.whale_long_pct !== null && w.whale_long_pct !== undefined));
+      if (!w) return false;
+      const ada = (v) => v !== null && v !== undefined;
+      return ada(w.whale_long_pct) || ada(w.ritel_long_pct);
     },
 
     get barisPosisi() {
@@ -365,7 +369,8 @@ function briefApp() {
         baris.push({ label: 'Top trader (pemain besar)', long: w.whale_long_pct, short: w.whale_short_pct });
       }
       if (w.ritel_long_pct !== null && w.ritel_long_pct !== undefined) {
-        baris.push({ label: 'Seluruh akun (ritel)', long: w.ritel_long_pct, short: w.ritel_short_pct });
+        const via = w.sumber_ritel === 'bybit' ? ' · via Bybit' : '';
+        baris.push({ label: 'Seluruh akun (ritel)' + via, long: w.ritel_long_pct, short: w.ritel_short_pct });
       }
       return baris;
     },

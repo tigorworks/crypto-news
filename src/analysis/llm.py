@@ -187,13 +187,28 @@ class LLMClient:
             raise LLMError(f"OpenRouter error pada step '{step}': {data['error']}")
 
         try:
-            content = data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]
+            content = choice["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMError(f"Struktur balasan tidak dikenali pada step '{step}': {exc}") from exc
 
+        # Biaya dicatat lebih dulu: token yang terpakai tetap ditagih walaupun
+        # balasannya nanti kita tolak.
         self._catat_biaya(
             data.get("model", models[0]), data.get("usage") or {}, durasi, step
         )
+
+        # Balasan yang terpotong di batas max_tokens hampir selalu JSON tak
+        # lengkap. Tanpa pemeriksaan ini, parser akan menyelamatkan potongan
+        # objek yang sekilas valid tapi kehilangan field wajib — dan step-nya
+        # gagal diam-diam setelah token telanjur dibayar.
+        finish = choice.get("finish_reason") or choice.get("native_finish_reason")
+        if finish == "length":
+            raise LLMError(
+                f"Balasan step '{step}' terpotong di batas max_tokens "
+                f"({max_tokens}). Naikkan max_tokens untuk step ini."
+            )
+
         return content or ""
 
     def chat_json(self, models: List[str], system: str, user: str, **kwargs) -> Any:

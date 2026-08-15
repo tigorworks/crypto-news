@@ -1,13 +1,15 @@
 """Data posisi whale vs ritel, dan aliran taker.
 
-Semua endpoint di bawah gratis dan tanpa API key, tapi hanya ada di Binance
-Futures. Kalau Binance memblokir IP (403/451), seluruh modul mengembalikan
-None dan pipeline lanjut tanpa analisa whale.
-
 Gagasan intinya: Binance memisahkan statistik "top trader" (akun dengan margin
 terbesar — proksi whale) dari "global account" (seluruh akun — didominasi
 ritel). Ketika keduanya berlawanan arah, itu sinyal yang tidak terlihat dari
 grafik harga saja.
+
+Pemisahan itu hanya ada di Binance. Saat Binance memblokir IP (403/451),
+Bybit dipakai sebagai cadangan — tapi Bybit cuma menyediakan rasio AGREGAT
+seluruh akun. Jadi yang pulih hanya sisi ritel; divergensi whale-vs-ritel
+tetap tidak tersedia dan dilaporkan apa adanya, bukan ditambal dengan angka
+yang berbeda maknanya.
 """
 
 from __future__ import annotations
@@ -16,6 +18,8 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from ..utils.http import HttpError, get_json
+from . import bybit
+from .binance import _ringkas
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +71,7 @@ def collect(symbol: str, period: str = "1h", limit: int = 24) -> Dict[str, Any]:
         "taker_tren": None,
         "periode": period,
         "jam_dipantau": limit,
+        "sumber_ritel": "binance",
     }
     failed: List[str] = []
 
@@ -80,7 +85,7 @@ def collect(symbol: str, period: str = "1h", limit: int = 24) -> Dict[str, Any]:
             data["whale_ratio"] = round(float(rows[-1]["longShortRatio"]), 3)
             data["whale_tren_long_pp"] = _tren(seri)
     except (HttpError, KeyError, ValueError, TypeError, IndexError) as exc:
-        log.warning("Rasio posisi whale gagal: %s", exc)
+        log.warning("Rasio posisi whale gagal: %s", _ringkas(exc))
         failed.append("whale_posisi")
 
     # -- posisi seluruh akun (proksi ritel) ------------------------------
@@ -93,7 +98,7 @@ def collect(symbol: str, period: str = "1h", limit: int = 24) -> Dict[str, Any]:
             data["ritel_ratio"] = round(float(rows[-1]["longShortRatio"]), 3)
             data["ritel_tren_long_pp"] = _tren(seri)
     except (HttpError, KeyError, ValueError, TypeError, IndexError) as exc:
-        log.warning("Rasio posisi ritel gagal: %s", exc)
+        log.warning("Rasio posisi ritel gagal: %s", _ringkas(exc))
         failed.append("ritel_posisi")
 
     # -- aliran taker (agresor beli vs jual) -----------------------------
@@ -110,8 +115,23 @@ def collect(symbol: str, period: str = "1h", limit: int = 24) -> Dict[str, Any]:
                 else "seimbang"
             )
     except (HttpError, KeyError, ValueError, TypeError, IndexError) as exc:
-        log.warning("Rasio taker gagal: %s", exc)
+        log.warning("Rasio taker gagal: %s", _ringkas(exc))
         failed.append("taker_flow")
+
+    # -- cadangan Bybit kalau Binance memblokir ---------------------------
+    # Bybit hanya punya rasio agregat seluruh akun, jadi yang bisa dipulihkan
+    # cuma sisi "ritel". Divergensi whale-vs-ritel tetap tidak tersedia, dan
+    # itu dilaporkan apa adanya ketimbang ditambal angka yang beda maknanya.
+    if data["ritel_long_pct"] is None:
+        cadangan = bybit.fetch_account_ratio(symbol)
+        if cadangan["long_pct"] is not None:
+            data["ritel_long_pct"] = cadangan["long_pct"]
+            data["ritel_short_pct"] = cadangan["short_pct"]
+            data["ritel_tren_long_pp"] = cadangan["tren_long_pp"]
+            data["sumber_ritel"] = "bybit"
+            log.info("Rasio posisi agregat diambil dari Bybit")
+            if "ritel_posisi" in failed:
+                failed.remove("ritel_posisi")
 
     # -- divergensi whale vs ritel ---------------------------------------
     whale = data["whale_long_pct"]
