@@ -30,7 +30,7 @@ from .collectors import (
     whale,
 )
 from .config import Config, SUBSCRIBERS_PATH, load_config
-from .output import builder, subscribers, telegram
+from .output import builder, stylist, subscribers, telegram
 from .utils.timezone import iso_utc, now_utc
 
 log = logging.getLogger("brief")
@@ -568,7 +568,24 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     )
 
     # -- 15. Kirim Telegram (SEBELUM tulis file) --------------------------
-    pesan = telegram.render(brief, cfg.site_url)
+    # Perapi menambah emoji dan jeda baris, jadi pesan dasarnya dirender
+    # dengan ruang kepala. Tanpa itu hasil rapinya selalu melewati 4096
+    # karakter dan selalu ditolak.
+    rapikan_aktif = bool(client) and cfg.telegram.get("rapikan_dengan_llm", True)
+    pesan = telegram.render(
+        brief, cfg.site_url, batas=3400 if rapikan_aktif else None
+    )
+
+    # Perapian tata letak lewat LLM murah. Kalau hasilnya tidak lolos
+    # verifikasi, pesan asli yang dipakai — jadi langkah ini tidak pernah
+    # bisa memperburuk isi, paling banter tidak memperbaiki tampilannya.
+    if rapikan_aktif:
+        log.info("Rapikan pesan Telegram")
+        hasil_rapi = stylist.rapikan(client, cfg.llm_models("format"), pesan, brief)
+        pesan = hasil_rapi["pesan"]
+        if not hasil_rapi["dirapikan"] and hasil_rapi["alasan"]:
+            catatan.append("Perapian pesan dilewati: " + hasil_rapi["alasan"])
+
     penerima, state_pelanggan = _kumpulkan_penerima(cfg, dry_run, catatan)
 
     if dry_run:

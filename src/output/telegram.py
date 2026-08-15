@@ -509,8 +509,15 @@ def _blok_penutup(brief: Dict[str, Any], site_url: str) -> List[str]:
     return baris
 
 
-def render(brief: Dict[str, Any], site_url: str = "") -> str:
-    """Susun pesan HTML. Kalau kepanjangan, bagian berita dipangkas lebih dulu."""
+def render(brief: Dict[str, Any], site_url: str = "", batas: Optional[int] = None) -> str:
+    """Susun pesan HTML. Kalau kepanjangan, bagian berita dipangkas lebih dulu.
+
+    `batas` memungkinkan pemanggil menyisakan ruang kepala. Perapi LLM
+    menambah emoji dan jeda baris, jadi kalau pesan sudah mepet 4096 karakter
+    hasil rapinya pasti melewati batas dan selalu ditolak — perapiannya jadi
+    tidak pernah terpakai.
+    """
+    batas_efektif = batas or BATAS_KARAKTER
     kepala = [
         "📊 <b>Ringkasan Pasar Bitcoin</b>",
         f"🕐 {esc(brief.get('generated_at_wib', ''))}",
@@ -559,20 +566,20 @@ def render(brief: Dict[str, Any], site_url: str = "") -> str:
         bagian += _blok_ai(brief, paragraf_maks=ai_n) + penutup
 
         pesan = "\n".join(bagian)
-        if len(pesan) <= BATAS_KARAKTER:
+        if len(pesan) <= batas_efektif:
             return pesan
 
     # Terakhir: pangkas isi blok AI sendiri, sisakan kepala + harga + penutup.
     dasar = "\n".join(kepala + _blok_harga(brief))
-    sisa = BATAS_KARAKTER - len(dasar) - len("\n".join(penutup)) - 120
+    sisa = batas_efektif - len(dasar) - len("\n".join(penutup)) - 120
     ai_teks = "\n".join(_blok_ai(brief, paragraf_maks=1))
     if sisa > 200:
         ai_teks = ai_teks[:sisa].rsplit("\n", 1)[0] + f"\n…\n{PEMISAH}"
     else:
         ai_teks = ""
     pesan = "\n".join([dasar, ai_teks] + penutup)
-    if len(pesan) > BATAS_KARAKTER:
-        pesan = pesan[: BATAS_KARAKTER - 60].rsplit("\n", 1)[0] + "\n\n…\n<i>Pesan dipotong.</i>"
+    if len(pesan) > batas_efektif:
+        pesan = pesan[: batas_efektif - 60].rsplit("\n", 1)[0] + "\n\n…\n<i>Pesan dipotong.</i>"
     return pesan
 
 
