@@ -27,12 +27,35 @@ log = logging.getLogger(__name__)
 SCHEMA_VERSION = 1
 DISCLAIMER = "Konten ini bersifat informasional dan bukan saran investasi."
 
-# Semua sumber yang dihitung dalam skor kualitas data.
-SUMBER_DIPANTAU = [
-    "price", "technical", "funding_oi", "fear_greed",
-    "onchain", "etf_flow", "macro", "news", "whale", "statements",
-    "options", "onchain_valuasi", "flows",
-]
+# Semua sumber yang dihitung dalam skor kualitas data, beserta bobotnya.
+#
+# Bobot dibutuhkan karena sumber-sumber ini jauh dari setara. Dengan hitungan
+# rata semua, kehilangan dua sumber pinggiran (arus ETF yang cuma bisa
+# di-scrape, rasio posisi bursa) langsung menurunkan label seluruh brief jadi
+# "sedang" — padahal harga, teknikal, opsi, on-chain, makro, dan berita
+# semuanya lengkap. Label itu menyesatkan ke arah yang salah: pembaca
+# meragukan analisa yang sebenarnya bertumpu pada data utuh.
+#
+#   3 = tanpa ini brief kehilangan makna
+#   2 = pembentuk utama analisa
+#   1 = pelengkap, berguna tapi bisa absen
+BOBOT_SUMBER = {
+    "price": 3,
+    "technical": 3,
+    "news": 2,
+    "funding_oi": 2,
+    "macro": 2,
+    "options": 2,
+    "onchain_valuasi": 2,
+    "fear_greed": 1,
+    "onchain": 1,
+    "flows": 1,
+    "etf_flow": 1,
+    "whale": 1,
+    "statements": 1,
+}
+
+SUMBER_DIPANTAU = list(BOBOT_SUMBER)
 
 
 def baca_json(path: Path) -> Optional[Dict[str, Any]]:
@@ -57,14 +80,25 @@ def tulis_json(path: Path, data: Any) -> None:
 # Kualitas data
 # --------------------------------------------------------------------------
 def hitung_kualitas(failed: List[str], llm_cost: float, catatan: List[str]) -> Dict[str, Any]:
-    gagal = sorted(set(failed))
-    total = len(SUMBER_DIPANTAU)
-    ok = total - len([f for f in gagal if f in SUMBER_DIPANTAU])
-    rasio = ok / total if total else 0
+    """Skor kualitas data, dihitung berbobot.
 
-    if rasio >= 0.875:
+    Jumlah sumber yang berhasil tetap dilaporkan apa adanya; yang berbobot
+    hanyalah LABEL keyakinannya, supaya label itu mencerminkan seberapa penting
+    yang hilang — bukan sekadar berapa banyak.
+    """
+    gagal = sorted(set(failed))
+    gagal_dipantau = [f for f in gagal if f in BOBOT_SUMBER]
+
+    total = len(SUMBER_DIPANTAU)
+    ok = total - len(gagal_dipantau)
+
+    bobot_total = sum(BOBOT_SUMBER.values())
+    bobot_hilang = sum(BOBOT_SUMBER[f] for f in gagal_dipantau)
+    rasio = (bobot_total - bobot_hilang) / bobot_total if bobot_total else 0
+
+    if rasio >= 0.85:
         confidence = "baik"
-    elif rasio >= 0.625:
+    elif rasio >= 0.65:
         confidence = "sedang"
     else:
         confidence = "rendah"
@@ -72,6 +106,7 @@ def hitung_kualitas(failed: List[str], llm_cost: float, catatan: List[str]) -> D
     return {
         "sources_ok": ok,
         "sources_total": total,
+        "skor_berbobot": round(rasio * 100, 1),
         "failed_sources": gagal,
         "confidence": confidence,
         "llm_cost_usd": round(llm_cost, 5),
@@ -192,6 +227,10 @@ def bersihkan_berita(articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             {
                 "id": a.get("id"),
                 "judul": a.get("judul"),
+                # Judul dan ringkasan berbahasa Indonesia hasil terjemahan LLM.
+                # Judul asli tetap disimpan supaya bisa dicocokkan dengan sumber.
+                "judul_id": a.get("judul_id"),
+                "ringkasan_id": a.get("ringkasan_id"),
                 "sumber": a.get("sumber"),
                 "url": a.get("url"),
                 "waktu_utc": a.get("waktu_utc"),

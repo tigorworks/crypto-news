@@ -573,10 +573,12 @@ def analyze(
     result["oi_price_interpretasi"] = oi_signal["interpretasi"]
     result["oi_change_pct"] = oi_signal["oi_change_pct"]
 
-    # Sinyal palsu dicari di 4H (cukup halus untuk menangkap sapuan likuiditas,
-    # cukup kasar untuk tidak kebanjiran derau seperti di 1H).
+    # Sinyal palsu dicari pada timeframe terhalus yang tersedia, maksimal dua.
+    # Pada brief harian yang tersedia cuma 1D, dan itu memang yang dicari:
+    # sapuan likuiditas serta absorpsi volume pada skala harian.
+    tf_sinyal = [tf for tf in ("4h", "1h", "1d") if klines_per_tf.get(tf)][:2]
     sinyal_palsu: List[Dict[str, Any]] = []
-    for tf in ("4h", "1h"):
+    for tf in tf_sinyal:
         for s in deteksi_sinyal_palsu(
             klines_per_tf.get(tf, []), funding_rate, oi_signal["oi_change_pct"]
         ):

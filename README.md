@@ -13,7 +13,7 @@ Seluruh teks yang dilihat pengguna berbahasa Indonesia. Sifatnya informasional �
 
 ```
 Binance/CoinGecko ─┐   (harga, klines)
-Binance/Bybit      │   (funding, OI, posisi)
+Binance/Bybit/OKX  │   (funding, OI, posisi whale vs ritel)
 Deribit            │   (opsi: DVOL, skew, max pain)
 Coin Metrics       │   (MVRV, NVT, alamat aktif)
 Coinbase           │   (premium AS)
@@ -45,10 +45,29 @@ Tidak ada satu pun angka di output yang dihitung oleh LLM. Prinsipnya tegas: **k
 ### Yang dianalisa
 
 - **Kenapa harga bergerak** — narasi 6–9 paragraf yang mengurai sebab pergerakan, plus daftar `penyebab_pergerakan` terurut lengkap dengan tingkat keyakinan dan dasar datanya. Kalau penyebabnya tidak jelas, model diwajibkan mengatakan begitu.
-- **Pembacaan teknikal** — kondisi tiap timeframe, di mana 1D/4H/1H saling menguatkan, di mana saling bertentangan, dan apa yang membatalkan pembacaannya.
+- **Pembacaan teknikal** — kondisi candle harian: struktur & tren, momentum & volume, di mana indikator saling menguatkan, di mana saling bertentangan, dan apa yang membatalkan pembacaannya.
 - **Sinyal palsu & pemain besar** — divergensi posisi top trader versus ritel, ditambah pola candle yang sering menandai pergerakan tidak tulus.
 - **Pernyataan tokoh berpengaruh** — ucapan pejabat dan tokoh yang berpotensi menggerakkan pasar, lengkap dengan status keasliannya.
 - **Pandangan ke depan** — skenario menguat/melemah beserta pemicunya, faktor geopolitik, keputusan besar yang dipantau, dan risiko utama.
+
+### Kenapa hanya candle harian
+
+Brief ini terbit sekali sehari, jadi timeframe analisanya **1D saja**. 4H dan 1H sudah dibuang, dan itu bukan sekadar penyederhanaan tampilan:
+
+- Pada laporan harian, sinyal 1H sudah basi sebelum pembacanya bangun.
+- Tiga timeframe sekaligus membuat model menulis angka dari timeframe yang berbeda dalam satu kalimat, lalu pemeriksa fakta mencocokkannya dengan timeframe yang salah dan memvonisnya karangan. Ini benar-benar terjadi di produksi: EMA20 1H dituduh karangan karena dibandingkan dengan EMA20 4H.
+
+Candle 1H tetap diambil, tapi untuk satu keperluan saja: mengukur reaksi harga satu jam setelah sebuah berita terbit. Candle itu tidak pernah dianalisa maupun ditampilkan sebagai timeframe. Atur lewat `timeframes` dan `timeframe_reaksi` di `config.yaml`.
+
+### Berita berbahasa Indonesia
+
+Feed sumbernya berbahasa Inggris. Judul dan ringkasan diterjemahkan pada langkah klasifikasi yang memang sudah membaca tiap artikel — jadi tidak ada panggilan LLM tambahan, dan biayanya nyaris tidak berubah. Judul aslinya tetap ditampilkan kecil di bawah terjemahan, karena artikel yang dibuka tetap berbahasa Inggris dan pembaca perlu bisa mencocokkannya.
+
+Nama diri, nama lembaga, dan istilah pasar yang memang dipakai apa adanya di Indonesia (Bitcoin, ETF, Fed, SEC, futures) tidak ikut diterjemahkan.
+
+### Grafik candle
+
+Grafik harga memakai widget **TradingView** (`BINANCE:BTCUSDT`, interval harian, zona waktu Jakarta) alih-alih grafik garis dari data sendiri. Alasannya: candle sungguhan yang bisa di-zoom lebih berguna daripada garis penutupan 60 hari, dan datanya selalu terkini walau brief-nya dibuat pagi tadi. Temanya ikut tema halaman. Kalau skripnya gagal dimuat, area grafik menampilkan pesan pengganti — tidak ada angka di halaman yang bergantung padanya.
 
 ### Deteksi sinyal palsu
 
@@ -87,12 +106,23 @@ Kata-kata hype dilarang, begitu pula prediksi harga sebagai kepastian dan rekome
 
 ### Kalau critic menemukan masalah
 
-Critic memeriksa seluruh bagian naratif terhadap data mentah yang **persis sama** dengan yang dipakai penulisnya. Kalau ada temuan fatal:
+Critic memeriksa seluruh bagian naratif terhadap data mentah yang **persis sama** dengan yang dipakai penulisnya. Yang membedakan: **tidak semua temuan diperlakukan sama.**
+
+| Jenis temuan | Akibatnya |
+|---|---|
+| `angka_karangan` — angka yang tidak ada di data | **Bagian itu ditahan** |
+| `pengetahuan_luar` — peristiwa yang tidak ada di data | **Bagian itu ditahan** |
+| `saran_investasi` — kalimat bernada anjuran tindakan | Ditandai, analisa tetap tampil |
+| `sebab_akibat` — klaim sebab-akibat yang terlalu percaya diri | Ditandai, analisa tetap tampil |
+
+Alasannya: yang berbahaya adalah **fakta yang dikarang**, bukan kalimat yang kebetulan terbaca seperti anjuran. Brief ini dibaca pemiliknya sendiri yang tetap memutuskan sendiri — menahan seluruh analisa karena satu kalimat menyerempet anjuran justru menghapus bagian yang paling berguna. Kalimat semacam itu diberi keterangan terbuka di web dan Telegram, lalu ditampilkan apa adanya.
+
+Kalau ada temuan yang benar-benar menahan:
 
 1. **Satu putaran revisi** — narasi dikirim balik beserta daftar temuan untuk diperbaiki, lalu diperiksa ulang.
 2. **Kalau masih gagal, hanya bagian bermasalah yang ditahan** — bukan seluruh analisa. Pembacaan teknikal, analisa whale, dan outlook tetap terkirim kalau tidak ikut ditandai.
 
-Bagian yang ditahan disebutkan terus terang di web dan Telegram, lengkap dengan namanya.
+**Tuduhan angka karangan diperiksa ulang oleh kode.** Sebelum sebuah temuan boleh menahan apa pun, setiap angka pada kalimat yang dituduh dicocokkan dengan seluruh angka di data — dengan toleransi pembulatan dan tanpa peduli pemisah ribuan. Kalau semuanya ternyata ada, tuduhannya dibatalkan. Ini menutup satu kelas kesalahan yang nyata terjadi di produksi: critic memvonis `64.371,18` sebagai karangan padahal datanya memuat `64371.1839` — angka yang sama, ditulis berbeda.
 
 ### Data tingkat institusional
 
@@ -173,8 +203,9 @@ Halaman dirancang mobile-first dan diuji di lebar 360px, 390px, dan 430px:
 - **Target sentuh minimal 44px** pada perangkat sentuh, sesuai pedoman iOS dan Android
 - **Ukuran teks minimal 11px** di ponsel; ukuran yang lebih kecil hanya dipakai mulai breakpoint `sm`
 - **Nav lompat** khusus ponsel di bawah header — halaman ini panjang, jadi ada baris pintasan yang bisa digulir ke samping menuju tiap bagian
-- **Daftar panjang dipotong** di layar sempit (4 berita, 3 pernyataan) dengan tombol "Tampilkan semua"; di desktop semuanya langsung tampil
-- Grafik, tabel indikator, dan grid makro menyusun ulang jadi satu kolom
+- **Daftar panjang dipaginasi** 3 baris per halaman — berita dan pernyataan tokoh berbagi satu bagian dengan dua tab, jadi halaman tidak memanjang dan bagian di bawahnya tetap terjangkau
+- Grafik candle TradingView dipendekkan jadi 260px di ponsel
+- Tabel indikator dan grid makro menyusun ulang jadi satu kolom
 
 ---
 
@@ -217,7 +248,7 @@ Kesembilan step sudah terisi model yang wajar sebagai titik awal, jadi bisa lang
 | `format` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | menata tampilan pesan Telegram |
 | `mechanism` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | butuh penalaran sebab-akibat |
 | `statements` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | menyaring pernyataan dari derau |
-| `technical` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menafsirkan indikator lintas timeframe |
+| `technical` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menafsirkan indikator candle harian |
 | `whale` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | membaca divergensi posisi |
 | `synthesis` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menulis analisa panjang |
 | `outlook` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menggabungkan banyak sumber |
@@ -377,6 +408,7 @@ src/
 │   ├── macro.py            # yfinance: DXY, yield, minyak, indeks (+ FRED opsional)
 │   ├── news.py             # RSS + dedup + skor prioritas
 │   ├── whale.py            # posisi top trader vs ritel, aliran taker
+│   ├── okx.py              # cadangan posisi whale/ritel + taker (pemisahan utuh)
 │   ├── bybit.py            # cadangan derivatif saat Binance memblokir
 │   ├── options.py          # opsi Deribit: DVOL, put/call, skew, max pain
 │   ├── onchain.py          # valuasi on-chain: MVRV, NVT, alamat aktif
@@ -416,6 +448,7 @@ docs/                       # GitHub Pages
 - **Budget LLM per run** dibatasi `max_cost_usd_per_run`. Begitu terlampaui, step LLM sisanya dihentikan dan brief tetap terbit dengan data seadanya.
 - **Timeout 60 detik** per panggilan HTTP, retry maksimal 2× dengan exponential backoff.
 - **Kredensial hanya lewat environment variable.** Tidak ada key di kode maupun di JSON keluaran.
+- **Skor kualitas data dibobot menurut kepentingan.** 13 sumber dipantau, tapi tidak setara: harga dan teknikal berbobot 3, pembentuk analisa berbobot 2, pelengkap berbobot 1. Tanpa pembobotan, kehilangan dua sumber pinggiran sudah cukup melabeli seluruh brief "sedang" padahal seluruh data intinya utuh — label yang menyesatkan ke arah yang salah. Jumlah sumber yang berhasil tetap dilaporkan apa adanya di `sources_ok`; yang dibobot hanya labelnya.
 - **JSON keluaran tidak memuat prompt atau API key** — repo kemungkinan publik.
 - **Telegram dikirim sebelum operasi file/commit**, supaya kegagalan git tidak membatalkan notifikasi.
 - **Critic memeriksa SELURUH bagian naratif** (narasi, teknikal, whale, outlook) terhadap data mentah. Kalau menemukan angka karangan, saran investasi, target harga, atau klaim dari pengetahuan luar, seluruh bagian AI ditahan.
@@ -430,7 +463,9 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 - Di web, bagian AI diberi border indigo, latar berbeda, badge `✦ AI`, dan keterangan bahwa isinya dapat keliru.
 - Chip hasil AI di kartu berita (sentimen, kekuatan, kategori, mekanisme) diberi ring indigo.
 - Di Telegram, blok AI dipisah garis dan ditandai `✦ ANALISA AI`.
-- Kalau critic menolak narasi, web menampilkan banner peringatan dan Telegram menampilkan `⚠️ Analisa AI ditahan karena tidak lolos verifikasi.`
+- Kalau critic menemukan angka karangan, web menampilkan banner peringatan dan Telegram menyebut bagian mana yang ditahan.
+- Kalau critic cuma menandai kalimat bernada anjuran, analisanya tetap tampil disertai keterangan terbuka — di web sebagai panel yang bisa dibuka berisi kalimat yang ditandai, di Telegram sebagai satu baris catatan.
+- Nama model LLM tidak ditampilkan di halaman. Yang perlu diketahui pembaca adalah bagian mana yang dihasilkan AI, bukan model mana yang menuliskannya.
 
 ---
 
@@ -439,7 +474,7 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 | Gejala | Penyebab & solusi |
 |---|---|
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |
-| `failed_sources` memuat `etf_flow` | Struktur tabel Farside berubah. Tidak fatal — kolom ETF akan tampil "tidak tersedia". |
+| `failed_sources` memuat `etf_flow` | Farside (di belakang Cloudflare) menolak atau strukturnya berubah. Kalau brief sebelumnya punya angka ETF, angka itu dipakai ulang lengkap dengan tanggal aslinya dan ditandai `etf_flow_kedaluwarsa`. |
 | Funding/OI kosong | Binance (451) dan Bybit (CloudFront) sama-sama memblokir IP runner AS. Deribit dipakai sebagai lapis ketiga. |
 | Analisa bertanda "belum terverifikasi" | Critic gagal dijalankan pada run itu. Analisanya tetap dikirim supaya tidak hilang, tapi statusnya ditandai terus terang di web dan Telegram. |
 | Riwayat OI kosong | Tidak ada bursa yang menyediakannya dari IP runner. Perubahan OI diturunkan dari brief sebelumnya sebagai gantinya. |
@@ -447,7 +482,9 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 | Kartu opsi/valuasi/aliran kosong | Deribit, Coin Metrics, atau Coinbase sedang tidak terjangkau. Semuanya opsional — brief tetap terbit, dan sumber yang gagal tercatat di `failed_sources`. |
 | Bagian pernyataan kosong | Wajar kalau memang tidak ada pernyataan relevan dalam 48 jam. Kalau selalu kosong, cek `sumber_gagal` di log — Truth Social memang sering memblokir IP data center. |
 | Log penuh "HTTP 451 restricted location" | Normal di GitHub Actions. Binance menolak IP runner yang berbasis AS — pembatasan wilayah permanen. Harga otomatis pindah ke CoinGecko, funding/OI ke Bybit. |
-| Divergensi whale kosong | Pemisahan "top trader" vs "seluruh akun" hanya ada di Binance. Saat Binance terblokir, hanya sisi ritel yang pulih lewat Bybit, jadi divergensi memang tidak bisa dihitung. |
+| Divergensi whale kosong | Urutan sumbernya Binance → OKX → Bybit. Dua yang pertama memisahkan "top trader" dari "seluruh akun"; Bybit hanya punya rasio agregat, jadi kalau sampai jatuh ke Bybit hanya sisi ritel yang pulih dan divergensi memang tidak bisa dihitung. |
+| Analisa AI ditahan | Hanya terjadi kalau ada angka yang benar-benar tidak ada di data — dan itu pun sudah diperiksa ulang oleh kode lebih dulu. Kalimat bernada anjuran tidak lagi menahan apa pun, cuma ditandai. |
+| Grafik candle kosong | Skrip TradingView tidak bisa dimuat (jaringan atau pemblokir iklan). Area grafik menampilkan pesan pengganti; seluruh angka di halaman tetap akurat karena tidak bergantung pada widget itu. |
 | Step AI gagal dengan "terpotong di batas max_tokens" | Naikkan `max_tokens` step tersebut di `src/analysis/news_analysis.py`. Balasan yang terpotong ditolak sengaja, karena JSON separuh jadi lebih berbahaya daripada tidak ada hasil. |
 | Brief terbit tanpa bagian AI | `OPENROUTER_API_KEY` kosong, nama model masih placeholder, atau budget per run tercapai. Cek `data_quality.catatan`. |
 | Telegram tidak masuk | Pastikan sudah mengirim pesan pertama ke bot, dan `TELEGRAM_CHAT_ID` benar (ID grup diawali minus). |

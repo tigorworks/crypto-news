@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -115,7 +116,17 @@ def _prompt_klasifikasi() -> str:
         f"  status_kepastian: salah satu dari {STATUS_KEPASTIAN}\n"
         "  entitas: array nama lembaga/perusahaan/orang yang disebut (maksimal 4)\n"
         f"  sudah_priced_in: salah satu dari {PRICED_IN}\n"
-        f"  tipe_klaim: salah satu dari {TIPE_KLAIM}\n\n"
+        f"  tipe_klaim: salah satu dari {TIPE_KLAIM}\n"
+        "  judul_id: judul artikel diterjemahkan ke bahasa Indonesia, maksimal 120 karakter\n"
+        "  ringkasan_id: 1-2 kalimat isi artikel dalam bahasa Indonesia, maksimal 220 karakter\n\n"
+        "Aturan penerjemahan:\n"
+        "  - Terjemahkan maknanya, bukan kata per kata. Judul harus terbaca wajar "
+        "sebagai judul berita berbahasa Indonesia.\n"
+        "  - Nama diri, nama lembaga, ticker, dan istilah pasar yang memang dipakai "
+        "apa adanya di Indonesia (Bitcoin, ETF, Fed, SEC, halving, futures) "
+        "JANGAN diterjemahkan.\n"
+        "  - Jangan menambah, menghilangkan, atau melunakkan isi. Angka disalin persis.\n"
+        "  - Kalau judulnya memang sudah berbahasa Indonesia, salin apa adanya.\n\n"
         "Bedakan dengan tegas berita yang SUDAH terjadi dari yang baru RUMOR atau "
         "sekadar OPINI analis. Berita berjadwal (rilis data yang belum keluar) "
         "berstatus terjadwal.\n\n" + ATURAN_DASAR
@@ -138,7 +149,15 @@ def _validasi_klasifikasi(item: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(entitas, list):
         entitas = []
 
+    def teks(key: str, batas: int) -> Optional[str]:
+        nilai = item.get(key)
+        if not isinstance(nilai, str) or not nilai.strip():
+            return None
+        return nilai.strip()[:batas]
+
     return {
+        "judul_id": teks("judul_id", 160),
+        "ringkasan_id": teks("ringkasan_id", 280),
         "kategori": enum("kategori", KATEGORI),
         "sentimen": enum("sentimen", SENTIMEN),
         "kekuatan": kekuatan,
@@ -177,7 +196,10 @@ def klasifikasi(
                 system,
                 "Klasifikasikan artikel berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
                 step="classify",
-                max_tokens=4000,
+                # Naik dari 4000: langkah ini sekarang juga menerjemahkan judul
+                # dan ringkasan tiap artikel, jadi keluarannya jauh lebih panjang.
+                # Terpotong di tengah berarti seluruh batch hilang.
+                max_tokens=9000,
             )
         except BudgetExceeded as exc:
             log.warning("Klasifikasi berhenti di batch %d: %s", i // batch_size + 1, exc)
@@ -198,7 +220,7 @@ def klasifikasi(
             klas = {
                 "kategori": None, "sentimen": None, "kekuatan": None, "horizon": None,
                 "status_kepastian": None, "entitas": [], "sudah_priced_in": None,
-                "tipe_klaim": None,
+                "tipe_klaim": None, "judul_id": None, "ringkasan_id": None,
             }
         keluaran.append({**a, **klas, "mekanisme": None, "jalur_transmisi": None})
 
@@ -605,16 +627,21 @@ def interpretasi_teknikal(
         "DILARANG KERAS menghitung, memperkirakan, atau menyebut angka yang tidak ada "
         "dalam data yang diberikan. Kalau sebuah angka tidak tersedia, katakan tidak "
         "tersedia — jangan mengarang.\n\n"
+        "Laporan ini terbit sekali sehari, jadi acuannya CANDLE HARIAN (1D). "
+        "Jangan menyebut timeframe lain — datanya tidak dikirim kepadamu.\n\n"
+
         "Yang harus kamu jelaskan:\n"
-        "  - Apa yang sedang diberitahukan struktur harga di ketiga timeframe\n"
-        "  - Di mana timeframe saling MENGUATKAN dan di mana saling BERTENTANGAN\n"
+        "  - Apa yang sedang diberitahukan struktur harga harian\n"
+        "  - Di mana kelompok indikator saling MENGUATKAN dan di mana saling "
+        "BERTENTANGAN (tren vs momentum vs volume vs volatilitas)\n"
         "  - Apa arti kondisi momentum dan volatilitas saat ini\n"
         "  - Apakah volume mengonfirmasi pergerakan harga atau tidak\n"
         "  - Kondisi konkret apa yang akan MEMBATALKAN pembacaan ini\n\n"
         "Balas objek JSON:\n"
-        "  ringkasan: 2-3 kalimat inti kondisi teknikal\n"
-        "  per_timeframe: {\"1d\": \"...\", \"4h\": \"...\", \"1h\": \"...\"} — 2-3 kalimat tiap timeframe\n"
-        "  konfluensi: array string, hal yang saling menguatkan antar timeframe\n"
+        "  ringkasan: 2-3 kalimat inti kondisi teknikal harian\n"
+        "  struktur: 2-4 kalimat tentang tren dan posisi harga terhadap EMA\n"
+        "  momentum_volume: 2-4 kalimat tentang RSI/MACD dan konfirmasi volume\n"
+        "  konfluensi: array string, indikator yang saling menguatkan\n"
         "  kontradiksi: array string, sinyal yang saling bertentangan\n"
         "  kualitas_tren: salah satu dari \"kuat\", \"melemah\", \"tidak_jelas\", \"berbalik\"\n"
         "  pembatalan: string, kondisi harga yang membatalkan pembacaan di atas\n\n"
@@ -640,13 +667,13 @@ def interpretasi_teknikal(
         log.warning("Interpretasi teknikal: balasan tanpa field 'ringkasan', dilewati")
         return None
 
-    per_tf = hasil.get("per_timeframe")
     kualitas = hasil.get("kualitas_tren")
     return {
         "ringkasan": str(hasil["ringkasan"]).strip(),
-        "per_timeframe": {
-            k: str(v)[:800] for k, v in per_tf.items() if isinstance(v, str)
-        } if isinstance(per_tf, dict) else {},
+        "struktur": str(hasil["struktur"])[:900] if hasil.get("struktur") else "",
+        "momentum_volume": (
+            str(hasil["momentum_volume"])[:900] if hasil.get("momentum_volume") else ""
+        ),
         "konfluensi": [str(x)[:250] for x in (hasil.get("konfluensi") or [])[:6]],
         "kontradiksi": [str(x)[:250] for x in (hasil.get("kontradiksi") or [])[:6]],
         "kualitas_tren": kualitas if kualitas in ("kuat", "melemah", "tidak_jelas", "berbalik") else None,
@@ -1070,6 +1097,94 @@ def sintesis(
 # --------------------------------------------------------------------------
 # LLM #5 — critic
 # --------------------------------------------------------------------------
+# Hanya dua jenis temuan yang boleh MENAHAN analisa: keduanya soal fakta yang
+# dikarang. Sisanya (nada menyerempet saran, sebab-akibat yang terlalu percaya
+# diri) cuma diberi tanda — analisanya tetap tampil.
+#
+# Alasannya: brief ini dibaca pemiliknya sendiri yang memutuskan sendiri.
+# Menahan seluruh analisa karena satu kalimat bernada anjuran justru menghapus
+# hal yang paling berguna, sementara bahaya sebenarnya — angka yang tidak
+# pernah ada di data — tetap disaring, bahkan diperiksa ulang oleh kode.
+JENIS_PENAHAN = {"angka_karangan", "pengetahuan_luar"}
+
+_POLA_ANGKA = re.compile(r"\d[\d.,]*")
+
+# Angka pendek (≤2 digit) hampir selalu hasil turunan: persentase, jumlah
+# butir, skor 1-5. Menuntutnya ada mentah-mentah di data akan menolak kalimat
+# yang benar.
+_MIN_DIGIT_DIPERIKSA = 3
+
+
+def _kandidat_nilai(teks: str) -> List[float]:
+    """Semua tafsir masuk akal dari satu angka tertulis.
+
+    "63.226,18" bisa gaya Indonesia, "63,226.18" gaya Inggris, dan "63.226"
+    ambigu antara keduanya. Semua tafsir dikumpulkan lalu dicocokkan; cukup
+    satu yang cocok untuk menganggap angka itu ada.
+    """
+    bersih = teks.strip().strip(".,")
+    if not bersih:
+        return []
+    kandidat = set()
+    for ubah in (
+        lambda s: s.replace(".", "").replace(",", "."),   # 63.226,18 -> 63226.18
+        lambda s: s.replace(",", ""),                      # 63,226.18 -> 63226.18
+    ):
+        try:
+            kandidat.add(float(ubah(bersih)))
+        except ValueError:
+            continue
+    return sorted(kandidat)
+
+
+def _angka_dalam_data(obj: Any, keluaran: Optional[List[float]] = None) -> List[float]:
+    """Kumpulkan setiap angka di seluruh struktur data, termasuk dalam string."""
+    if keluaran is None:
+        keluaran = []
+    if isinstance(obj, bool):
+        return keluaran
+    if isinstance(obj, (int, float)):
+        keluaran.append(float(obj))
+    elif isinstance(obj, str):
+        for cocok in _POLA_ANGKA.findall(obj):
+            keluaran.extend(_kandidat_nilai(cocok))
+    elif isinstance(obj, dict):
+        for nilai in obj.values():
+            _angka_dalam_data(nilai, keluaran)
+    elif isinstance(obj, (list, tuple)):
+        for nilai in obj:
+            _angka_dalam_data(nilai, keluaran)
+    return keluaran
+
+
+def _ada_di_data(nilai: float, nilai_data: List[float]) -> bool:
+    """Cocok kalau selisihnya masih dalam batas pembulatan yang wajar."""
+    for pembanding in nilai_data:
+        if abs(nilai - pembanding) <= max(0.01, abs(pembanding) * 0.005):
+            return True
+    return False
+
+
+def _semua_angka_didukung(kutipan: str, nilai_data: List[float]) -> bool:
+    """True kalau setiap angka panjang pada kutipan memang ada di data.
+
+    Ini pemeriksaan KODE, bukan penilaian model. Critic berkali-kali menuduh
+    angka sebagai karangan padahal angkanya ada — cuma ditulis dengan pemisah
+    ribuan yang berbeda. Pemeriksaan ini membatalkan tuduhan semacam itu tanpa
+    melemahkan penyaringan angka yang benar-benar tidak ada.
+    """
+    diperiksa = 0
+    for cocok in _POLA_ANGKA.findall(kutipan or ""):
+        digit = sum(c.isdigit() for c in cocok)
+        if digit < _MIN_DIGIT_DIPERIKSA:
+            continue
+        diperiksa += 1
+        if not any(_ada_di_data(n, nilai_data) for n in _kandidat_nilai(cocok)):
+            return False
+    # Tanpa angka panjang sama sekali, tuduhan "angka karangan" tidak berdasar.
+    return True if diperiksa else True
+
+
 def pilih_model_critic(
     models: List[str], model_synthesis: Optional[str]
 ) -> List[str]:
@@ -1110,11 +1225,18 @@ def critic(
         "    menulis 'naik 10%' itu benar, bukan karangan.\n"
         "  - Pembulatan dan format berbeda: 4,21 vs 4.2 vs 4,2% adalah angka yang sama.\n"
         "  - Angka yang muncul di BAGIAN MANA PUN dari data, termasuk di dalam "
-        "    objek interpretasi_teknikal, analisa_whale, teknikal_1h, teknikal_4h, "
+        "    objek interpretasi_teknikal, analisa_whale, teknikal_1d, level_kunci, "
         "    opsi_deribit, valuasi_onchain, dan aliran_dana. Periksa SELURUH data "
         "    sebelum menyimpulkan sebuah angka tidak ada.\n"
+        "  - PEMISAH RIBUAN DAN DESIMAL YANG BERBEDA. 64.371,18 dan 64,371.18 dan "
+        "    64371.1839 adalah ANGKA YANG SAMA. Jangan pernah menandai angka hanya "
+        "    karena cara penulisannya berbeda dari data.\n"
         "  - Skenario kondisional yang merujuk level dari data: 'selama bertahan "
         "    di atas 116.500, kondisi X cenderung berlanjut'.\n"
+        "  - Menyebut support/resistance dari data sebagai kemungkinan tujuan "
+        "    pergerakan. Itu pembacaan teknikal biasa, BUKAN saran investasi.\n"
+        "  - Kalimat menunggu konfirmasi ('belum ada yang mendesak sampai level X "
+        "    ditembus'). Itu penilaian kondisi, bukan ajakan bertransaksi.\n"
         "  - Pernyataan ketidakpastian: 'penyebabnya tidak jelas dari data hari ini'.\n"
         "  - Penyebutan pola sebagai kemungkinan berkeyakinan rendah.\n"
         "  - Istilah teknis umum yang tidak memerlukan angka.\n\n"
@@ -1122,18 +1244,20 @@ def critic(
         "YANG HARUS KAMU TANDAI:\n"
         "  1. angka_karangan: angka yang setelah kamu telusuri SELURUH data "
         "     memang tidak ada dan tidak bisa diturunkan dari data\n"
-        "  2. sebab_akibat: klaim sebab-akibat tanpa dukungan sama sekali\n"
-        "  3. saran_investasi: rekomendasi beli/jual, target harga eksplisit "
-        "     ('menuju 130.000'), atau ajakan bertransaksi\n"
-        "  4. pengetahuan_luar: peristiwa konkret yang tidak ada di data sama sekali\n\n"
+        "  2. pengetahuan_luar: peristiwa konkret yang tidak ada di data sama sekali\n"
+        "  3. sebab_akibat: klaim sebab-akibat tanpa dukungan sama sekali\n"
+        "  4. saran_investasi: HANYA ajakan bertransaksi yang eksplisit — "
+        "     'beli sekarang', 'segera jual', 'pasang stop loss di X'. "
+        "     Menyebut level dan skenario TIDAK termasuk di sini.\n\n"
 
         "KEPARAHAN — pakai dengan hemat:\n"
-        "  fatal = HANYA untuk saran investasi, target harga eksplisit, atau angka "
-        "          yang jelas-jelas karangan setelah kamu benar-benar mencarinya\n"
-        "  minor = semua sisanya, termasuk klaim yang terlalu percaya diri\n\n"
-        "KALAU RAGU, PILIH minor. Menahan seluruh analisa karena keraguan yang "
-        "tidak pasti jauh lebih merugikan pembaca daripada membiarkan satu "
-        "kalimat yang agak longgar lewat.\n\n"
+        "  fatal = HANYA untuk angka_karangan dan pengetahuan_luar, dan hanya "
+        "          setelah kamu benar-benar mencarinya di seluruh data\n"
+        "  minor = semua sisanya, termasuk nada yang menyerempet anjuran dan "
+        "          klaim yang terlalu percaya diri\n\n"
+        "KALAU RAGU, PILIH minor. Menahan analisa karena keraguan yang tidak "
+        "pasti jauh lebih merugikan pembaca daripada membiarkan satu kalimat "
+        "yang agak longgar lewat.\n\n"
 
         "Untuk setiap temuan, WAJIB sebutkan di field `dicari_di` bagian data mana "
         "yang sudah kamu periksa. Kalau kamu tidak bisa menyebutkannya, berarti "
@@ -1163,35 +1287,67 @@ def critic(
         return {"passed": True, "corrections": [], "dijalankan": False}
 
     if not isinstance(hasil, dict):
-        return {"passed": True, "corrections": [], "dijalankan": False}
+        return {"passed": True, "corrections": [], "tanda": [], "dijalankan": False}
 
     corrections = hasil.get("corrections")
     corrections = corrections if isinstance(corrections, list) else []
+
+    # Daftar angka dari data disiapkan sekali, dipakai untuk membantah tuduhan
+    # "angka karangan" yang sebenarnya cuma beda format penulisan.
+    nilai_data = _angka_dalam_data(data_mentah)
+
     bersih = []
     for c in corrections[:10]:
         if not isinstance(c, dict):
             continue
+        jenis = str(c.get("jenis", ""))[:60]
+        kutipan = str(c.get("kutipan", ""))[:200]
+        alasan = str(c.get("alasan", ""))[:300]
         keparahan = c.get("keparahan")
+        keparahan = keparahan if keparahan in ("fatal", "minor") else "minor"
+
+        # 1. Bantahan kode: kalau setiap angka pada kutipan ternyata ADA di
+        #    data, tuduhan mengarang angka tidak berdasar.
+        if keparahan == "fatal" and jenis == "angka_karangan":
+            if _semua_angka_didukung(kutipan, nilai_data):
+                keparahan = "minor"
+                alasan = "[dibantah kode: semua angka ditemukan di data] " + alasan
+                log.info(
+                    "Tuduhan angka karangan dibatalkan, angkanya ada di data: %s",
+                    kutipan[:80],
+                )
+
+        # 2. Hanya kesalahan fakta yang boleh menahan. Sisanya jadi tanda:
+        #    analisanya tetap tampil, cuma diberi keterangan.
+        if keparahan == "fatal" and jenis not in JENIS_PENAHAN:
+            keparahan = "tanda"
+
         bersih.append(
             {
-                "jenis": str(c.get("jenis", ""))[:60],
-                "keparahan": keparahan if keparahan in ("fatal", "minor") else "minor",
+                "jenis": jenis,
+                "keparahan": keparahan,
                 "bagian": str(c.get("bagian", ""))[:60],
-                "kutipan": str(c.get("kutipan", ""))[:200],
-                "alasan": str(c.get("alasan", ""))[:300],
+                "kutipan": kutipan,
+                "alasan": alasan,
                 "dicari_di": str(c.get("dicari_di", ""))[:200],
             }
         )
 
-    ada_fatal = any(c["keparahan"] == "fatal" for c in bersih)
-    passed = bool(hasil.get("passed", True)) and not ada_fatal
+    fatal = [c for c in bersih if c["keparahan"] == "fatal"]
+    tanda = [c for c in bersih if c["keparahan"] == "tanda"]
+    passed = not fatal
 
-    if not passed:
-        fatal = [c for c in bersih if c["keparahan"] == "fatal"]
-        log.warning("Critic menolak narasi: %d koreksi fatal", len(fatal))
+    if fatal:
+        log.warning("Critic menahan narasi: %d kesalahan fakta", len(fatal))
         for c in fatal[:5]:
             log.warning(
                 "  fatal [%s] %s | kutipan: %s | alasan: %s",
                 c.get("bagian") or "?", c["jenis"], c["kutipan"][:80], c["alasan"][:120],
             )
-    return {"passed": passed, "corrections": bersih, "dijalankan": True}
+    for c in tanda[:5]:
+        log.info(
+            "  ditandai [%s] %s | kutipan: %s",
+            c.get("bagian") or "?", c["jenis"], c["kutipan"][:80],
+        )
+
+    return {"passed": passed, "corrections": bersih, "tanda": tanda, "dijalankan": True}

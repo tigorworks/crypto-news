@@ -88,13 +88,11 @@ def _konteks_llm(
     """
     return {
         "harga": price,
-        # SELURUH timeframe dikirim. Sebelumnya 1H dihilangkan, padahal
-        # langkah interpretasi teknikal menerimanya dan menulis angka 1H di
-        # narasinya — critic lalu tidak bisa memverifikasi angka itu dan
-        # menandainya sebagai karangan.
+        # Hanya candle harian. Sebelumnya 4H dan 1H ikut dikirim, dan itu
+        # justru menimbulkan masalah: model menulis EMA 1H lalu critic
+        # mencocokkannya dengan EMA 4H dan memvonisnya karangan. Untuk laporan
+        # harian, satu timeframe menghapus seluruh kelas kesalahan itu.
         "teknikal_1d": teknikal.get("1d"),
-        "teknikal_4h": teknikal.get("4h"),
-        "teknikal_1h": teknikal.get("1h"),
         "level_kunci": teknikal.get("key_levels"),
         "sinyal_oi": {
             "sinyal": teknikal.get("oi_price_signal"),
@@ -203,9 +201,17 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     gagal: List[str] = []
     catatan: List[str] = []
 
+    # Brief sebelumnya dibaca sekali di awal: dipakai untuk menurunkan
+    # perubahan OI, menambal arus ETF yang gagal di-scrape, dan menghitung diff.
+    sebelumnya = builder.brief_sebelumnya()
+
     # -- 1. Harga + klines (FATAL kalau gagal) --------------------------
     log.info("[1/21] Ambil harga dan klines")
-    data_harga = binance.fetch_price_and_klines(cfg.symbol, cfg.timeframes, cfg.candle_limit)
+    # Candle reaksi diambil terpisah dari timeframe analisa: dipakai hanya untuk
+    # mengukur gerak harga satu jam setelah berita terbit, tidak pernah
+    # ditampilkan maupun dikirim ke LLM sebagai timeframe.
+    tf_diambil = list(dict.fromkeys([*cfg.timeframes, cfg.timeframe_reaksi]))
+    data_harga = binance.fetch_price_and_klines(cfg.symbol, tf_diambil, cfg.candle_limit)
     price = data_harga["price"]
     klines = data_harga["klines"]
     if data_harga["source"] != "binance":
@@ -224,8 +230,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     # sehari cukup untuk sinyal OI-vs-harga, dan jauh lebih baik daripada
     # kehilangan sinyalnya sama sekali.
     if not oi_history and open_interest is not None:
-        sebelumnya_awal = builder.brief_sebelumnya()
-        oi_lama = ((sebelumnya_awal or {}).get("market") or {}).get("open_interest")
+        oi_lama = ((sebelumnya or {}).get("market") or {}).get("open_interest")
         if oi_lama:
             oi_history = [
                 {"timestamp": 0, "open_interest": float(oi_lama)},
@@ -236,7 +241,8 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
                 "(%.0f -> %.0f)", float(oi_lama), float(open_interest),
             )
 
-    teknikal = technical.analyze(klines, price, oi_history, funding)
+    klines_analisa = {tf: klines.get(tf, []) for tf in cfg.timeframes}
+    teknikal = technical.analyze(klines_analisa, price, oi_history, funding)
     if not teknikal.get("1d"):
         gagal.append("technical")
     if teknikal.get("sinyal_palsu"):
@@ -252,11 +258,42 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         **hasil_pasar["data"],
     }
 
+    # Arus ETF hanya bisa di-scrape dari halaman HTML pihak ketiga, jadi
+    # sesekali gagal. Angkanya sendiri terbit sekali sehari dan SELALU membawa
+    # tanggalnya sendiri, jadi memakai ulang nilai terakhir yang diketahui
+    # tetap jujur — pembaca melihat tanggal aslinya. Yang tidak boleh adalah
+    # menampilkannya seolah baru, karena itu ada penanda kedaluwarsa.
+    if pasar.get("etf_flow_usd") is None:
+        pasar_lama = (sebelumnya or {}).get("market") or {}
+        if pasar_lama.get("etf_flow_usd") is not None:
+            pasar["etf_flow_usd"] = pasar_lama["etf_flow_usd"]
+            pasar["etf_flow_date"] = pasar_lama.get("etf_flow_date")
+            pasar["etf_flow_kedaluwarsa"] = True
+            if "etf_flow" in gagal:
+                gagal.remove("etf_flow")
+            catatan.append(
+                "Arus ETF gagal diambil; dipakai angka terakhir yang diketahui "
+                f"(tanggal {pasar.get('etf_flow_date') or 'tidak diketahui'})."
+            )
+            log.info("Arus ETF memakai nilai terakhir yang diketahui")
+
     hasil_whale = whale.collect(cfg.symbol)
     posisi_whale = hasil_whale["data"]
-    if hasil_whale["failed"]:
+    # Sumber ini punya tiga jalur cadangan; yang menentukan gagal atau tidak
+    # adalah DATA yang akhirnya didapat, bukan berapa jalur yang sempat error.
+    # Sebelumnya satu percobaan gagal sudah cukup menandai sumbernya gagal,
+    # padahal cadangannya berhasil — dan itu menyeret skor kualitas tiap run.
+    ada_posisi = (
+        posisi_whale.get("whale_long_pct") is not None
+        or posisi_whale.get("ritel_long_pct") is not None
+    )
+    if not ada_posisi:
         gagal.append("whale")
         catatan.append("Data posisi whale tidak tersedia; analisa manipulasi dilewati.")
+    elif posisi_whale.get("whale_long_pct") is None:
+        catatan.append(
+            "Rasio posisi pemain besar tidak tersedia; hanya sisi ritel yang terbaca."
+        )
 
     # -- 4. Opsi, valuasi on-chain, aliran dana --------------------------
     log.info("[4/21] Ambil data opsi, valuasi on-chain, dan aliran dana")
@@ -356,7 +393,9 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
 
     # -- 9. Cross-check berita vs harga ----------------------------------
     log.info("[12/21] Cross-check berita vs pergerakan harga 1H")
-    hasil_cross = news_analysis.cross_check(artikel, klines.get("1h", []), funding)
+    hasil_cross = news_analysis.cross_check(
+        artikel, klines.get(cfg.timeframe_reaksi, []), funding
+    )
     conflicts = hasil_cross["conflicts"]
 
     # -- 10. Agregasi sentimen -------------------------------------------
@@ -365,9 +404,8 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     agregat["dominant_themes"] = news_analysis.tema_dominan(artikel)
     agregat["narrative_shift"] = ""
 
-    # -- 11. Baca brief sebelumnya ---------------------------------------
-    log.info("[14/21] Baca brief sebelumnya")
-    sebelumnya = builder.brief_sebelumnya()
+    # -- 11. Bandingkan dengan brief sebelumnya --------------------------
+    log.info("[14/21] Bandingkan dengan brief sebelumnya")
     diff_sementara = builder.hitung_diff(
         {"price": price, "aggregate": agregat, "market": pasar, "technical": teknikal, "news": artikel},
         sebelumnya,
@@ -384,6 +422,10 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         "narrative_singkat": "",
         "penyebab_pergerakan": [],
         "bagian_ditahan": [],
+        # Catatan editorial: kalimat yang menyerempet anjuran atau sebab-akibat
+        # yang terlalu percaya diri. Ditampilkan sebagai keterangan, TIDAK
+        # menahan analisanya.
+        "tanda_editorial": [],
         "teknikal": None,
         "whale": None,
         "outlook": None,
@@ -486,6 +528,12 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
                         log.warning("Revisi masih belum lolos critic")
 
             ai["critic"] = hasil_critic
+            ai["tanda_editorial"] = hasil_critic.get("tanda") or []
+            if ai["tanda_editorial"]:
+                log.info(
+                    "%d kalimat diberi tanda editorial (analisa tetap dikirim)",
+                    len(ai["tanda_editorial"]),
+                )
 
             # Critic yang gagal dijalankan diperlakukan sebagai lolos supaya
             # analisa tidak hilang, tapi statusnya TIDAK boleh diam-diam
@@ -513,9 +561,10 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
                 ai["whale"] = hasil_whale_ai
                 ai["outlook"] = hasil_outlook
             else:
-                # Hanya bagian yang benar-benar ditandai fatal yang ditahan.
-                # Menahan semuanya berarti pembaca kehilangan analisa teknikal
-                # dan outlook yang mungkin sama sekali tidak bermasalah.
+                # Sampai di sini berarti ada kesalahan FAKTA (angka karangan
+                # atau peristiwa yang tidak ada di data) — satu-satunya alasan
+                # yang boleh menahan. Yang ditahan pun hanya bagian yang
+                # ditandai; sisanya tetap dikirim.
                 bermasalah = {
                     c.get("bagian", "") for c in hasil_critic["corrections"]
                     if c.get("keparahan") == "fatal"
