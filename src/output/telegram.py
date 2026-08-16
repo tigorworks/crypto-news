@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -738,8 +739,70 @@ _ALASAN_PERMANEN = (
 )
 
 
+# Ciri penolakan Telegram yang penyebabnya MARKUP, bukan penerimanya.
+# Untuk kasus ini pesan yang sama masih bisa dikirim tanpa parse_mode.
+_CIRI_MASALAH_MARKUP = (
+    "can't parse entities",
+    "cant parse entities",
+    "unsupported start tag",
+    "unclosed start tag",
+    "can't find end tag",
+    "unexpected end tag",
+    "bad request: can't parse",
+)
+
+
+def _tanpa_tag(teks: str) -> str:
+    """Buang tag HTML dan kembalikan entity ke bentuk aslinya.
+
+    Dipakai hanya sebagai upaya terakhir: lebih baik pembaca menerima pesan
+    polos tanpa tebal/miring daripada tidak menerima apa pun.
+    """
+    polos = re.sub(r"<[^>]+>", "", teks)
+    return (
+        polos.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    )
+
+
 def _kirim_satu(token: str, chat_id: str, pesan: str) -> Dict[str, Any]:
-    """Kirim ke satu chat. Return {ok, permanen}."""
+    """Kirim ke satu chat. Return {ok, permanen}.
+
+    Kalau Telegram menolak karena MARKUP-nya (bukan karena penerimanya),
+    pesan diulang sekali tanpa parse_mode. Tanpa jaring ini, satu tag rusak
+    membuat SELURUH penerima tidak menerima apa pun — dan itu benar-benar
+    terjadi di produksi: 0 dari 2 penerima, brief harian hilang sepenuhnya
+    padahal isinya sudah jadi.
+    """
+    def _post(teks: str, pakai_html: bool) -> Dict[str, Any]:
+        muatan = {
+            "chat_id": chat_id,
+            "text": teks,
+            "disable_web_page_preview": True,
+        }
+        if pakai_html:
+            muatan["parse_mode"] = "HTML"
+        return post_json(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            muatan,
+            timeout=30,
+            retries=1,
+        )
+
+    def _coba_polos(keterangan: str) -> Optional[Dict[str, Any]]:
+        if not any(c in keterangan for c in _CIRI_MASALAH_MARKUP):
+            return None
+        log.warning(
+            "Telegram menolak markup untuk %s; dikirim ulang sebagai teks polos", chat_id
+        )
+        try:
+            ulang = _post(_tanpa_tag(pesan), pakai_html=False)
+        except HttpError as exc:
+            log.warning("Kiriman teks polos ke %s juga gagal: %s", chat_id, str(exc)[:150])
+            return None
+        if ulang.get("ok"):
+            return {"ok": True, "permanen": False}
+        return None
+
     try:
         hasil = post_json(
             f"https://api.telegram.org/bot{token}/sendMessage",
@@ -755,11 +818,17 @@ def _kirim_satu(token: str, chat_id: str, pesan: str) -> Dict[str, Any]:
         if hasil.get("ok"):
             return {"ok": True, "permanen": False}
         keterangan = str(hasil.get("description", "")).lower()
+        pulih = _coba_polos(keterangan)
+        if pulih:
+            return pulih
         permanen = any(a in keterangan for a in _ALASAN_PERMANEN)
         log.warning("Telegram menolak kirim ke %s: %s", chat_id, hasil.get("description"))
         return {"ok": False, "permanen": permanen}
     except HttpError as exc:
         keterangan = str(exc).lower()
+        pulih = _coba_polos(keterangan)
+        if pulih:
+            return pulih
         permanen = any(a in keterangan for a in _ALASAN_PERMANEN)
         log.warning("Gagal kirim ke %s: %s", chat_id, str(exc)[:150])
         return {"ok": False, "permanen": permanen}

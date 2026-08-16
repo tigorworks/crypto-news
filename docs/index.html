@@ -119,30 +119,6 @@
         </div>
       </div>
 
-      <!-- Sumber gagal ditulis terang-terangan, bukan cuma di tooltip badge
-           kualitas — tooltip nyaris tak berguna di ponsel (tanpa hover), dan
-           gampang terlewat bahkan di desktop. Pembaca berhak tahu run hari
-           ini "buta" di sumbu mana. -->
-      <template x-if="sumberGagalTampil.length">
-        <div class="mt-2 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
-          <i data-lucide="triangle-alert" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
-          <span>Sumber tidak tersedia run ini: <b x-text="sumberGagalTampil.join(', ')"></b></span>
-        </div>
-      </template>
-
-      <!-- Catatan run: ditulis pipeline tapi sebelumnya tidak pernah tampil
-           di mana pun, padahal di sinilah tercatat bagian AI yang gagal
-           dihasilkan atau data yang dipakai ulang dari brief kemarin. -->
-      <template x-if="catatanPenting.length">
-        <ul class="mt-1.5 space-y-0.5">
-          <template x-for="(c, i) in catatanPenting" :key="i">
-            <li class="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
-              <i data-lucide="info" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
-              <span x-text="c"></span>
-            </li>
-          </template>
-        </ul>
-      </template>
     </div>
 
     <!-- Notice agenda mendesak: ditaruh di dalam header sticky supaya tetap
@@ -1490,6 +1466,32 @@
             </span>
           </template>
         </p>
+      </template>
+
+      <!-- Catatan run: sumber yang gagal dan bagian yang tidak sempat
+           dihasilkan. Ditaruh di FOOTER, bukan header — ini keterangan
+           teknis untuk memeriksa kesehatan pipeline, dan menaruhnya di
+           paling atas justru membuat pembaca menyambut brief dengan
+           deretan peringatan alih-alih isinya. Tetap ditampilkan supaya
+           kegagalan tidak pernah senyap, hanya tidak lagi menyita
+           perhatian pertama. -->
+      <template x-if="sumberGagalTampil.length || catatanPenting.length">
+        <div class="text-xs space-y-0.5">
+          <template x-if="sumberGagalTampil.length">
+            <p class="flex items-start gap-1.5">
+              <i data-lucide="triangle-alert" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+              <span>Sumber tidak tersedia run ini:
+                <span class="font-medium text-slate-600 dark:text-slate-300" x-text="sumberGagalTampil.join(', ')"></span>
+              </span>
+            </p>
+          </template>
+          <template x-for="(c, i) in catatanPenting" :key="i">
+            <p class="flex items-start gap-1.5">
+              <i data-lucide="info" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+              <span x-text="c"></span>
+            </p>
+          </template>
+        </div>
       </template>
 
       <p class="text-xs">

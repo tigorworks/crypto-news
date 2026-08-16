@@ -182,6 +182,12 @@ Serangkaian penambahan berdasar audit "apa yang bisa membuat insight-nya lebih b
 - **Field yang sudah dikumpulkan tapi tak pernah ditampilkan** kini muncul di web: rentang DVOL 7 hari (bukan cuma titik terakhir), expiry opsi dengan OI terbesar (indikasi pinning/gamma menjelang jatuh tempo), tren posisi whale vs ritel dalam periode pemantauan, rincian kapitalisasi per stablecoin, neraca The Fed dan M2 (skala makro, likuiditas dolar), serta fee mempool.
 - **Bug satuan FRED yang ditemukan sekaligus dibetulkan**: WALCL (neraca Fed) dilaporkan FRED dalam JUTAAN dolar dan M2SL dalam MILIAR dolar — bukan dolar mentah. Tanpa penskalaan, `fed_balance_sheet` bernilai ~6.500.000 yang gampang salah dibaca sebagai "$6,5 juta" padahal sebenarnya $6,5 TRILIUN. Diskalakan di `src/collectors/macro.py`, di sumbernya — supaya konteks yang dibaca LLM maupun tampilan web sama-sama memakai dolar sungguhan.
 
+### Plafon max_tokens diberi margin lebar
+
+Balasan yang terpotong di batas `max_tokens` bukan kehilangan sebagian — **seluruh** keluaran langkah itu hangus, karena JSON-nya tidak lagi bisa diparse. Ini sudah terjadi di produksi: `synthesis` menyentuh tepat 10.000 token dan narasi harian hilang seluruhnya.
+
+Polanya khas dan pelan: keluaran merangkak naik seiring bertambahnya konteks (feed baru, field data baru) sampai suatu hari menyentuh plafon. Karena itu plafonnya diberi margin lebar, bukan pas-pasan — yang ditagih adalah token yang benar-benar dipakai, bukan plafonnya, jadi margin longgar praktis gratis. `synthesis` dan `revisi` di 16.000, `outlook` di 12.000 (keluaran terpantau sudah 6.016 dari plafon lama 7.000).
+
 ### Kegagalan tidak boleh senyap
 
 Prinsip yang dipegang di jalur parsing dan pelaporan: **gagal keras lebih baik daripada berhasil dengan data terpotong.** Analisa yang hilang sebagian tanpa peringatan lebih berbahaya daripada error yang kelihatan, karena brief yang kehilangan narasi utamanya terbaca persis seperti brief yang memang singkat hari itu.
