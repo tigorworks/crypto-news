@@ -17,7 +17,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from ..utils.http import HttpError, get_json
-from . import bybit, options
+from . import bybit, okx, options
 
 log = logging.getLogger(__name__)
 
@@ -127,11 +127,14 @@ def fetch_open_interest_history(symbol: str, period: str = "1d", limit: int = 30
     except (HttpError, KeyError, ValueError, TypeError) as exc:
         log.warning("Riwayat OI Binance gagal (%s), coba Bybit", _ringkas(exc))
         hasil = bybit.fetch_open_interest_history(symbol)
-        if not hasil:
-            # Tidak ada sumber ketiga untuk riwayat OI (beda dari fetch_open_interest
-            # yang masih bisa jatuh ke Deribit) — dicatat eksplisit di sini supaya
-            # kekosongannya kelihatan di log, bukan cuma hilang tanpa jejak.
-            log.warning("Riwayat OI Bybit juga gagal, riwayat OI kosong untuk run ini")
+        if hasil:
+            return hasil
+        log.warning("Bybit juga gagal, coba OKX")
+        hasil = okx.fetch_open_interest_history()
+        if hasil:
+            log.info("Riwayat OI diambil dari OKX")
+        else:
+            log.warning("OKX juga gagal, riwayat OI kosong untuk run ini")
         return hasil
 
 

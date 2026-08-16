@@ -347,6 +347,30 @@ def analyze_timeframe(klines: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def volatilitas_realized_tahunan(klines_1d: List[Dict[str, Any]], window: int = 30) -> Optional[float]:
+    """Volatilitas realized tahunan (%) dari log return candle harian.
+
+    Dihitung dari data yang SUDAH ADA (candle harian) tanpa sumber tambahan,
+    supaya bisa dibandingkan langsung dengan DVOL (implied vol tahunan
+    Deribit): rasio IV/RV menunjukkan opsi mahal (>1, pasar membayar premi
+    untuk proteksi/spekulasi) atau murah (<1, jarang dan biasanya sinyal
+    kompresi menjelang pergerakan besar) relatif terhadap volatilitas yang
+    SUNGGUHAN terjadi.
+    """
+    df = _to_frame(klines_1d)
+    if len(df) < window + 1:
+        return None
+    closes = df["close"].tail(window + 1).to_numpy()
+    if (closes <= 0).any():
+        return None
+    log_return = np.diff(np.log(closes))
+    if len(log_return) < 2:
+        return None
+    # 365 (bukan 252 seperti saham): kripto berdagang tiap hari, tanpa akhir
+    # pekan libur.
+    return _f(float(np.std(log_return, ddof=1)) * np.sqrt(365) * 100, 2)
+
+
 def oi_price_signal(
     price_change_pct: Optional[float], oi_history: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
