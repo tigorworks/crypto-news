@@ -638,6 +638,31 @@ function briefApp() {
       return [d.options, d.onchain, d.flows].some((o) => o && Object.keys(o).length);
     },
 
+    /* Kelas grid yang MENGIKUTI jumlah kartu yang benar-benar dirender.
+       Sebelumnya kelasnya dipatok (mis. `lg:grid-cols-2` untuk whale), jadi
+       ketika kartu keduanya tidak ada — sinyal palsu kosong, data on-chain
+       gagal diambil — separuh baris tampil melompong. Kolom hanya dibuat
+       sebanyak kartu yang ada. */
+    _kelasGrid(jumlah, maks) {
+      const kolom = Math.max(1, Math.min(jumlah, maks));
+      if (kolom <= 1) return 'grid grid-cols-1 gap-4';
+      if (kolom === 2) return 'grid grid-cols-1 lg:grid-cols-2 gap-4';
+      return 'grid grid-cols-1 lg:grid-cols-3 gap-4';
+    },
+
+    get kelasGridInstitusional() {
+      const d = this.data || {};
+      const jumlah = [d.options, d.onchain, d.flows]
+        .filter((o) => o && Object.keys(o).length).length;
+      return this._kelasGrid(jumlah, 3);
+    },
+
+    get kelasGridWhale() {
+      const jumlah = (this.adaDataWhale ? 1 : 0)
+        + ((this.data?.technical?.sinyal_palsu || []).length ? 1 : 0);
+      return this._kelasGrid(jumlah, 2);
+    },
+
     get barisOpsi() {
       const o = this.data?.options || {};
       const b = [];
@@ -825,8 +850,8 @@ function briefApp() {
       if (!d) return [];
       const item = [
         { id: 's-harga', label: 'Harga', ada: true },
-        { id: 's-ai', label: 'Analisa AI', ada: true },
         { id: 's-teknikal', label: 'Teknikal', ada: !!d.technical?.['1d'] },
+        { id: 's-ai', label: 'Analisa AI', ada: true },
         { id: 's-pasar', label: 'Pasar', ada: true },
         { id: 's-institusional', label: 'Opsi & Valuasi', ada: this.adaDataInstitusional },
         { id: 's-whale', label: 'Whale', ada: this.adaDataWhale || !!d.technical?.sinyal_palsu?.length },

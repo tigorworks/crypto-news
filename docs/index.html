@@ -304,30 +304,122 @@
           </div>
         </template>
 
-        <!-- "Apa yang berubah sejak kemarin" adalah pertanyaan inti
-             sebuah laporan HARIAN — dipindah dekat TL;DR, bukan hanya
-             ditemani agenda di bagian bawah halaman. -->
-          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
-            <h2 class="font-semibold flex items-center gap-2 mb-3">
-              <i data-lucide="git-compare-arrows" class="w-4 h-4 text-slate-400"></i> Perubahan vs Brief Sebelumnya
+        <!-- ================= TEKNIKAL ================= -->
+        <section id="s-teknikal" class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl">
+          <div class="flex items-center justify-between gap-3 p-5 pb-3 flex-wrap">
+            <h2 class="font-semibold flex items-center gap-2">
+              <i data-lucide="activity" class="w-4 h-4 text-slate-400"></i> Analisa Teknikal
             </h2>
-            <template x-if="!data.diff_vs_previous?.tersedia">
-              <p class="text-sm text-slate-500" x-text="data.diff_vs_previous?.alasan || 'Belum ada pembanding.'"></p>
-            </template>
-            <template x-if="data.diff_vs_previous?.tersedia">
-              <div>
-                <p class="text-xs text-slate-400 mb-2" x-text="'Dibandingkan dengan brief ' + data.diff_vs_previous.dibanding"></p>
-                <ul class="space-y-1.5 text-sm">
-                  <template x-for="(b, i) in (data.diff_vs_previous.ringkasan || [])" :key="i">
-                    <li class="flex gap-2"><span class="text-slate-300 dark:text-slate-600">•</span><span x-text="b"></span></li>
-                  </template>
-                </ul>
-                <template x-if="!data.diff_vs_previous.ringkasan?.length">
-                  <p class="text-sm text-slate-500">Tidak ada perubahan berarti.</p>
-                </template>
-              </div>
-            </template>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/70 text-slate-500 dark:text-slate-300">
+              Candle harian (1D)
+            </span>
           </div>
+
+          <template x-if="!tfAktif || !tfAktif.momentum">
+            <p class="px-5 pb-5 text-sm text-slate-500">Indikator harian tidak tersedia pada run terakhir.</p>
+          </template>
+
+          <template x-if="tfAktif && tfAktif.momentum">
+            <div class="px-5 pb-5 grid grid-cols-1 md:grid-cols-3 gap-5">
+
+              <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Tren</h3>
+                <dl class="space-y-1.5 text-sm">
+                  <template x-for="p in [20,50,100,200]" :key="p">
+                    <div class="flex justify-between items-center">
+                      <dt class="text-slate-500 dark:text-slate-400" x-text="'EMA ' + p"></dt>
+                      <dd class="flex items-center gap-2">
+                        <span x-text="uang(tfAktif.tren['ema'+p])"></span>
+                        <span class="text-[11px] sm:text-[11px] sm:text-[10px] px-1.5 py-0.5 rounded font-medium"
+                              :class="tfAktif.tren.posisi?.['ema'+p] === 'di_atas'
+                                      ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                                      : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'"
+                              x-text="tfAktif.tren.posisi?.['ema'+p] === 'di_atas' ? 'harga di atas' : 'harga di bawah'"></span>
+                      </dd>
+                    </div>
+                  </template>
+                  <div class="flex justify-between pt-1">
+                    <dt class="text-slate-500 dark:text-slate-400">Struktur</dt>
+                    <dd class="font-medium" x-text="tfAktif.tren.struktur"></dd>
+                  </div>
+                  <template x-if="tfAktif.tren.cross_50_200">
+                    <div class="flex justify-between">
+                      <dt class="text-slate-500 dark:text-slate-400">Persilangan EMA</dt>
+                      <dd class="font-medium" x-text="tfAktif.tren.cross_50_200 === 'golden_cross' ? 'Golden cross' : 'Death cross'"></dd>
+                    </div>
+                  </template>
+                </dl>
+              </div>
+
+              <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Momentum</h3>
+                <dl class="space-y-1.5 text-sm">
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">RSI (14)</dt>
+                    <dd class="font-medium"><span x-text="angka(tfAktif.momentum.rsi, 1)"></span>
+                      <span class="text-slate-400 text-xs" x-text="'· ' + labelZona(tfAktif.momentum.rsi_zona)"></span></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">MACD</dt>
+                    <dd x-text="angka(tfAktif.momentum.macd, 1)"></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Histogram</dt>
+                    <dd><span x-text="angka(tfAktif.momentum.macd_histogram, 1)"></span>
+                      <span class="text-slate-400 text-xs" x-text="'· ' + tfAktif.momentum.macd_arah"></span></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Stoch RSI %K</dt>
+                    <dd x-text="angka(tfAktif.momentum.stoch_rsi_k, 1)"></dd></div>
+                  <template x-if="tfAktif.momentum.divergensi_rsi">
+                    <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Divergensi RSI</dt>
+                      <dd class="font-medium" x-text="'terdeteksi (' + tfAktif.momentum.divergensi_rsi + ')'"></dd></div>
+                  </template>
+                </dl>
+              </div>
+
+              <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Volatilitas &amp; Volume</h3>
+                <dl class="space-y-1.5 text-sm">
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Bollinger atas</dt>
+                    <dd x-text="uang(tfAktif.volatilitas.bb_atas)"></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Bollinger bawah</dt>
+                    <dd x-text="uang(tfAktif.volatilitas.bb_bawah)"></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Bandwidth</dt>
+                    <dd><span x-text="angka(tfAktif.volatilitas.bb_bandwidth, 2) + '%'"></span>
+                      <template x-if="tfAktif.volatilitas.bb_squeeze">
+                        <span class="ml-1 text-[11px] sm:text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700">menyempit</span>
+                      </template></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">ATR (14)</dt>
+                    <dd><span x-text="uang(tfAktif.volatilitas.atr)"></span>
+                      <span class="text-slate-400 text-xs" x-text="'· ' + angka(tfAktif.volatilitas.atr_pct, 2) + '%'"></span></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Volume vs rata²</dt>
+                    <dd x-text="tfAktif.volume.rasio_vs_rata ? angka(tfAktif.volume.rasio_vs_rata, 2) + '×' : '—'"></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">OBV</dt>
+                    <dd x-text="tfAktif.volume.obv_arah"></dd></div>
+                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">VWAP harian</dt>
+                    <dd x-text="uang(tfAktif.volume.vwap_harian)"></dd></div>
+                </dl>
+              </div>
+
+              <!-- Level -->
+              <div class="md:col-span-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Level dari candle harian</h3>
+                <div class="flex flex-wrap gap-2 text-sm">
+                  <template x-for="lv in (tfAktif.level.support || [])" :key="'s'+lv">
+                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
+                      <span class="text-slate-400 text-xs">S</span> <span x-text="uang(lv)"></span></span>
+                  </template>
+                  <template x-for="lv in (tfAktif.level.resistance || [])" :key="'r'+lv">
+                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
+                      <span class="text-slate-400 text-xs">R</span> <span x-text="uang(lv)"></span></span>
+                  </template>
+                  <template x-if="tfAktif.level.pivot?.pivot">
+                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
+                      <span class="text-slate-400 text-xs">Pivot</span> <span x-text="uang(tfAktif.level.pivot.pivot)"></span></span>
+                  </template>
+                  <template x-if="tfAktif.level.fib_618">
+                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
+                      <span class="text-slate-400 text-xs">Fib 0,618</span> <span x-text="uang(tfAktif.level.fib_618)"></span></span>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+        </section>
         <!-- ================= ANALISA AI ================= -->
         <!-- Area ini SENGAJA dibedakan: border indigo, latar berbeda, badge AI. -->
         <section id="s-ai" class="rounded-xl border-2 border-indigo-300 dark:border-indigo-600/70 bg-indigo-50/60 dark:bg-indigo-950/30 p-5">
@@ -659,122 +751,6 @@
             </div>
           </template>
         </section>
-        <!-- ================= TEKNIKAL ================= -->
-        <section id="s-teknikal" class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl">
-          <div class="flex items-center justify-between gap-3 p-5 pb-3 flex-wrap">
-            <h2 class="font-semibold flex items-center gap-2">
-              <i data-lucide="activity" class="w-4 h-4 text-slate-400"></i> Analisa Teknikal
-            </h2>
-            <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/70 text-slate-500 dark:text-slate-300">
-              Candle harian (1D)
-            </span>
-          </div>
-
-          <template x-if="!tfAktif || !tfAktif.momentum">
-            <p class="px-5 pb-5 text-sm text-slate-500">Indikator harian tidak tersedia pada run terakhir.</p>
-          </template>
-
-          <template x-if="tfAktif && tfAktif.momentum">
-            <div class="px-5 pb-5 grid grid-cols-1 md:grid-cols-3 gap-5">
-
-              <div>
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Tren</h3>
-                <dl class="space-y-1.5 text-sm">
-                  <template x-for="p in [20,50,100,200]" :key="p">
-                    <div class="flex justify-between items-center">
-                      <dt class="text-slate-500 dark:text-slate-400" x-text="'EMA ' + p"></dt>
-                      <dd class="flex items-center gap-2">
-                        <span x-text="uang(tfAktif.tren['ema'+p])"></span>
-                        <span class="text-[11px] sm:text-[11px] sm:text-[10px] px-1.5 py-0.5 rounded font-medium"
-                              :class="tfAktif.tren.posisi?.['ema'+p] === 'di_atas'
-                                      ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                                      : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'"
-                              x-text="tfAktif.tren.posisi?.['ema'+p] === 'di_atas' ? 'harga di atas' : 'harga di bawah'"></span>
-                      </dd>
-                    </div>
-                  </template>
-                  <div class="flex justify-between pt-1">
-                    <dt class="text-slate-500 dark:text-slate-400">Struktur</dt>
-                    <dd class="font-medium" x-text="tfAktif.tren.struktur"></dd>
-                  </div>
-                  <template x-if="tfAktif.tren.cross_50_200">
-                    <div class="flex justify-between">
-                      <dt class="text-slate-500 dark:text-slate-400">Persilangan EMA</dt>
-                      <dd class="font-medium" x-text="tfAktif.tren.cross_50_200 === 'golden_cross' ? 'Golden cross' : 'Death cross'"></dd>
-                    </div>
-                  </template>
-                </dl>
-              </div>
-
-              <div>
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Momentum</h3>
-                <dl class="space-y-1.5 text-sm">
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">RSI (14)</dt>
-                    <dd class="font-medium"><span x-text="angka(tfAktif.momentum.rsi, 1)"></span>
-                      <span class="text-slate-400 text-xs" x-text="'· ' + labelZona(tfAktif.momentum.rsi_zona)"></span></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">MACD</dt>
-                    <dd x-text="angka(tfAktif.momentum.macd, 1)"></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Histogram</dt>
-                    <dd><span x-text="angka(tfAktif.momentum.macd_histogram, 1)"></span>
-                      <span class="text-slate-400 text-xs" x-text="'· ' + tfAktif.momentum.macd_arah"></span></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Stoch RSI %K</dt>
-                    <dd x-text="angka(tfAktif.momentum.stoch_rsi_k, 1)"></dd></div>
-                  <template x-if="tfAktif.momentum.divergensi_rsi">
-                    <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Divergensi RSI</dt>
-                      <dd class="font-medium" x-text="'terdeteksi (' + tfAktif.momentum.divergensi_rsi + ')'"></dd></div>
-                  </template>
-                </dl>
-              </div>
-
-              <div>
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Volatilitas &amp; Volume</h3>
-                <dl class="space-y-1.5 text-sm">
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Bollinger atas</dt>
-                    <dd x-text="uang(tfAktif.volatilitas.bb_atas)"></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Bollinger bawah</dt>
-                    <dd x-text="uang(tfAktif.volatilitas.bb_bawah)"></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Bandwidth</dt>
-                    <dd><span x-text="angka(tfAktif.volatilitas.bb_bandwidth, 2) + '%'"></span>
-                      <template x-if="tfAktif.volatilitas.bb_squeeze">
-                        <span class="ml-1 text-[11px] sm:text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700">menyempit</span>
-                      </template></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">ATR (14)</dt>
-                    <dd><span x-text="uang(tfAktif.volatilitas.atr)"></span>
-                      <span class="text-slate-400 text-xs" x-text="'· ' + angka(tfAktif.volatilitas.atr_pct, 2) + '%'"></span></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Volume vs rata²</dt>
-                    <dd x-text="tfAktif.volume.rasio_vs_rata ? angka(tfAktif.volume.rasio_vs_rata, 2) + '×' : '—'"></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">OBV</dt>
-                    <dd x-text="tfAktif.volume.obv_arah"></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">VWAP harian</dt>
-                    <dd x-text="uang(tfAktif.volume.vwap_harian)"></dd></div>
-                </dl>
-              </div>
-
-              <!-- Level -->
-              <div class="md:col-span-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Level dari candle harian</h3>
-                <div class="flex flex-wrap gap-2 text-sm">
-                  <template x-for="lv in (tfAktif.level.support || [])" :key="'s'+lv">
-                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
-                      <span class="text-slate-400 text-xs">S</span> <span x-text="uang(lv)"></span></span>
-                  </template>
-                  <template x-for="lv in (tfAktif.level.resistance || [])" :key="'r'+lv">
-                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
-                      <span class="text-slate-400 text-xs">R</span> <span x-text="uang(lv)"></span></span>
-                  </template>
-                  <template x-if="tfAktif.level.pivot?.pivot">
-                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
-                      <span class="text-slate-400 text-xs">Pivot</span> <span x-text="uang(tfAktif.level.pivot.pivot)"></span></span>
-                  </template>
-                  <template x-if="tfAktif.level.fib_618">
-                    <span class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700/60">
-                      <span class="text-slate-400 text-xs">Fib 0,618</span> <span x-text="uang(tfAktif.level.fib_618)"></span></span>
-                  </template>
-                </div>
-              </div>
-            </div>
-          </template>
-        </section>
         <!-- ================= POSISI PASAR + MAKRO ================= -->
         <section id="s-pasar" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
@@ -870,7 +846,7 @@
         </section>
         <!-- ============ DATA INSTITUSIONAL: OPSI, VALUASI, ALIRAN ============ -->
         <template x-if="adaDataInstitusional">
-          <section id="s-institusional" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <section id="s-institusional" :class="kelasGridInstitusional">
 
             <template x-if="data.options && Object.keys(data.options).length">
               <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
@@ -951,7 +927,7 @@
         </template>
         <!-- ============ POSISI WHALE + SINYAL TERDETEKSI (data mentah) ============ -->
         <template x-if="adaDataWhale || data.technical.sinyal_palsu?.length">
-          <section id="s-whale" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <section id="s-whale" :class="kelasGridWhale">
 
             <template x-if="adaDataWhale">
               <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
@@ -1362,6 +1338,30 @@
           </div>
         </section>
 
+
+        <!-- Perubahan vs brief sebelumnya: konteks penutup, ditaruh di
+             bawah setelah pembaca melihat kondisi hari ini. -->
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
+            <h2 class="font-semibold flex items-center gap-2 mb-3">
+              <i data-lucide="git-compare-arrows" class="w-4 h-4 text-slate-400"></i> Perubahan vs Brief Sebelumnya
+            </h2>
+            <template x-if="!data.diff_vs_previous?.tersedia">
+              <p class="text-sm text-slate-500" x-text="data.diff_vs_previous?.alasan || 'Belum ada pembanding.'"></p>
+            </template>
+            <template x-if="data.diff_vs_previous?.tersedia">
+              <div>
+                <p class="text-xs text-slate-400 mb-2" x-text="'Dibandingkan dengan brief ' + data.diff_vs_previous.dibanding"></p>
+                <ul class="space-y-1.5 text-sm">
+                  <template x-for="(b, i) in (data.diff_vs_previous.ringkasan || [])" :key="i">
+                    <li class="flex gap-2"><span class="text-slate-300 dark:text-slate-600">•</span><span x-text="b"></span></li>
+                  </template>
+                </ul>
+                <template x-if="!data.diff_vs_previous.ringkasan?.length">
+                  <p class="text-sm text-slate-500">Tidak ada perubahan berarti.</p>
+                </template>
+              </div>
+            </template>
+          </div>
         <!-- ================= ARSIP ================= -->
         <section class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
           <div class="flex items-center justify-between gap-3 flex-wrap">
