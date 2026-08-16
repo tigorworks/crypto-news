@@ -535,13 +535,20 @@ def _blok_penutup(brief: Dict[str, Any], site_url: str) -> List[str]:
     return baris
 
 
-def render(brief: Dict[str, Any], site_url: str = "", batas: Optional[int] = None) -> str:
-    """Susun pesan HTML. Kalau kepanjangan, bagian berita dipangkas lebih dulu.
+def render_terpisah(
+    brief: Dict[str, Any], site_url: str = "", batas: Optional[int] = None
+) -> tuple:
+    """Sama seperti render(), tapi judul+waktu dipisah dari sisa pesan.
 
-    `batas` memungkinkan pemanggil menyisakan ruang kepala. Perapi LLM
-    menambah emoji dan jeda baris, jadi kalau pesan sudah mepet 4096 karakter
-    hasil rapinya pasti melewati batas dan selalu ditolak — perapiannya jadi
-    tidak pernah terpakai.
+    Dipakai supaya perapi LLM (stylist) hanya pernah melihat dan menata
+    BADAN pesan — judul "Ringkasan Pasar Bitcoin" dan timestamp tidak pernah
+    dikirim ke LLM sama sekali, jadi tidak mungkin hilang atau tertulis
+    ulang biar pun modelnya lupa instruksi "pertahankan judul". Sebelumnya
+    judul ini kadang hilang dari pesan yang sudah dirapikan karena
+    verifikasinya tidak pernah mewajibkan judul itu ada.
+
+    Return: (kepala_teks, badan_teks) — digabung apa adanya (tanpa pemisah
+    tambahan) menghasilkan pesan yang identik dengan render().
     """
     batas_efektif = batas or BATAS_KARAKTER
     kepala = [
@@ -549,6 +556,7 @@ def render(brief: Dict[str, Any], site_url: str = "", batas: Optional[int] = Non
         f"🕐 {esc(brief.get('generated_at_wib', ''))}",
         "",
     ]
+    kepala_teks = "\n".join(kepala)
     inti = (
         _blok_harga(brief)
         + _blok_teknikal(brief)
@@ -593,7 +601,7 @@ def render(brief: Dict[str, Any], site_url: str = "", batas: Optional[int] = Non
 
         pesan = "\n".join(bagian)
         if len(pesan) <= batas_efektif:
-            return pesan
+            return kepala_teks, pesan[len(kepala_teks):]
 
     # Terakhir: pangkas isi blok AI sendiri, sisakan kepala + harga + penutup.
     dasar = "\n".join(kepala + _blok_harga(brief))
@@ -606,7 +614,19 @@ def render(brief: Dict[str, Any], site_url: str = "", batas: Optional[int] = Non
     pesan = "\n".join([dasar, ai_teks] + penutup)
     if len(pesan) > batas_efektif:
         pesan = pesan[: batas_efektif - 60].rsplit("\n", 1)[0] + "\n\n…\n<i>Pesan dipotong.</i>"
-    return pesan
+    return kepala_teks, pesan[len(kepala_teks):]
+
+
+def render(brief: Dict[str, Any], site_url: str = "", batas: Optional[int] = None) -> str:
+    """Susun pesan HTML. Kalau kepanjangan, bagian berita dipangkas lebih dulu.
+
+    `batas` memungkinkan pemanggil menyisakan ruang kepala. Perapi LLM
+    menambah emoji dan jeda baris, jadi kalau pesan sudah mepet 4096 karakter
+    hasil rapinya pasti melewati batas dan selalu ditolak — perapiannya jadi
+    tidak pernah terpakai.
+    """
+    kepala_teks, badan_teks = render_terpisah(brief, site_url, batas)
+    return kepala_teks + badan_teks
 
 
 def broadcast(

@@ -665,19 +665,24 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     # dengan ruang kepala. Tanpa itu hasil rapinya selalu melewati 4096
     # karakter dan selalu ditolak.
     rapikan_aktif = bool(client) and cfg.telegram.get("rapikan_dengan_llm", True)
-    pesan = telegram.render(
+    kepala_pesan, badan_pesan = telegram.render_terpisah(
         brief, cfg.site_url, batas=3400 if rapikan_aktif else None
     )
 
-    # Perapian tata letak lewat LLM murah. Kalau hasilnya tidak lolos
-    # verifikasi, pesan asli yang dipakai — jadi langkah ini tidak pernah
-    # bisa memperburuk isi, paling banter tidak memperbaiki tampilannya.
+    # Perapian tata letak lewat LLM murah — HANYA badan pesan yang dikirim.
+    # Judul "Ringkasan Pasar Bitcoin" dan timestamp tidak pernah dilihat LLM
+    # sama sekali, jadi tidak mungkin hilang atau ditulis ulang biar pun
+    # modelnya lupa instruksi "pertahankan judul" (yang pernah terjadi).
+    # Kalau hasilnya tidak lolos verifikasi, badan asli yang dipakai — jadi
+    # langkah ini tidak pernah bisa memperburuk isi.
     if rapikan_aktif:
         log.info("Rapikan pesan Telegram")
-        hasil_rapi = stylist.rapikan(client, cfg.llm_models("format"), pesan, brief)
-        pesan = hasil_rapi["pesan"]
+        hasil_rapi = stylist.rapikan(client, cfg.llm_models("format"), badan_pesan, brief)
+        pesan = kepala_pesan + hasil_rapi["pesan"]
         if not hasil_rapi["dirapikan"] and hasil_rapi["alasan"]:
             catatan.append("Perapian pesan dilewati: " + hasil_rapi["alasan"])
+    else:
+        pesan = kepala_pesan + badan_pesan
 
     penerima, state_pelanggan = _kumpulkan_penerima(cfg, dry_run, catatan)
 

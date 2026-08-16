@@ -64,6 +64,15 @@ def _tag_dipakai(teks: str) -> Set[str]:
     return {t.lower() for t in POLA_TAG.findall(teks)}
 
 
+# Rasio minimal panjang hasil terhadap pesan asli. Perapi cuma boleh MENATA
+# ulang, bukan MERINGKAS — kalau hasilnya jauh lebih pendek dari aslinya,
+# yang paling mungkin terjadi bukan tata letak dirapikan, tapi seluruh
+# bagian (penyebab, whale, outlook, kesimpulan, dst) ikut hilang saat
+# ditulis ulang. Rasio 0,6 memberi ruang untuk pemadatan wajar (spasi dan
+# pengulangan label dihapus) tapi menolak versi yang dipangkas jadi ringkasan.
+RASIO_PANJANG_MINIMAL = 0.6
+
+
 def periksa(asli: str, hasil: str) -> Optional[str]:
     """Return alasan penolakan, atau None kalau hasilnya layak pakai."""
     if not hasil or len(hasil.strip()) < 100:
@@ -71,6 +80,12 @@ def periksa(asli: str, hasil: str) -> Optional[str]:
 
     if len(hasil) > BATAS_KARAKTER:
         return f"melebihi batas Telegram ({len(hasil)} karakter)"
+
+    if len(asli) >= 100 and len(hasil) < len(asli) * RASIO_PANJANG_MINIMAL:
+        return (
+            f"hasil jauh lebih pendek dari asli ({len(hasil)} vs {len(asli)} "
+            "karakter) — kemungkinan sebagian isi ikut terhapus, bukan cuma dirapikan"
+        )
 
     asing = _tag_dipakai(hasil) - TAG_DIIZINKAN
     if asing:
@@ -118,7 +133,14 @@ def _prompt() -> str:
         "  - JANGAN menambah angka baru, termasuk perhitungan sendiri.\n"
         "  - JANGAN menambah fakta, klaim, atau kesimpulan yang tidak ada.\n"
         "  - JANGAN menghapus angka penting, penanda ANALISA AI, atau disclaimer.\n"
-        "  - JANGAN memberi saran beli/jual atau target harga.\n\n"
+        "  - JANGAN memberi saran beli/jual atau target harga.\n"
+        "  - JANGAN meringkas atau memendekkan isi. Setiap bagian di pesan asli "
+        "(penyebab pergerakan, pandangan ke depan, teknikal, whale, kesimpulan, "
+        "dst) WAJIB tetap ada di hasil, dengan kalimat yang boleh dirapikan tapi "
+        "TIDAK dipotong maknanya. Hasil yang jauh lebih pendek dari aslinya "
+        "akan ditolak otomatis dan pesan asli yang dikirim — jadi lebih baik "
+        "menata semuanya dengan rapi daripada memilih-milih bagian mana yang "
+        "disertakan.\n\n"
 
         "YANG BOLEH KAMU LAKUKAN:\n"
         "  - Menata urutan supaya mengalir: harga dan analisa AI paling menonjol\n"
