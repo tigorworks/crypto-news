@@ -376,7 +376,7 @@ Cocok untuk beberapa penerima yang jarang berubah, termasuk grup (ID grup diawal
 
 ### Cara 2: pelanggan lewat /start
 
-Siapa pun bisa mengirim `/start` ke bot untuk berlangganan, dan `/stop` untuk berhenti. Tiap run membaca perintah baru, mengirim sapaan ke pendaftar, lalu memasukkan mereka ke daftar kirim.
+Siapa pun bisa mengirim `/start` ke bot untuk berlangganan, dan `/stop` untuk berhenti. Halaman web menyediakan **tombol Berlangganan** (di header dan footer) yang membuka bot lewat `https://t.me/<bot>?start=web` — Telegram menampilkan tombol MULAI yang langsung mengirim `/start`, jadi pembaca tidak perlu mengetiknya. Atur nama botnya di `config.yaml` bagian `telegram.bot_username`; kosongkan kalau tombolnya tidak ingin ditampilkan. Tiap run membaca perintah baru, mengirim sapaan ke pendaftar, lalu memasukkan mereka ke daftar kirim.
 
 Butuh satu secret tambahan: **`TELEGRAM_SUBSCRIBER_KEY`** — isi bebas, misalnya hasil `openssl rand -base64 32`.
 

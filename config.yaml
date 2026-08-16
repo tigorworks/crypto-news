@@ -187,6 +187,9 @@ telegram:
   rapikan_dengan_llm: true
   # Jeda antar pesan saat broadcast. Telegram membatasi sekitar 30 pesan/detik.
   jeda_kirim_detik: 0.06
+  # Username bot (tanpa @). Dipakai halaman web untuk tombol berlangganan.
+  # Kosongkan kalau tombolnya tidak ingin ditampilkan.
+  bot_username: tmmcrypto_bot
 
 archive_retention_days: 90
 

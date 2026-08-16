@@ -686,6 +686,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             for k in klines.get("1d", [])[-60:]
         ],
         tautan_luar=cfg.tautan_luar,
+        bot_telegram=str(cfg.telegram.get("bot_username") or "").lstrip("@"),
         previous=sebelumnya,
     )
 
