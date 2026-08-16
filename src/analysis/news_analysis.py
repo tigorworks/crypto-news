@@ -1237,7 +1237,33 @@ def sintesis(
         "baik/buruknya berita. Berita buruk yang sudah diantisipasi sering direspons "
         "kecil atau malah naik. Bandingkan aktual vs konsensus, bukan vs bulan lalu.\n\n"
 
-        "4. Bedakan pergerakan teknikal dari fundamental.\n"
+        "4. PERTANYAAN PERTAMA YANG WAJIB DIJAWAB: 24 jam ini NAIK atau TURUN, "
+        "kenapa, dan itu kenaikan/penurunan JENIS APA.\n"
+        "   Ini yang paling ingin diketahui pembaca dan harus terjawab tuntas, "
+        "bukan tersirat. Field `pergerakan_24j` sudah berisi klasifikasi yang "
+        "DIHITUNG KODE — pakai itu apa adanya, jangan hitung ulang dan jangan "
+        "membantahnya:\n"
+        "     `arah`            -> naik | turun | datar\n"
+        "     `besaran`         -> tipis | wajar | besar | ekstrem, relatif "
+        "terhadap kisaran harian normal (ATR), bukan angka mutlak\n"
+        "     `jenis`           -> sifat pergerakannya dari arah open interest:\n"
+        "         long_baru       = naik karena UANG BARU masuk ke sisi beli\n"
+        "         short_covering  = naik karena POSISI JUAL DITUTUP, bukan "
+        "permintaan baru — cenderung kehilangan tenaga saat posisi jual habis\n"
+        "         short_baru      = turun karena POSISI JUAL BARU masuk\n"
+        "         long_ditutup    = turun karena POSISI BELI keluar/dilikuidasi "
+        "— tekanan mereda begitu posisi rapuh selesai keluar\n"
+        "     `volume_konfirmasi` -> apakah volume mendukung pergerakan itu\n"
+        "     `berita_pendukung`/`berita_berlawanan` -> kandidat pemicu yang "
+        "sudah disaring kode; kamu yang merangkai sebab-akibatnya\n"
+        "   Bedanya jenis ini PENTING dan harus dijelaskan artinya ke pembaca "
+        "dengan bahasa manusia: naik 3% karena uang baru masuk tidak sama "
+        "artinya dengan naik 3% karena short tertutup, walaupun angkanya sama. "
+        "Kalau `jenis` bernilai null (data open interest tidak ada), katakan "
+        "terus terang bahwa sifat pergerakannya belum bisa dipastikan — jangan "
+        "menebak.\n\n"
+
+        "4b. Bedakan pergerakan teknikal dari fundamental.\n"
         "   KALAU TIDAK ADA KATALIS BERITA, KATAKAN BEGITU — jangan mengarang narasi. "
         "Penyebab mekanis yang sering terjadi: short squeeze, likuidasi long "
         "beruntun, tarikan ke max pain menjelang expiry opsi, pengurangan posisi "
@@ -1308,6 +1334,15 @@ def sintesis(
         "  judul: temuan utama, BUKAN 'Update Harga BTC'. Mulai dari temuannya.\n"
         "  posisi_harga: angka terkini, perubahan 24 jam, konteks jarak ke "
         "support/resistance kunci (2-3 kalimat)\n"
+        "  karakter_pergerakan: WAJIB DIISI. 2-4 kalimat yang menjawab tuntas: "
+        "24 jam ini naik atau turun dan berapa; itu pergerakan jenis apa "
+        "(pakai `pergerakan_24j.jenis` — uang baru masuk, penutupan posisi "
+        "jual, posisi jual baru, atau posisi beli dilikuidasi) DAN apa artinya "
+        "bagi ketahanan pergerakan itu; apa pemicunya (berita tertentu, atau "
+        "murni mekanis kalau tidak ada berita searah). Tulis dalam bahasa "
+        "manusia, tanpa nama field. Ini bagian yang dibaca paling awal — "
+        "jangan mengulanginya lagi kata per kata di `penyebab`, di sana "
+        "telusuri rantai sebab-akibatnya lebih dalam.\n"
         "  penyebab: rantai sebab-akibat lengkap dengan angka pendukung. Kalau "
         "penyebabnya teknikal, katakan itu teknikal. (2-4 paragraf)\n"
         "  data_pendukung: array 2-4 poin berangka (arus ETF, likuidasi, on-chain, "
@@ -1374,6 +1409,7 @@ def sintesis(
     bagian = {
         "judul": teks("judul", 200),
         "posisi_harga": teks("posisi_harga"),
+        "karakter_pergerakan": teks("karakter_pergerakan", 1500),
         "penyebab": teks("penyebab"),
         "data_pendukung": daftar("data_pendukung", 4),
         "peta_level": teks("peta_level"),
@@ -1392,6 +1428,8 @@ def sintesis(
     potongan: List[str] = []
     if bagian["posisi_harga"]:
         potongan.append(bagian["posisi_harga"])
+    if bagian["karakter_pergerakan"]:
+        potongan.append(bagian["karakter_pergerakan"])
     if bagian["penyebab"]:
         potongan.append(bagian["penyebab"])
     if bagian["data_pendukung"]:

@@ -557,12 +557,62 @@ function briefApp() {
       return this.data?.technical?.['1d'] || null;
     },
 
+    /* Klasifikasi pergerakan 24 jam — dihitung pipeline, bukan AI. Tetap
+       tampil walaupun bagian AI gagal atau ditahan critic. */
+    get pergerakan24j() {
+      return this.data?.technical?.pergerakan_24j || null;
+    },
+
+    get labelArah24j() {
+      const p = this.pergerakan24j;
+      if (!p?.arah) return '';
+      if (p.arah === 'datar') return 'Praktis datar dalam 24 jam';
+      const arah = p.arah === 'naik' ? 'Naik' : 'Turun';
+      // Nilai mutlak + kata arah, bukan persen(): persen() menambahkan tanda
+      // "+" untuk angka positif, jadi hari turun akan terbaca "Turun +2,80%".
+      const angka = p.perubahan_pct === null || p.perubahan_pct === undefined
+        ? '' : ` ${this.angka(Math.abs(p.perubahan_pct), 2)}%`;
+      return `${arah}${angka} dalam 24 jam`;
+    },
+
+    get labelBesaran24j() {
+      return {
+        tipis: 'tipis', wajar: 'wajar', besar: 'besar', ekstrem: 'sangat besar',
+      }[this.pergerakan24j?.besaran] || '—';
+    },
+
+    /* Warna mengikuti ARAH, bukan jenisnya — pembaca membaca warna sebagai
+       naik/turun, dan memakainya untuk hal lain justru menyesatkan. */
+    get kelasPergerakan() {
+      const arah = this.pergerakan24j?.arah;
+      if (arah === 'naik') {
+        return {
+          kotak: 'bg-emerald-50/70 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-800/60',
+          teks: 'text-emerald-700 dark:text-emerald-300',
+          ikon: 'trending-up',
+        };
+      }
+      if (arah === 'turun') {
+        return {
+          kotak: 'bg-rose-50/70 dark:bg-rose-900/20 border-rose-300 dark:border-rose-800/60',
+          teks: 'text-rose-700 dark:text-rose-300',
+          ikon: 'trending-down',
+        };
+      }
+      return {
+        kotak: 'bg-slate-100/70 dark:bg-slate-800/40 border-slate-300 dark:border-slate-600',
+        teks: 'text-slate-700 dark:text-slate-200',
+        ikon: 'move-horizontal',
+      };
+    },
+
     /* Bagian analis sesuai struktur laporan harian: temuan, penyebab, data
        pendukung, peta level, sisi lawan, katalis, kesimpulan. */
     get bagianAnalis() {
       const b = this.data?.ai?.bagian || {};
       const urutan = [
         ['posisi_harga', 'Posisi harga', 'teks'],
+        ['karakter_pergerakan', 'Naik atau turun, dan kenaikan/penurunan jenis apa', 'teks'],
         ['penyebab', 'Penyebab', 'teks'],
         ['data_pendukung', 'Data pendukung', 'daftar'],
         ['peta_level', 'Peta level', 'teks'],
