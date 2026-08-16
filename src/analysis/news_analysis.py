@@ -1181,6 +1181,18 @@ _POLA_ANGKA = re.compile(r"\d[\d.,]*")
 # yang benar.
 _MIN_DIGIT_DIPERIKSA = 3
 
+# Narasi menyingkat angka besar ("$20,5 miliar") sementara data mentah
+# menyimpan angka penuh (20497629840). Tanpa penyesuaian skala ini, kutipan
+# yang sepenuhnya benar selalu gagal dicocokkan — persis yang terjadi di
+# produksi saat critic menuduh "Volume candle harian $20,5 miliar" sebagai
+# karangan padahal data memuat 20.497.629.840 (beda ~0,01%).
+_SKALA_SUFFIKS = {
+    "triliun": 1e12, "miliar": 1e9, "milyar": 1e9, "juta": 1e6, "ribu": 1e3,
+}
+_POLA_SUFFIKS_SKALA = re.compile(
+    r"^\s*(triliun|miliar|milyar|juta|ribu)\b", re.IGNORECASE
+)
+
 
 def _kandidat_nilai(teks: str) -> List[float]:
     """Semua tafsir masuk akal dari satu angka tertulis.
@@ -1240,16 +1252,25 @@ def _semua_angka_didukung(kutipan: str, nilai_data: List[float]) -> bool:
     ribuan yang berbeda. Pemeriksaan ini membatalkan tuduhan semacam itu tanpa
     melemahkan penyaringan angka yang benar-benar tidak ada.
     """
-    diperiksa = 0
-    for cocok in _POLA_ANGKA.findall(kutipan or ""):
+    kutipan = kutipan or ""
+    for m in _POLA_ANGKA.finditer(kutipan):
+        cocok = m.group()
         digit = sum(c.isdigit() for c in cocok)
         if digit < _MIN_DIGIT_DIPERIKSA:
             continue
-        diperiksa += 1
-        if not any(_ada_di_data(n, nilai_data) for n in _kandidat_nilai(cocok)):
+        kandidat = _kandidat_nilai(cocok)
+        # Kalau kata setelah angka ini adalah suffix skala ("miliar", dst),
+        # ikutkan versi yang sudah dikalikan sebagai tafsir tambahan — tanpa
+        # membuang tafsir apa adanya, kalau-kalau angkanya memang tidak
+        # disingkat.
+        suffiks = _POLA_SUFFIKS_SKALA.match(kutipan[m.end():])
+        if suffiks:
+            skala = _SKALA_SUFFIKS[suffiks.group(1).lower()]
+            kandidat = kandidat + [k * skala for k in kandidat]
+        if not any(_ada_di_data(n, nilai_data) for n in kandidat):
             return False
     # Tanpa angka panjang sama sekali, tuduhan "angka karangan" tidak berdasar.
-    return True if diperiksa else True
+    return True
 
 
 def pilih_model_critic(
@@ -1306,13 +1327,41 @@ def critic(
         "    ditembus'). Itu penilaian kondisi, bukan ajakan bertransaksi.\n"
         "  - Pernyataan ketidakpastian: 'penyebabnya tidak jelas dari data hari ini'.\n"
         "  - Penyebutan pola sebagai kemungkinan berkeyakinan rendah.\n"
-        "  - Istilah teknis umum yang tidak memerlukan angka.\n\n"
+        "  - Istilah teknis umum yang tidak memerlukan angka.\n"
+        "  - DUA ANGKA VOLUME BERBEDA YANG SAMA-SAMA VALID: `harga.volume_24h` "
+        "    (volume bergulir 24 jam) dan `teknikal_1d.volume.terakhir`/`.rata_20` "
+        "    (volume candle harian) adalah metrik yang BERBEDA — angkanya BOLEH "
+        "    dan MEMANG SERING tidak sama satu sama lain. Kalau narasi menyebut "
+        "    'volume candle harian' atau 'volume hari ini' dan angkanya cocok "
+        "    dengan teknikal_1d.volume, itu BENAR — jangan menuntutnya sama "
+        "    dengan volume_24h, itu memang seharusnya beda.\n"
+        "  - MENGHUBUNGKAN beberapa data poin yang ADA menjadi satu penjelasan "
+        "    (mis. 'BB squeeze + taker sell dominan + short buildup tipis "
+        "    menjelaskan kenapa harga belum bergerak'), menilai apakah suatu "
+        "    berita SUDAH TERCERMIN DI HARGA berdasarkan status/waktunya, atau "
+        "    menilai dampak suatu agenda/pertemuan yang akan datang — semua ini "
+        "    adalah PEKERJAAN UTAMA analis (menyusun sebab-akibat dari data "
+        "    mentah), BUKAN pengetahuan_luar. Kalau setiap fakta/angka yang "
+        "    dirujuk memang ada di data, ini paling banter sebab_akibat MINOR "
+        "    (interpretasi tidak eksplisit), TIDAK PERNAH pengetahuan_luar.\n\n"
 
         "YANG HARUS KAMU TANDAI:\n"
         "  1. angka_karangan: angka yang setelah kamu telusuri SELURUH data "
         "     memang tidak ada dan tidak bisa diturunkan dari data\n"
-        "  2. pengetahuan_luar: peristiwa konkret yang tidak ada di data sama sekali\n"
-        "  3. sebab_akibat: klaim sebab-akibat tanpa dukungan sama sekali\n"
+        "  2. pengetahuan_luar: HANYA fakta, angka, peristiwa, atau ENTITAS "
+        "     KONKRET yang disebut narasi tapi TIDAK ADA DI MANA PUN dalam "
+        "     data — misalnya menyebut peristiwa yang tidak pernah muncul di "
+        "     `berita`/`pernyataan_tokoh`, atau menyebut nilai numerik yang "
+        "     benar-benar tidak bisa ditelusuri dari data manapun (kalau itu "
+        "     soal angka, harusnya masuk angka_karangan, bukan sini). "
+        "     Kategori ini BUKAN untuk kalimat yang MENAFSIRKAN atau "
+        "     MENGHUBUNGKAN data yang sudah ada — itu sebab_akibat.\n"
+        "  3. sebab_akibat: klaim sebab-akibat, kesimpulan, atau penilaian "
+        "     ('kemungkinan besar', 'tampak lebih terkait', 'berpotensi "
+        "     mempengaruhi') yang DIBANGUN dari data yang ada tapi hubungan "
+        "     kausalnya tidak dinyatakan eksplisit di data itu sendiri. Ini "
+        "     SELALU minor, tidak peduli seberapa spekulatif nadanya — "
+        "     menyimpulkan dari data adalah tugas analis, bukan kesalahan.\n"
         "  4. saran_investasi: HANYA ajakan bertransaksi yang eksplisit — "
         "     'beli sekarang', 'segera jual', 'pasang stop loss di X'. "
         "     Menyebut level dan skenario TIDAK termasuk di sini.\n\n"
@@ -1322,6 +1371,13 @@ def critic(
         "          setelah kamu benar-benar mencarinya di seluruh data\n"
         "  minor = semua sisanya, termasuk nada yang menyerempet anjuran dan "
         "          klaim yang terlalu percaya diri\n\n"
+        "  jenis sebab_akibat TIDAK PERNAH fatal, berapa pun percaya dirinya "
+        "  nada kalimatnya — kalau kamu ingin menahan sebuah kalimat sebab-"
+        "  akibat, itu tandanya kamu salah memberi jenis. Cek ulang: apakah "
+        "  SETIAP fakta yang dirujuk kalimat itu ada di data? Kalau ya, itu "
+        "  sebab_akibat (minor). Hanya kalau ada fakta/angka yang BENAR-BENAR "
+        "  tidak ada di data sama sekali, itu baru pengetahuan_luar/"
+        "  angka_karangan (boleh fatal).\n\n"
         "KALAU RAGU, PILIH minor. Menahan analisa karena keraguan yang tidak "
         "pasti jauh lebih merugikan pembaca daripada membiarkan satu kalimat "
         "yang agak longgar lewat.\n\n"
