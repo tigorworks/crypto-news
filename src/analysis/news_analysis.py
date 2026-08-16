@@ -710,6 +710,11 @@ def analisa_pernyataan(
         "  mekanisme: satu kalimat rantai sebab-akibat menuju harga BTC\n"
         "  relevansi_btc: 0-100\n\n"
         "PEMBEDAAN YANG WAJIB KAMU JAGA:\n"
+        "  - jenis_sumber 'x_grok' berarti teksnya SALINAN postingan X yang "
+        "keberadaannya BELUM bisa diverifikasi kode. Perlakukan sebagai "
+        "'verbatim' hanya kalau memang berbentuk postingan langsung, dan "
+        "turunkan relevansi_btc kalau isinya terbaca janggal atau tidak "
+        "sejalan dengan berita mana pun di data.\n"
         "  - status 'verbatim' hanya kalau teks memuat ucapan/postingan langsung\n"
         "  - status 'dilaporkan_media' kalau media melaporkan tokoh mengatakan sesuatu\n"
         "  - status 'rumor' kalau bersumber dari 'orang dalam' atau belum dikonfirmasi\n"
@@ -797,6 +802,11 @@ def analisa_pernyataan(
             "url": k["url"],
             "sumber": k["sumber"],
             "jenis_sumber": k["jenis_sumber"],
+            # Hanya terisi untuk item dari X lewat Grok: apakah isinya juga
+            # muncul di sumber lain. Dipakai pembaca (dan langkah hilir) untuk
+            # menimbang bobotnya, karena postingan X tidak bisa diverifikasi
+            # keberadaannya oleh kode.
+            "terkonfirmasi_media": k.get("terkonfirmasi_media"),
             "waktu_utc": k["waktu_utc"],
         })
 

@@ -28,6 +28,7 @@ llm:
   #   format    -> DeepSeek, cuma menata pesan Telegram
   #   agenda    -> DeepSeek, ekstraksi teks-ke-JSON dari investing.com
   #   riset     -> DeepSeek, mengusulkan kueri pencarian berita hari ini
+  #   x_posts   -> GROK (wajib xAI: cuma Grok yang bisa mencari di X)
   #   agenda_dampak -> DeepSeek, menilai dampak agenda ke kripto
   #   mechanism -> DeepSeek, keterangan pendek per berita
   #   statements-> DeepSeek (menyaring pernyataan tokoh dari derau berita)
@@ -65,6 +66,15 @@ llm:
   # hanya menentukan ARAH pencarian; artikelnya diambil kode lewat Google
   # News RSS, jadi tidak ada peluang mengarang sumber. Tugas ringan.
   riset:      ["deepseek/deepseek-v3.2"]
+
+  # Mengambil postingan X (Twitter) lewat Grok. HARUS keluarga Grok: hanya
+  # xAI yang punya akses pencarian langsung ke X. Model lain akan menjawab
+  # dari ingatan — persis yang tidak kita inginkan.
+  #
+  # Verifikasi sesungguhnya ada di kode (src/collectors/x_grok.py), bukan
+  # pada kepatuhan model: tiap item wajib punya URL status X berbentuk sah
+  # dengan akun yang cocok dan waktu yang masuk akal, atau dibuang.
+  x_posts:    ["x-ai/grok-4", "x-ai/grok-3"]
 
   # Ekstraksi teks kalender ekonomi investing.com jadi JSON. Tugasnya
   # sekadar "baca teks berantakan, temukan baris jadwal event" — tidak
@@ -224,6 +234,15 @@ fomc_dates:
 # Twitter/X tidak dipakai langsung: API gratisnya tidak lagi mengizinkan
 # pembacaan timeline. Pernyataan di X tetap tertangkap lewat laporan media.
 statements:
+  # Postingan X lewat Grok. Matikan (aktif: false) kalau ingin brief ini
+  # bersandar sepenuhnya pada sumber yang bisa diverifikasi kode — laporan
+  # media dan feed resmi. Baca catatan panjang di src/collectors/x_grok.py
+  # sebelum menyalakannya: verifikasi bentuk URL TIDAK membuktikan
+  # postingannya ada, cuma membuktikan formatnya benar.
+  x_grok:
+    aktif: true
+    akun:
+      - realDonaldTrump
   max_age_hours: 48
   max_items: 25          # kandidat maksimum sebelum masuk LLM
   max_analyzed: 12       # pernyataan maksimum yang disimpan di brief

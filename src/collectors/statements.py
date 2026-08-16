@@ -30,6 +30,7 @@ import feedparser
 
 from ..utils.http import HttpError, get_json
 from ..utils.timezone import iso_utc, now_utc
+from . import x_grok
 
 log = logging.getLogger(__name__)
 
@@ -194,11 +195,19 @@ def _dedup(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return disimpan
 
 
-def collect(cfg_statements: Dict[str, Any]) -> Dict[str, Any]:
+def collect(
+    cfg_statements: Dict[str, Any],
+    client: Any = None,
+    models_x: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     """Kumpulkan kandidat pernyataan dari semua sumber.
 
     Penyaringan apakah sebuah item benar-benar memuat pernyataan yang relevan
     dilakukan langkah LLM berikutnya, bukan di sini.
+
+    `client` + `models_x` mengaktifkan pengambilan postingan X lewat Grok.
+    Hasilnya masuk lewat pintu yang sama dengan sumber lain — penyaringan
+    umur, dedup, lalu analisa LLM — jadi tidak ada jalur pintas untuknya.
     """
     max_age = int(cfg_statements.get("max_age_hours", 48))
     max_items = int(cfg_statements.get("max_items", 25))
@@ -233,6 +242,25 @@ def collect(cfg_statements: Dict[str, Any]) -> Dict[str, Any]:
             log.warning("Google News '%s' gagal: %s", query, exc)
             gagal.append("google_news")
 
+    # X lewat Grok: opsional, dan sengaja ditaruh PALING AKHIR supaya
+    # `tandai_konfirmasi_media` bisa membandingkannya dengan kandidat dari
+    # sumber lain yang sudah terkumpul.
+    cfg_x = cfg_statements.get("x_grok") or {}
+    if client is not None and models_x and cfg_x.get("aktif"):
+        for akun in cfg_x.get("akun", []) or []:
+            try:
+                item = x_grok.ambil_postingan(client, models_x, akun, max_age)
+                # id dibuat di sini, bukan di x_grok, supaya seluruh kandidat
+                # memakai satu skema id yang sama dan dedup lintas-sumber
+                # tetap bekerja.
+                for i in item:
+                    i["id"] = _id_pernyataan(i["teks"], i["url"])
+                x_grok.tandai_konfirmasi_media(item, kandidat)
+                kandidat.extend(item)
+            except Exception as exc:
+                log.warning("Pengambilan X @%s gagal: %s", akun, exc)
+                gagal.append(f"x_grok:{akun}")
+
     batas_waktu = now_utc() - timedelta(hours=max_age)
     segar = [i for i in kandidat if i["_waktu"] is not None and i["_waktu"] >= batas_waktu]
     log.info("Kandidat pernyataan segar (< %sj): %d dari %d", max_age, len(segar), len(kandidat))
@@ -245,11 +273,15 @@ def collect(cfg_statements: Dict[str, Any]) -> Dict[str, Any]:
 
     # Kalau semua sumber gagal, ini kegagalan sumber. Kalau sumber jalan tapi
     # memang tidak ada pernyataan baru, itu hasil yang sah — bukan kegagalan.
-    semua_gagal = len(gagal) >= (
+    total_sumber = (
         len(cfg_statements.get("truth_social_accounts", []) or [])
         + len(cfg_statements.get("official_feeds", []) or [])
         + len(cfg_statements.get("google_news_queries", []) or [])
+        + (len(cfg_x.get("akun", []) or []) if cfg_x.get("aktif") else 0)
     )
+    # `>= 0` akan selalu benar kalau tidak ada sumber terkonfigurasi sama
+    # sekali, dan itu bukan kegagalan sumber — itu konfigurasi kosong.
+    semua_gagal = total_sumber > 0 and len(gagal) >= total_sumber
 
     return {
         "items": unik,

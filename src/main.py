@@ -387,7 +387,12 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
 
     # -- 7. Pernyataan tokoh berpengaruh ----------------------------------
     log.info("[7/21] Ambil pernyataan tokoh berpengaruh")
-    hasil_pernyataan = statements_collector.collect(cfg.statements)
+    # Client diteruskan supaya postingan X bisa diambil lewat Grok. Hasilnya
+    # tetap masuk lewat pintu yang sama (saringan umur, dedup, analisa LLM,
+    # critic) — tidak ada jalur pintas untuk sumber ini.
+    hasil_pernyataan = statements_collector.collect(
+        cfg.statements, client=client, models_x=cfg.llm_models("x_posts")
+    )
     kandidat_pernyataan = hasil_pernyataan["items"]
     gagal.extend(hasil_pernyataan["failed"])
     if hasil_pernyataan["sumber_gagal"] and not hasil_pernyataan["failed"]:
