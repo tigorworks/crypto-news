@@ -31,7 +31,13 @@ ATURAN_DASAR = """ATURAN WAJIB:
 2. Setiap penilaian harus merujuk isi artikel yang diberikan, bukan pengetahuan umummu.
 3. DILARANG memberi target harga, rekomendasi beli/jual, atau prediksi arah harga.
 4. Kalau informasi tidak cukup, isi null. JANGAN MENEBAK.
-5. Seluruh teks naratif ditulis dalam bahasa Indonesia."""
+5. Seluruh teks naratif ditulis dalam bahasa Indonesia.
+6. DI DALAM nilai string, pemisah paragraf ditulis sebagai \\n (dua karakter:
+   backslash lalu huruf n) — JANGAN menekan enter/baris baru sungguhan.
+   Baris baru mentah di dalam string membuat JSON tidak sah dan SELURUH
+   balasanmu terbuang, bukan cuma satu field.
+7. Tanda kutip ganda di dalam nilai string wajib di-escape (\\"). Kalau ragu,
+   pakai tanda kutip tunggal ('begini') supaya tidak perlu di-escape."""
 
 KATEGORI = ["regulasi", "makro", "etf", "onchain", "hack", "adopsi", "teknologi", "geopolitik"]
 SENTIMEN = ["bullish", "bearish", "netral"]

@@ -51,6 +51,11 @@ function briefApp() {
     filterDampakAgenda: 'besar',
     daftarArsip: [],
     arsipDipilih: '',
+    // Perbandingan dua arsip: dibaca terpisah dari `data` (arsip yang
+    // sedang ditampilkan), jadi tidak mengganggu tampilan utama.
+    arsipBanding: '',
+    dataBanding: null,
+    memuatBanding: false,
     // Berita dan pernyataan tokoh berbagi satu bagian dengan dua tab.
     tabKonten: 'berita',
     halamanBerita: 1,
@@ -106,6 +111,50 @@ function briefApp() {
 
     bukaArsip() {
       this.muat(this.arsipDipilih ? `data/${this.arsipDipilih}` : 'data/latest.json');
+    },
+
+    /* Bandingkan arsip yang sedang tampil (this.data) dengan arsip lain,
+       dimuat TERPISAH supaya tidak mengganggu tampilan utama maupun grafik. */
+    async muatBanding() {
+      if (!this.arsipBanding) { this.dataBanding = null; return; }
+      this.memuatBanding = true;
+      try {
+        const resp = await fetch(`data/${this.arsipBanding}?t=${Date.now()}`, { cache: 'no-store' });
+        if (!resp.ok) throw new Error('gagal memuat');
+        this.dataBanding = await resp.json();
+      } catch (e) {
+        this.dataBanding = null;
+      } finally {
+        this.memuatBanding = false;
+      }
+    },
+
+    /* Baris perbandingan numerik antara arsip aktif dan arsip pembanding.
+       Cuma metrik yang paling sering dicari saat membandingkan dua hari —
+       bukan seluruh isi brief, supaya tabelnya tetap ringkas dan terbaca. */
+    get barisBanding() {
+      const a = this.data, b = this.dataBanding;
+      if (!a || !b) return [];
+      const ambil = (obj, path) => path.split('.').reduce((o, k) => (o == null ? null : o[k]), obj);
+      const daftar = [
+        ['Harga', 'price.last', (v) => this.uang(v)],
+        ['Perubahan 24j', 'price.change_24h_pct', (v) => this.persen(v, 2)],
+        ['Sentimen', 'aggregate.sentiment_score', (v) => this.angka(v, 1)],
+        ['Funding rate', 'market.funding_rate', (v) => this.tekstFunding(v)],
+        ['Open interest', 'market.open_interest', (v) => this.angka(v, 0) + ' BTC'],
+        ['DVOL', 'options.dvol', (v) => this.angka(v, 1)],
+        ['Dominasi BTC', 'market.btc_dominance_pct', (v) => this.angka(v, 1) + '%'],
+        ['MVRV', 'onchain.mvrv', (v) => this.angka(v, 2)],
+      ];
+      return daftar
+        .map(([label, path, format]) => {
+          const nilaiA = ambil(a, path);
+          const nilaiB = ambil(b, path);
+          if (nilaiA === null || nilaiA === undefined || nilaiB === null || nilaiB === undefined) return null;
+          const delta = typeof nilaiA === 'number' && typeof nilaiB === 'number' ? nilaiA - nilaiB : null;
+          return { label, a: format(nilaiA), b: format(nilaiB), warnaDelta: delta === null ? '' : this.warnaAngka(delta) };
+        })
+        .filter(Boolean);
     },
 
     gambarIkon() {
@@ -460,6 +509,18 @@ function briefApp() {
     get sumberGagalTampil() {
       const kode = this.data?.data_quality?.failed_sources || [];
       return kode.map((k) => this.labelSumberGagal(k));
+    },
+
+    /* Catatan run (`data_quality.catatan`) selama ini ditulis pipeline tapi
+       TIDAK PERNAH ditampilkan di mana pun — padahal justru di situ tercatat
+       hal yang paling perlu diketahui pembaca: bagian AI yang gagal
+       dihasilkan, harga yang memakai sumber cadangan, arus ETF yang dipakai
+       ulang dari brief kemarin. Yang bersifat administratif (kunci pelanggan,
+       daftar kueri riset) disaring supaya sisanya tidak tenggelam. */
+    get catatanPenting() {
+      const abaikan = ['Fitur pelanggan dimatikan', 'Riset berita tambahan'];
+      return (this.data?.data_quality?.catatan || [])
+        .filter((c) => !abaikan.some((a) => c.startsWith(a)));
     },
 
     get kelasKualitas() {

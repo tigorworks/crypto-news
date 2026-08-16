@@ -573,6 +573,24 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             client, cfg.llm_models("outlook"), konteks_sintesis
         )
 
+        # Langkah AI yang GAGAL (balasan tidak bisa diparse, budget habis,
+        # model error) sebelumnya hilang tanpa jejak bagi pembaca: catatan
+        # "Analisa AI tidak tersedia" hanya muncul kalau SELURUH blok ai
+        # kosong, sedangkan sintesis gagal + outlook sukses menghasilkan
+        # brief yang kehilangan narasi utamanya tanpa satu pun keterangan.
+        # Bagian yang ditahan critic sudah punya catatannya sendiri; ini
+        # untuk yang tidak pernah sempat dihasilkan sama sekali.
+        for hasil_langkah, nama_langkah in (
+            (hasil_sintesis, "narasi utama"),
+            (hasil_outlook, "pandangan ke depan"),
+            (hasil_teknikal, "pembacaan teknikal"),
+            (hasil_whale_ai, "analisa whale"),
+        ):
+            if not hasil_langkah:
+                pesan = f"Bagian AI '{nama_langkah}' gagal dihasilkan pada run ini."
+                catatan.append(pesan)
+                log.warning(pesan)
+
         # Critic memeriksa SEMUA bagian naratif sekaligus.
         teks_diperiksa = {
             "narasi_utama": (hasil_sintesis or {}).get("narrative", ""),

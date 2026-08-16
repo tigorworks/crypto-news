@@ -574,6 +574,17 @@ def _blok_penutup(brief: Dict[str, Any], site_url: str) -> List[str]:
     # kesehatan pipeline, bukan informasi pasar, dan pembaca tidak bisa
     # berbuat apa-apa dengannya. Tetap tersimpan di `data_quality` pada
     # latest.json dan tampil di web untuk keperluan pemeriksaan.
+    #
+    # BEDA dengan catatan di bawah: kalau sebuah BAGIAN ANALISA gagal
+    # dihasilkan, pembaca WAJIB tahu — kalau tidak, brief yang kehilangan
+    # narasi utamanya terbaca seperti brief yang memang singkat hari itu.
+    catatan_gagal = [
+        c for c in ((brief.get("data_quality") or {}).get("catatan") or [])
+        if "gagal dihasilkan" in c
+    ]
+    for c in catatan_gagal[:3]:
+        baris.append(f"⚠️ {esc(c)}")
+
     if site_url:
         baris.append("")
         baris.append(f"🔗 Selengkapnya: {esc(site_url)}")
