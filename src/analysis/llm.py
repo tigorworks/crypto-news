@@ -237,8 +237,17 @@ class LLMClient:
         temperature: float = 0.2,
         max_tokens: int = 2000,
         json_schema: Optional[Dict[str, Any]] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Kirim satu percakapan; return teks balasan mentah."""
+        """Kirim satu percakapan; return teks balasan mentah.
+
+        `extra_body` menyisipkan field khusus provider ke payload — dipakai
+        langkah `x_posts` untuk menyalakan Live Search xAI supaya Grok
+        menjawab dari hasil pencarian X yang sungguhan, bukan dari ingatan
+        model. Kalau OpenRouter tidak meneruskannya, field ini diabaikan
+        server dan tidak merusak apa pun; jaring pengamannya tetap di kode
+        (lihat src/collectors/x_grok.py).
+        """
         if not models:
             raise LLMError(f"Tidak ada model terkonfigurasi untuk step '{step}'")
         self._cek_budget()
@@ -261,6 +270,8 @@ class LLMClient:
                 "type": "json_schema",
                 "json_schema": {"name": step, "strict": False, "schema": json_schema},
             }
+        if extra_body:
+            payload.update(extra_body)
 
         mulai = time.time()
         try:

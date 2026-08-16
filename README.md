@@ -85,6 +85,26 @@ Dengan 36 feed tetap plus feed riset, satu run bisa menarik ratusan artikel. Tig
 - **Kredibilitas sumber jadi pemecah imbang.** Pada relevansi setara, sumber tier 1 menang (tier 1 ×1,30 … tier 3 ×1,00). Sengaja ringan, bukan bobot penuh `1,0/0,7/0,4` yang dipakai skor sentimen: berita Bitcoin paling banyak datang dari media kripto yang kebanyakan tier 2–3, dan bobot penuh akan membuat berita makro tier 1 yang cuma menyerempet BTC menggusur berita kripto yang justru jadi pokok laporan.
 - **Diisi bergiliran per outlet.** Ronde pertama mengambil artikel terbaik dari tiap domain, ronde kedua yang terbaik kedua, dan seterusnya. Satu outlet yang rajin menerbitkan (Blockworks pernah 50 artikel dalam satu tarikan) tidak bisa memborong kuota semata-mata karena jumlahnya banyak. Cara ini juga tidak pernah menyisakan slot kosong kalau kandidatnya memang terkonsentrasi di sedikit outlet.
 
+### Postingan X (Twitter) lewat Grok
+
+Pernyataan Trump di X diambil lewat Grok (step `x_posts`), karena hanya xAI yang punya pencarian langsung ke X — API gratis X sendiri sudah lama tidak mengizinkan pembacaan timeline.
+
+**Ini titik paling rawan di seluruh proyek**, dan diperlakukan begitu. Di semua tempat lain, aturannya "model tidak pernah menghasilkan fakta atau URL". Di sini kita justru meminta sebuah LLM menyebutkan apa yang diposting seseorang — dan model yang tidak tahu jawabannya cenderung mengarang jawaban yang meyakinkan. Postingan presiden AS soal kripto yang dikarang, lalu disiarkan ke Telegram sebagai intelijen pasar, jauh lebih buruk daripada tidak punya data X sama sekali.
+
+Dua lapis pengaman, dan **lapis kedua yang benar-benar dipegang**:
+
+1. **Pencarian langsung.** Permintaan menyertakan `search_parameters` (Live Search xAI) supaya Grok menjawab dari hasil pencarian X sungguhan. Ini menaikkan peluang jawabannya berdasar — tapi tidak bisa diverifikasi dari sisi kita: kalau OpenRouter tidak meneruskan parameternya, model diam-diam kembali menjawab dari ingatan.
+2. **Verifikasi kode per item.** Tiap item wajib punya URL status X berbentuk sah (`x.com/<akun>/status/<id>`), dengan **akun yang cocok** dengan yang diminta, teks tidak kosong, dan waktu di dalam jangkauan (termasuk menolak tanggal masa depan — tanda kuat timestamp karangan). Yang tidak lolos dibuang, tidak peduli seberapa meyakinkan teksnya.
+
+**Yang jujur perlu diakui:** verifikasi bentuk URL membuktikan formatnya benar, **bukan** bahwa postingannya ada. Model yang mengarang URL berformat rapi tetap bisa lolos lapis ini. Karena itu:
+
+- Item dari sini ditandai `jenis_sumber: "x_grok"` dan **tidak pernah** diperlakukan sebagai sumber primer.
+- Langkah LLM pernyataan tetap wajib menilai `status` (verbatim / dilaporkan media / rumor), dan diberi tahu bahwa sumber ini belum terverifikasi.
+- `terkonfirmasi_media` menandai apakah isinya juga muncul di kandidat dari sumber lain — satu-satunya verifikasi ISI yang bisa dilakukan kode.
+- Semuanya tetap lewat pintu yang sama: saringan umur, dedup, analisa LLM, critic. Tidak ada jalur pintas.
+
+Matikan lewat `statements.x_grok.aktif: false` kalau ingin brief bersandar sepenuhnya pada sumber yang bisa diverifikasi kode.
+
 ### Berita berbahasa Indonesia
 
 Feed sumbernya berbahasa Inggris. Judul dan ringkasan diterjemahkan pada langkah klasifikasi yang memang sudah membaca tiap artikel — jadi tidak ada panggilan LLM tambahan, dan biayanya nyaris tidak berubah. Judul aslinya tetap ditampilkan kecil di bawah terjemahan, karena artikel yang dibuka tetap berbahasa Inggris dan pembaca perlu bisa mencocokkannya.
