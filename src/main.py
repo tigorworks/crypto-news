@@ -475,6 +475,25 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         )
     agenda = calendar_collector.collect(cfg.fomc_dates, konfirmasi=konfirmasi_agenda)
 
+    # Kalender cuma menghasilkan daftar mentah; "acara ekonomi" tidak berarti
+    # "berdampak ke BTC". Langkah ini menilai relevansi tiap acara terhadap
+    # kripto secara spesifik dan menjelaskan lewat jalur apa dampaknya sampai
+    # ke harga. Model hanya memberi anotasi — pencocokannya lewat indeks yang
+    # dikirim kode, jadi acara tidak bisa ditambah maupun dibuang.
+    if client and agenda:
+        log.info("[14b/21] LLM analisa dampak agenda ke kripto")
+        agenda = news_analysis.analisa_agenda(
+            client,
+            cfg.llm_models("agenda_dampak"),
+            agenda,
+            {
+                "harga_btc": price.get("last"),
+                "perubahan_24j_pct": price.get("change_24h_pct"),
+                "funding_rate": pasar.get("funding_rate"),
+                "max_pain_opsi": opsi.get("max_pain_expiry_terdekat"),
+            },
+        )
+
     # -- 12-15. Rangkaian LLM analitis -------------------------------------
     ai: Dict[str, Any] = {
         "narrative": "",

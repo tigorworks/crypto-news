@@ -958,6 +958,28 @@
                     </div>
                     <div class="text-xs text-slate-500 dark:text-slate-400"
                          x-text="[a.hari, a.waktu_wib].filter(Boolean).join(', ')"></div>
+
+                    <!-- Penilaian dampak ke kripto: hasil AI, jadi diberi
+                         ring indigo seperti chip AI lain di halaman ini. -->
+                    <template x-if="a.jalur">
+                      <div class="mt-1.5">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <span class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-600 text-white shrink-0">
+                            <i data-lucide="sparkles" class="w-2.5 h-2.5"></i> AI
+                          </span>
+                          <template x-if="a.relevansi_kripto">
+                            <span class="text-[11px] px-1.5 py-0.5 rounded-full ring-1 ring-indigo-300 dark:ring-indigo-600/70"
+                                  :class="kelasRelevansiAgenda(a.relevansi_kripto)"
+                                  x-text="labelRelevansiAgenda(a.relevansi_kripto)"></span>
+                          </template>
+                          <template x-if="a.arah">
+                            <span class="text-[11px] px-1.5 py-0.5 rounded-full ring-1 ring-indigo-300 dark:ring-indigo-600/70 bg-slate-100 dark:bg-slate-700"
+                                  x-text="labelArahAgenda(a.arah)"></span>
+                          </template>
+                        </div>
+                        <p class="mt-1 text-xs text-slate-600 dark:text-slate-300 leading-relaxed" x-text="a.jalur"></p>
+                      </div>
+                    </template>
                   </div>
                   <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 whitespace-nowrap shrink-0"
                         x-text="hitungMundur(a.jam_lagi)"></span>

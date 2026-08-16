@@ -231,6 +231,122 @@ def klasifikasi(
 # --------------------------------------------------------------------------
 # LLM #3 — mekanisme transmisi
 # --------------------------------------------------------------------------
+def analisa_agenda(
+    client: LLMClient,
+    models: List[str],
+    agenda: List[Dict[str, Any]],
+    konteks_pasar: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Nilai seberapa besar tiap agenda berdampak ke kripto, dan lewat jalur apa.
+
+    Kalender menghasilkan daftar mentah: CPI, NFP, expiry opsi, pidato ECB,
+    penjualan ritel. Semuanya "acara ekonomi", tapi dampaknya ke BTC jauh dari
+    seragam — expiry opsi bulanan bergerak lewat mekanisme yang sama sekali
+    berbeda dari rilis CPI, dan sebagian acara nyaris tidak berpengaruh.
+
+    Model TIDAK boleh menambah atau membuang acara. Ia hanya memberi anotasi,
+    dan pencocokannya memakai indeks yang dikirim kode — anotasi dengan indeks
+    yang tidak dikenali dibuang. Jadi tidak ada peluang mengarang agenda.
+    """
+    if not agenda or not models:
+        return agenda
+
+    system = (
+        "Kamu analis makro yang menilai dampak agenda ekonomi terhadap harga "
+        "Bitcoin. Kamu menerima daftar acara terjadwal beserta kondisi pasar "
+        "saat ini.\n\n"
+
+        "Untuk SETIAP acara, nilai:\n"
+        "  - Seberapa besar potensi dampaknya ke BTC secara spesifik (bukan ke "
+        "pasar saham atau ekonomi umum)\n"
+        "  - Lewat JALUR APA dampak itu sampai ke harga BTC\n\n"
+
+        "Jalur transmisi yang lazim:\n"
+        "  - Rilis inflasi/tenaga kerja -> ekspektasi suku bunga Fed -> "
+        "likuiditas dolar -> aset berisiko termasuk BTC\n"
+        "  - Keputusan FOMC -> biaya modal dan selera risiko\n"
+        "  - Expiry opsi besar -> tarikan harga ke max pain, volatilitas "
+        "meningkat menjelang dan sesudahnya\n"
+        "  - Keputusan regulator (SEC/CFTC) -> premi risiko regulasi kripto\n\n"
+
+        "Balas array JSON, satu objek per acara:\n"
+        "  id: integer, SAMA PERSIS dengan id pada input\n"
+        "  relevansi_kripto: 1-5 (1 = nyaris tidak berpengaruh ke BTC, "
+        "5 = berpotensi menggerakkan harga secara signifikan)\n"
+        "  jalur: satu kalimat rantai transmisi menuju harga BTC, memakai "
+        "tanda panah. Contoh: \"CPI lebih panas dari perkiraan -> ekspektasi "
+        "pemangkasan suku bunga mundur -> dolar menguat -> BTC tertekan\"\n"
+        "  arah: salah satu dari \"naik\", \"turun\", \"dua_arah\" — pakai "
+        "\"dua_arah\" kalau hasilnya bisa menggerakkan ke mana saja "
+        "tergantung angkanya (ini yang PALING SERING benar untuk rilis data)\n\n"
+
+        "DILARANG memprediksi hasil rilisnya, menyebut target harga, atau "
+        "menyarankan tindakan. Yang kamu jelaskan adalah MEKANISME, bukan "
+        "ramalan. Untuk acara yang memang tidak punya kaitan jelas dengan "
+        "kripto, beri relevansi 1 dan katakan terus terang di `jalur`.\n\n"
+
+        "JANGAN menambah acara yang tidak ada di input, dan jangan membuang "
+        "acara yang ada. Jumlah objek balasanmu harus sama dengan jumlah "
+        "acara yang dikirim.\n\n" + ATURAN_DASAR
+    )
+
+    payload = [
+        {
+            "id": i,
+            "nama": a.get("nama"),
+            "waktu_wib": a.get("waktu_wib"),
+            "dampak_umum": a.get("dampak"),
+            "tanggal_perkiraan": a.get("perkiraan"),
+        }
+        for i, a in enumerate(agenda)
+    ]
+    user = (
+        "Kondisi pasar:\n" + json.dumps(konteks_pasar, ensure_ascii=False, default=str)
+        + "\n\nAgenda terjadwal:\n" + json.dumps(payload, ensure_ascii=False)
+    )
+
+    try:
+        hasil = client.chat_json(
+            models, system, user, step="agenda_dampak", temperature=0.2, max_tokens=4000
+        )
+    except (LLMError, BudgetExceeded) as exc:
+        log.warning("Analisa dampak agenda gagal: %s", exc)
+        return agenda
+
+    if not isinstance(hasil, list):
+        log.warning("Analisa dampak agenda: balasan bukan array, dilewati")
+        return agenda
+
+    anotasi: Dict[int, Dict[str, Any]] = {}
+    for item in hasil:
+        if not isinstance(item, dict):
+            continue
+        try:
+            idx = int(item["id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        # Indeks di luar jangkauan berarti model mengarang acara — dibuang.
+        if not 0 <= idx < len(agenda):
+            continue
+        try:
+            relevansi = max(1, min(5, int(item.get("relevansi_kripto"))))
+        except (TypeError, ValueError):
+            relevansi = None
+        arah = item.get("arah")
+        anotasi[idx] = {
+            "relevansi_kripto": relevansi,
+            "jalur": str(item.get("jalur", ""))[:400] or None,
+            "arah": arah if arah in ("naik", "turun", "dua_arah") else "dua_arah",
+        }
+
+    keluaran = []
+    for i, acara in enumerate(agenda):
+        keluaran.append({**acara, **(anotasi.get(i) or {})})
+
+    log.info("Dampak agenda dinilai: %d dari %d acara", len(anotasi), len(agenda))
+    return keluaran
+
+
 def analisa_mekanisme(
     client: LLMClient, models: List[str], articles: List[Dict[str, Any]], top_n: int = 10
 ) -> List[Dict[str, Any]]:

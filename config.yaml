@@ -27,6 +27,7 @@ llm:
   #   format    -> model murah, cuma menata pesan Telegram
   #   agenda    -> model murah, ekstraksi teks-ke-JSON dari investing.com
   #   riset     -> model murah, mengusulkan kueri pencarian berita hari ini
+  #   agenda_dampak -> model menengah, menilai dampak agenda ke kripto
   #   mechanism -> model menengah (butuh penalaran sebab-akibat)
   #   statements-> model menengah (menyaring pernyataan tokoh dari derau berita)
   #   technical -> model menengah/kuat (MENAFSIRKAN indikator, bukan menghitung)
@@ -63,6 +64,9 @@ llm:
 
   # Butuh penalaran sebab-akibat, tapi keluarannya pendek.
   mechanism:  ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  # Menilai relevansi tiap agenda ke BTC dan menjelaskan jalur transmisinya.
+  # Sifatnya sama dengan mechanism: penalaran sebab-akibat, keluaran pendek.
+  agenda_dampak: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
   statements: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
 
   # Menafsirkan data dan menulis panjang: di sini kualitas model paling terasa.

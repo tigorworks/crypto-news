@@ -325,6 +325,31 @@ function briefApp() {
       }[kekuatan] || '';
     },
 
+    /* Relevansi agenda ke kripto (1-5) dalam bahasa manusia — bukan angka
+       telanjang, yang tidak berarti apa-apa tanpa membaca dokumentasi. */
+    labelRelevansiAgenda(nilai) {
+      return {
+        1: 'dampak minim', 2: 'dampak terbatas', 3: 'dampak sedang',
+        4: 'dampak besar', 5: 'dampak sangat besar',
+      }[nilai] || '';
+    },
+
+    kelasRelevansiAgenda(nilai) {
+      if (nilai >= 4) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
+      if (nilai === 3) return 'bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200';
+      return 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400';
+    },
+
+    /* "dua_arah" adalah jawaban yang paling sering benar untuk rilis data:
+       arahnya tergantung angka yang keluar, bukan acaranya sendiri. */
+    labelArahAgenda(arah) {
+      return {
+        naik: 'cenderung mengangkat harga',
+        turun: 'cenderung menekan harga',
+        dua_arah: 'arah tergantung hasilnya',
+      }[arah] || '';
+    },
+
     labelZona(zona) {
       return { jenuh_beli: 'jenuh beli', jenuh_jual: 'jenuh jual', netral: 'netral' }[zona] || zona || '';
     },
