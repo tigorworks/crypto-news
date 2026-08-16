@@ -421,6 +421,12 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         )
     pernyataan: List[Dict[str, Any]] = []
 
+    # Corong berita: dari jaring yang ditebar sampai yang benar-benar dipakai.
+    # Dilaporkan di footer supaya terlihat berapa banyak yang disaring — angka
+    # ini juga yang menunjukkan apakah penambahan feed benar-benar menambah
+    # bahan atau cuma menambah derau.
+    corong_berita = dict(hasil_berita.get("jumlah") or {})
+
     # -- 7-10. Rangkaian LLM untuk berita dan pernyataan ---------------------------------
     if client:
         log.info("[8/21] LLM filter relevansi")
@@ -456,6 +462,10 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         artikel = artikel[: int(cfg.news.get("max_after_filter", 25))]
         for a in artikel:
             a["relevansi_btc"] = a.get("skor_prioritas")
+
+    # Dicatat SETELAH seluruh penyaringan, jadi apa adanya baik jalur LLM
+    # maupun jalur cadangan skor kata kunci.
+    corong_berita["dipakai"] = len(artikel)
 
     # -- 9. Cross-check berita vs harga ----------------------------------
     log.info("[12/21] Cross-check berita vs pergerakan harga 1H")
@@ -779,6 +789,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         token_masuk=client.total_token_masuk if client else 0,
         token_keluar=client.total_token_keluar if client else 0,
         durasi_detik=round(time.monotonic() - mulai_run, 1),
+        corong_berita=corong_berita,
     )
     brief = builder.build_brief(
         price=price,
