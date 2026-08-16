@@ -36,10 +36,47 @@ log = logging.getLogger(__name__)
 BATAS_KARAKTER = 4096
 
 # Tag yang benar-benar didukung parse_mode HTML Telegram. Selain ini,
-# API menolak seluruh pesan.
-TAG_DIIZINKAN = {"b", "strong", "i", "em", "u", "s", "code", "pre", "a", "br", "blockquote"}
+# API menolak SELURUH pesan dengan HTTP 400.
+#
+# `br` sengaja TIDAK ada di sini meski sempat terdaftar: Telegram tidak
+# mengenalnya sama sekali (baris baru dibuat dengan newline biasa), dan
+# daftar ini dulu bertentangan dengan promptnya sendiri yang sudah melarang
+# <br>. Akibatnya nyata di produksi: model tetap memakai <br>, verifikasi
+# meloloskannya karena ada di daftar, lalu Telegram menolak dan SEMUA
+# penerima tidak menerima apa pun.
+TAG_DIIZINKAN = {"b", "strong", "i", "em", "u", "s", "code", "pre", "a", "blockquote"}
 
+# Tag yang menutup sendiri tidak dipakai Telegram sama sekali, jadi setiap
+# tag di daftar di atas wajib punya pasangan pembuka/penutup.
 POLA_TAG = re.compile(r"</?([a-zA-Z][a-zA-Z0-9]*)")
+POLA_TAG_URUT = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>")
+
+
+def _tag_seimbang(teks: str) -> Optional[str]:
+    """Periksa tag HTML tertutup dan bersarang dengan benar.
+
+    Verifikasi lama hanya mencocokkan NAMA tag dengan daftar putih, jadi
+    `<b>teks` tanpa penutup — atau `<b><i>x</b></i>` yang bersarang salah —
+    lolos sepenuhnya. Telegram menolaknya dengan HTTP 400 dan seluruh pesan
+    hangus. Karena pemeriksaan ini murni struktural, ia menangkap juga
+    bentuk rusak yang belum pernah kita lihat.
+    """
+    tumpukan: List[str] = []
+    for penutup, nama in POLA_TAG_URUT.findall(teks):
+        nama = nama.lower()
+        if nama not in TAG_DIIZINKAN:
+            continue  # tag asing sudah ditangani pemeriksaan daftar putih
+        if not penutup:
+            tumpukan.append(nama)
+            continue
+        if not tumpukan:
+            return f"tag penutup </{nama}> tanpa pembuka"
+        if tumpukan[-1] != nama:
+            return f"tag bersarang salah: </{nama}> menutup <{tumpukan[-1]}>"
+        tumpukan.pop()
+    if tumpukan:
+        return "tag tidak ditutup: " + ", ".join(f"<{t}>" for t in tumpukan)
+    return None
 # Angka termasuk desimal dan pemisah ribuan, dengan tanda opsional.
 POLA_ANGKA = re.compile(r"-?\d[\d.,]*")
 
@@ -90,6 +127,10 @@ def periksa(asli: str, hasil: str) -> Optional[str]:
     asing = _tag_dipakai(hasil) - TAG_DIIZINKAN
     if asing:
         return f"memakai tag HTML yang tidak didukung Telegram: {', '.join(sorted(asing))}"
+
+    rusak = _tag_seimbang(hasil)
+    if rusak:
+        return f"struktur tag HTML rusak ({rusak}) — Telegram akan menolak pesannya"
 
     for penanda in PENANDA_WAJIB:
         if penanda.lower() not in hasil.lower():

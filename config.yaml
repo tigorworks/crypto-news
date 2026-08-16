@@ -170,17 +170,20 @@ news:
     - https://www.federalreserve.gov/feeds/press_all.xml
     - https://www.sec.gov/news/pressreleases.rss
     - https://www.cftc.gov/RSS/RSSGP/rssgp.xml
-    - https://home.treasury.gov/rss/press.xml
     - https://www.federalreserve.gov/feeds/speeches.xml
     - https://www.justice.gov/news/rss?type=press_release
-    - https://www.fdic.gov/news/press-releases/rss.xml
 
     # --- Bank sentral & lembaga keuangan global ---
     # Keputusan di luar AS ikut menggerakkan likuiditas global, dan selama
     # ini brief cuma melihat sisi AS.
+    #
+    # DIHAPUS karena terbukti gagal di produksi (bukan dugaan — muncul di
+    # `Feed gagal` pada run sungguhan): treasury.gov, fdic.gov, bis.org,
+    # imf.org. Semuanya menolak permintaan dari IP pusat data atau tidak
+    # menyajikan RSS yang bisa diparsing. Domainnya tetap terdaftar di
+    # source_tiers karena artikel dari sana masih bisa masuk lewat Google
+    # News, dan tier-nya tetap relevan untuk pembobotan.
     - https://www.ecb.europa.eu/rss/press.html
-    - https://www.bis.org/list/press_rlsereleases/rss.xml
-    - https://www.imf.org/en/News/RSS?Language=ENG
 
 # Tier kredibilitas sumber untuk pembobotan skor sentimen.
 # tier 1 = 1.0, tier 2 = 0.7, tier 3 = 0.4 (default tier 3 kalau tidak terdaftar)
