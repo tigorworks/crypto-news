@@ -77,6 +77,8 @@ def _tag_seimbang(teks: str) -> Optional[str]:
     if tumpukan:
         return "tag tidak ditutup: " + ", ".join(f"<{t}>" for t in tumpukan)
     return None
+
+
 # Angka termasuk desimal dan pemisah ribuan, dengan tanda opsional.
 POLA_ANGKA = re.compile(r"-?\d[\d.,]*")
 
@@ -95,6 +97,70 @@ def _angka_dinormalkan(teks: str) -> Set[str]:
         if bersih:
             hasil.add(bersih)
     return hasil
+
+
+def _nilai_numerik(teks: str) -> List[float]:
+    """Angka pada teks sebagai nilai numerik, bukan deretan digit.
+
+    Dipakai untuk memaafkan PEMBULATAN. Pencocokan berbasis deretan digit
+    menganggap "64.315" (hasil pembulatan) sebagai angka yang sama sekali
+    berbeda dari "64.315,33" di pesan asli — digitnya memang beda ("64315"
+    vs "6431533") — lalu memvonisnya karangan dan menolak seluruh hasil
+    perapian. Itu terjadi di produksi dan membuat pesan Telegram terkirim
+    dalam format mentah tanpa alasan yang sah.
+
+    Gaya Indonesia: titik = pemisah ribuan, koma = desimal. Bentuk lain
+    (titik sebagai desimal) ikut dicoba, dan keduanya dianggap tafsir yang
+    sah — tujuannya memaafkan, bukan menghakimi format.
+    """
+    nilai: List[float] = []
+    for cocok in POLA_ANGKA.findall(teks):
+        kandidat = set()
+        # Tafsir Indonesia: buang titik ribuan, koma jadi titik desimal.
+        kandidat.add(cocok.replace(".", "").replace(",", "."))
+        # Tafsir Inggris: buang koma ribuan, titik tetap desimal.
+        kandidat.add(cocok.replace(",", ""))
+        for k in kandidat:
+            try:
+                nilai.append(float(k))
+            except ValueError:
+                continue
+    return nilai
+
+
+def _angka_karangan(asli: str, hasil: str) -> Set[str]:
+    """Angka di `hasil` yang tidak bisa dijelaskan oleh angka mana pun di `asli`.
+
+    Sebuah angka dianggap SAH kalau cocok persis dengan salah satu angka
+    asli, ATAU merupakan hasil PEMBULATAN DESIMALNYA. Perapi memang boleh
+    membuang koma di belakang; yang dilarang adalah memunculkan besaran yang
+    tidak pernah ada.
+
+    Toleransinya sengaja MUTLAK (< 1 satuan), bukan persentase. Toleransi
+    relatif 1% pernah dipakai di sini dan terlalu longgar: pada harga
+    ~63.000 ia memaafkan selisih sampai 630, sehingga harga yang benar-benar
+    diubah (63.042 -> 63.542) lolos sebagai "pembulatan". Pembulatan yang
+    sah — 64.315,33 -> 64.315 — selalu berselisih di bawah satu satuan.
+    """
+    nilai_asli = _nilai_numerik(asli)
+    digit_asli = _angka_dinormalkan(asli)
+
+    mencurigakan: Set[str] = set()
+    for cocok in POLA_ANGKA.findall(hasil):
+        digit = cocok.replace(".", "").replace(",", "").lstrip("-").lstrip("0")
+        # Angka satu digit sering muncul dari penomoran daftar yang ditata
+        # ulang; itu bukan klaim data.
+        if not digit or len(digit) <= 1 or digit in digit_asli:
+            continue
+        try:
+            nilai = float(cocok.replace(".", "").replace(",", "."))
+        except ValueError:
+            mencurigakan.add(digit)
+            continue
+        if any(abs(nilai - a) < 1.0 for a in nilai_asli):
+            continue
+        mencurigakan.add(digit)
+    return mencurigakan
 
 
 def _tag_dipakai(teks: str) -> Set[str]:
@@ -149,11 +215,7 @@ def periksa(asli: str, hasil: str) -> Optional[str]:
         return "disclaimer tidak berada di dekat akhir pesan (kemungkinan terpotong)"
 
     # Inti pemeriksaan: tidak boleh ada angka yang tidak ada di pesan asli.
-    angka_asli = _angka_dinormalkan(asli)
-    angka_baru = _angka_dinormalkan(hasil) - angka_asli
-    # Angka satu digit sering muncul dari penomoran daftar yang ditata ulang;
-    # itu bukan klaim data, jadi tidak dihitung sebagai karangan.
-    angka_baru = {a for a in angka_baru if len(a) > 1}
+    angka_baru = _angka_karangan(asli, hasil)
     if angka_baru:
         return "memunculkan angka yang tidak ada di pesan asli: " + ", ".join(
             sorted(angka_baru)[:5]

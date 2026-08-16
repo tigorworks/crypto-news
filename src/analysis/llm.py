@@ -247,6 +247,55 @@ def _rapikan_string_baris(teks: str) -> str:
     return "\n".join(hasil)
 
 
+def _rapikan_kutip_liar(teks: str) -> str:
+    """Escape kutip liar tanpa bergantung pada pergantian baris.
+
+    `_rapikan_string_baris` bekerja per baris, jadi tidak menyentuh balasan
+    yang ditulis MINIFIED — seluruh objek dalam satu baris. Model yang sama
+    kadang mengembalikan bentuk itu, dan kutip liar di dalamnya membuat
+    seluruh balasan hangus.
+
+    Pemindainya per karakter: saat berada di dalam string dan bertemu kutip
+    yang tidak di-escape, kutip itu dianggap PENUTUP hanya kalau karakter
+    berikutnya (setelah spasi) memang bisa mengikuti akhir string dalam JSON
+    — `, : } ]` atau akhir teks. Selain itu, kutipnya bagian dari isi dan
+    di-escape.
+    """
+    hasil: List[str] = []
+    dalam_string = False
+    i = 0
+    n = len(teks)
+    while i < n:
+        c = teks[i]
+        if not dalam_string:
+            hasil.append(c)
+            if c == '"':
+                dalam_string = True
+            i += 1
+            continue
+
+        if c == "\\":
+            hasil.append(teks[i : i + 2])
+            i += 2
+            continue
+
+        if c == '"':
+            j = i + 1
+            while j < n and teks[j] in " \t\r\n":
+                j += 1
+            if j >= n or teks[j] in ",:}]":
+                hasil.append(c)
+                dalam_string = False
+            else:
+                hasil.append('\\"')
+            i += 1
+            continue
+
+        hasil.append(c)
+        i += 1
+    return "".join(hasil)
+
+
 def _extract_json(text: str) -> Any:
     """Parse JSON dari balasan model, seagresif yang diperlukan.
 
@@ -267,8 +316,10 @@ def _extract_json(text: str) -> Any:
     #
     # Urutannya dari yang paling aman ke yang paling agresif:
     #   1. escape karakter kontrol   — deterministik, tidak menebak apa pun
-    #   2. rapikan nilai string      — memakai heuristik batas string
+    #   2. rapikan nilai string      — memakai heuristik batas string per baris
     #   3. keduanya digabung         — untuk balasan yang rusak berlapis
+    #   4. kutip liar tanpa baris    — untuk balasan minified, di mana (2)
+    #                                  tidak punya baris untuk dijadikan patokan
     #
     # Tiap hasil WAJIB lolos _isi_terjaga(): sebuah perbaikan yang menghasilkan
     # JSON sah tapi isinya terpangkas lebih berbahaya daripada gagal parse,
@@ -279,6 +330,11 @@ def _extract_json(text: str) -> Any:
         (
             "karakter kontrol + nilai string rusak",
             lambda t: _rapikan_string_baris(_escape_kontrol_dalam_string(t)),
+        ),
+        ("kutip liar di balasan satu baris", _rapikan_kutip_liar),
+        (
+            "karakter kontrol + kutip liar",
+            lambda t: _rapikan_kutip_liar(_escape_kontrol_dalam_string(t)),
         ),
     )
     for nama, perbaiki in perbaikan:

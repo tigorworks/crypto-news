@@ -274,3 +274,97 @@ def tren_funding(history: List[Dict[str, Any]]) -> Dict[str, Any]:
         "funding_persisten_jam": berturut * 8,
         "funding_rata_7h_pct": round(rata * 100, 4),
     }
+
+
+# --------------------------------------------------------------------------
+# Harga & candle — cadangan SEBELUM CoinGecko
+# --------------------------------------------------------------------------
+# Binance menolak IP runner GitHub Actions (HTTP 451) pada setiap run, jadi
+# harga selalu jatuh ke CoinGecko. Masalahnya CoinGecko tidak menyediakan
+# OHLCV per interval: candle-nya di-RESAMPLE dari deret harga, sehingga
+# high/low/volume tiap candle cuma perkiraan. Seluruh indikator teknikal
+# (ATR, Bollinger, volume rata-rata, sapuan likuiditas) dihitung dari situ.
+#
+# OKX menyediakan OHLCV sungguhan dan terbukti tembus dari IP yang sama —
+# rasio whale, taker, dan riwayat OI semuanya berhasil lewat sini. Jadi OKX
+# ditaruh sebagai cadangan PERTAMA: candle asli jauh lebih baik daripada
+# candle hasil resampling.
+_INTERVAL_OKX = {"1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1D"}
+SPOT_INST = "BTC-USDT"
+
+
+def fetch_price() -> Dict[str, Any]:
+    """Harga spot + statistik 24 jam dari ticker OKX."""
+    resp = get_json(
+        f"{BASE}/api/v5/market/ticker", params={"instId": SPOT_INST}, timeout=15, retries=1
+    )
+    if not isinstance(resp, dict) or str(resp.get("code", "0")) != "0":
+        raise ValueError(f"ticker OKX menolak: {resp}")
+    baris = (resp.get("data") or [None])[0]
+    if not isinstance(baris, dict):
+        raise ValueError("ticker OKX tidak mengembalikan data")
+
+    terakhir = _angka(baris.get("last"))
+    buka24 = _angka(baris.get("open24h"))
+    if terakhir is None:
+        raise ValueError("ticker OKX tidak memuat harga terakhir")
+
+    return {
+        "last": terakhir,
+        "change_24h_pct": (
+            round((terakhir - buka24) / buka24 * 100, 2) if buka24 else None
+        ),
+        "high_24h": _angka(baris.get("high24h")),
+        "low_24h": _angka(baris.get("low24h")),
+        # volCcy24h = volume dalam mata uang quote (USDT), setara volume_24h
+        # Binance dalam USD — bukan volCcy dalam BTC.
+        "volume_24h": _angka(baris.get("volCcy24h")),
+    }
+
+
+def fetch_klines(interval: str, limit: int) -> List[Dict[str, Any]]:
+    """Candle OHLCV sungguhan, diurutkan lama ke baru.
+
+    OKX membalas terbaru-dulu dan membatasi 300 baris per permintaan; kode
+    lain di proyek ini mengasumsikan elemen terakhir yang terkini.
+    """
+    bar = _INTERVAL_OKX.get(interval)
+    if bar is None:
+        raise ValueError(f"interval '{interval}' tidak dikenali OKX")
+
+    resp = get_json(
+        f"{BASE}/api/v5/market/candles",
+        params={"instId": SPOT_INST, "bar": bar, "limit": min(limit, 300)},
+        timeout=15,
+        retries=1,
+    )
+    if not isinstance(resp, dict) or str(resp.get("code", "0")) != "0":
+        raise ValueError(f"candles OKX menolak: {resp}")
+
+    hasil: List[Dict[str, Any]] = []
+    for r in resp.get("data") or []:
+        # [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
+        if not isinstance(r, list) or len(r) < 7:
+            continue
+        nilai = [_angka(x) for x in r[:7]]
+        if any(v is None for v in nilai[:5]):
+            continue
+        ts = int(nilai[0])
+        hasil.append({
+            "open_time": ts,
+            "open": nilai[1], "high": nilai[2], "low": nilai[3], "close": nilai[4],
+            # volCcy (indeks 6) = volume dalam USDT, sepadan dengan volume
+            # quote Binance yang dipakai di seluruh analisa teknikal.
+            "volume": nilai[6] if nilai[6] is not None else nilai[5],
+            "close_time": ts - 1,
+        })
+    if not hasil:
+        raise ValueError("candles OKX kosong")
+
+    hasil.sort(key=lambda c: c["open_time"])
+    # close_time baru bisa dihitung setelah urut: jaraknya = selisih antar bar.
+    if len(hasil) >= 2:
+        lebar = hasil[1]["open_time"] - hasil[0]["open_time"]
+        for c in hasil:
+            c["close_time"] = c["open_time"] + lebar - 1
+    return hasil[-limit:]

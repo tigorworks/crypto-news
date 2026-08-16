@@ -1582,6 +1582,54 @@ def _semua_angka_didukung(kutipan: str, nilai_data: List[float]) -> bool:
     return True
 
 
+# Keberatan yang bunyinya "ISTILAH/FRASA/SEBUTAN ini tidak muncul di data".
+# Itu keberatan soal PILIHAN KATA, bukan keberadaan fakta: menurut prompt
+# critic sendiri, pengetahuan_luar dipakai hanya kalau fakta/entitasnya sama
+# sekali tidak ada. Ditemukan di produksi pada temuan yang bertahan sampai
+# putaran kedua ("Istilah pertemuan Gedung Putih tidak muncul dalam ringkasan
+# berita") padahal entitasnya jelas ada di judul berita yang disuplai.
+_POLA_KEBERATAN_ISTILAH = re.compile(
+    r"\b(?:istilah|frasa|sebutan|penyebutan|terminologi|kata|redaksi|"
+    r"ungkapan|label)\b[^.]{0,160}?"
+    r"\btidak\s+(?:muncul|ada|ditemukan|disebut\w*|tertulis|terdapat)\b",
+    re.IGNORECASE,
+)
+
+# Entitas = rangkaian minimal DUA kata berawalan huruf besar ("Gedung Putih",
+# "Federal Reserve", "Donald Trump"). Sengaja tidak menerima satu kata saja:
+# kata pertama kalimat juga berhuruf besar, dan mencocokkannya akan membantah
+# tuduhan yang justru benar.
+_POLA_ENTITAS = re.compile(r"\b[A-Z][\wÀ-ÿ'’-]{2,}(?:\s+[A-Z][\wÀ-ÿ'’-]{2,})+")
+
+
+def _teks_dalam_data(obj: Any, keluaran: Optional[List[str]] = None) -> List[str]:
+    """Kumpulkan setiap potongan teks di seluruh struktur data."""
+    if keluaran is None:
+        keluaran = []
+    if isinstance(obj, str):
+        keluaran.append(obj)
+    elif isinstance(obj, dict):
+        for kunci, nilai in obj.items():
+            keluaran.append(str(kunci))
+            _teks_dalam_data(nilai, keluaran)
+    elif isinstance(obj, (list, tuple)):
+        for nilai in obj:
+            _teks_dalam_data(nilai, keluaran)
+    return keluaran
+
+
+def _semua_entitas_didukung(kutipan: str, teks_data: str) -> bool:
+    """True kalau SETIAP entitas multi-kata pada kutipan memang ada di data.
+
+    False juga saat kutipan tidak memuat entitas sama sekali — tanpa entitas
+    tidak ada yang bisa dibantah, jadi tuduhannya dibiarkan berdiri.
+    """
+    entitas = _POLA_ENTITAS.findall(kutipan or "")
+    if not entitas:
+        return False
+    return all(" ".join(e.split()).lower() in teks_data for e in entitas)
+
+
 def _persentase_level_tersirat(data_mentah: Dict[str, Any]) -> List[float]:
     """Angka turunan: persentase jarak harga saat ini ke tiap level kunci
     (support/resistance/invalidasi).
@@ -1786,6 +1834,9 @@ def critic(
     # persentase jarak ke level kunci yang tidak muncul literal di data tapi
     # murni turunan dari dua angka yang memang ada (lihat _persentase_level_tersirat).
     nilai_data = _angka_dalam_data(data_mentah) + _persentase_level_tersirat(data_mentah)
+    # Versi teks datar dari data yang sama, untuk membantah tuduhan "entitas
+    # ini tidak ada di data" (lihat _semua_entitas_didukung).
+    teks_data = " ".join(_teks_dalam_data(data_mentah)).lower()
 
     bersih = []
     for c in corrections[:10]:
@@ -1830,6 +1881,19 @@ def critic(
                 alasan = "[dibantah kode: keberatannya soal tafsir/eksplisitas, bukan keberadaan fakta] " + alasan
                 log.info(
                     "Tuduhan pengetahuan_luar dibatalkan, keberatannya soal tafsir bukan fakta: %s",
+                    kutipan[:80],
+                )
+            elif (
+                _POLA_KEBERATAN_ISTILAH.search(alasan_asli)
+                and _semua_entitas_didukung(kutipan, teks_data)
+            ):
+                # Keberatannya soal pilihan kata, dan kode sudah memastikan
+                # setiap entitas yang disebut kutipan memang ada di data.
+                jenis = "sebab_akibat"
+                keparahan = "minor"
+                alasan = "[dibantah kode: keberatan soal istilah, entitasnya ada di data] " + alasan
+                log.info(
+                    "Tuduhan pengetahuan_luar dibatalkan, entitas kutipan ditemukan di data: %s",
                     kutipan[:80],
                 )
 
