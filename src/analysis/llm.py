@@ -319,9 +319,16 @@ def _extract_json(text: str) -> Any:
     # yang menyisakan seperempat isi bukan pemulihan, itu kehilangan data
     # yang menyamar jadi keberhasilan.
     for bagian in potongan:
+        # Pembandingnya `bagian`, BUKAN `cleaned`. Pertanyaan yang ingin
+        # dijawab adalah "apakah menambal potongan ini membuang isinya",
+        # dan preamble di luar potongan tidak pernah dimaksudkan jadi JSON.
+        # Memakai `cleaned` membuat balasan yang diawali basa-basi panjang
+        # ("Baik, saya sudah menganalisa ... Berikut hasilnya:") ditolak
+        # padahal JSON-nya utuh dan sah — persis kesalahan yang sempat
+        # terjadi setelah pengaman ini pertama dipasang.
         try:
             hasil = json.loads(bagian)
-            if _isi_terjaga(cleaned, hasil):
+            if _isi_terjaga(bagian, hasil):
                 return hasil
         except json.JSONDecodeError:
             pass
@@ -329,7 +336,7 @@ def _extract_json(text: str) -> Any:
             hasil = json.loads(_perbaiki_json(bagian))
         except json.JSONDecodeError:
             continue
-        if not _isi_terjaga(cleaned, hasil, ambang=0.80):
+        if not _isi_terjaga(bagian, hasil, ambang=0.80):
             continue
         log.warning("JSON model rusak tapi berhasil dipulihkan sebagian")
         return hasil

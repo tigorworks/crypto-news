@@ -1085,7 +1085,13 @@ def outlook(
             # Sama seperti synthesis: pandangan ke depan tidak boleh berayun
             # hanya karena sampling model, harus berayun karena datanya berubah.
             temperature=0.2,
-            max_tokens=7000,
+            # Dinaikkan dari 7000. Keluaran terpantau di produksi sudah
+            # menyentuh 6016 — margin 14% dari plafon, dan itu PERSIS pola
+            # yang menjatuhkan synthesis: keluarannya merangkak naik seiring
+            # bertambahnya konteks sampai akhirnya terpotong dan SELURUH
+            # bagian hilang. Batas longgar di sini praktis gratis (yang
+            # ditagih token yang benar-benar dipakai, bukan plafonnya).
+            max_tokens=12000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Analisa outlook gagal: %s", exc)
