@@ -51,6 +51,8 @@ Tidak ada satu pun angka di output yang dihitung oleh LLM. Prinsipnya tegas: **k
 - **Makro & geopolitik** — DXY, yield UST 10Y, minyak, emas, VIX, dan **USD/JPY** ditelusuri rantai transmisinya ke BTC (dolar menguat menekan aset berisiko; yen menguat tajam mengindikasikan pelepasan carry trade dolar-yen). Ini bukan bagian terpisah — prompt sintesis dan outlook diwajibkan menimbang data makro ini, bukan cuma berita dan harga.
 - **Pandangan ke depan** — skenario menguat/melemah beserta pemicunya, faktor geopolitik, keputusan besar yang dipantau (FOMC, rilis data ekonomi dari `agenda_mendatang`), dan risiko utama.
 
+**Urutan tampilan** (web dan Telegram): narasi utama → penyebab pergerakan → **pandangan ke depan (makro, geopolitik, agenda)** → pembacaan teknikal → whale. Geopolitik dan agenda sengaja ditempatkan tepat setelah penyebab pergerakan, bukan di paling bawah — faktor-faktor itu levelnya strategis dan sering lebih menentukan arah pasar dibanding detail teknikal harian.
+
 ### Kenapa hanya candle harian
 
 Brief ini terbit sekali sehari, jadi timeframe analisanya **1D saja**. 4H dan 1H sudah dibuang, dan itu bukan sekadar penyederhanaan tampilan:
