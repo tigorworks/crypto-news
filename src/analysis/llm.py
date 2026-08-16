@@ -125,9 +125,12 @@ def _extract_json(text: str) -> Any:
         except json.JSONDecodeError:
             continue
 
-    # Balasan penuh dicatat di level debug supaya bisa didiagnosis tanpa
-    # membanjiri log biasa.
-    log.debug("Balasan yang gagal diparse:\n%s", text)
+    # Run produksi jalan di level INFO (lihat main.py), jadi log.debug tidak
+    # pernah tercatat di sana — kegagalan macam ini jadi mustahil didiagnosis
+    # karena satu-satunya bukti yang tersisa cuma potongan 300 karakter di
+    # pesan exception. Dicatat di level warning supaya balasan penuhnya ikut
+    # ada di log produksi saat ini terjadi lagi.
+    log.warning("Balasan yang gagal diparse:\n%s", text)
     raise LLMError(f"Balasan model bukan JSON valid: {text[:300]}")
 
 
