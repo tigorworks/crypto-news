@@ -455,9 +455,17 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
         baris.append("")
         horizon = f" ({esc(ol['horizon'])})" if ol.get("horizon") else ""
         baris.append(f"<b>Ke depan{horizon}:</b> " + esc(_potong(outlook_ai, 400)))
+        # Geopolitik ditulis sebagai paragraf utuh, bukan tempelan satu baris.
+        # Pasar belakangan bergerak mengikuti isu ini, jadi ruangnya diberi
+        # jauh lebih lega daripada butir pendukung lain.
+        if ol.get("narasi_geopolitik"):
+            baris.append("")
+            baris.append("🌍 <b>Geopolitik &amp; regulasi</b>")
+            for par in [p.strip() for p in ol["narasi_geopolitik"].split("\n\n") if p.strip()][:3]:
+                baris.append(esc(_potong(par, 700)))
         if ol.get("faktor_geopolitik"):
-            baris.append("🌍 <b>Geopolitik:</b> " + esc(
-                _potong("; ".join(ol["faktor_geopolitik"][:3]), 300)))
+            for g in ol["faktor_geopolitik"][:3]:
+                baris.append("• " + esc(_potong(g, 200)))
         if ol.get("keputusan_besar"):
             for k in ol["keputusan_besar"][:2]:
                 apa = k.get("apa", "")
@@ -492,7 +500,11 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
                 baris.append(f"• {esc(sp.get('pola',''))}: {esc(_potong(sp.get('arti',''), 150))}")
 
     bagian = ai.get("bagian") or {}
-    if bagian.get("kesimpulan"):
+    # `narrative` sudah dirakit dari seluruh bagian TERMASUK kesimpulan, jadi
+    # menuliskannya lagi di sini membuat pembaca membaca paragraf yang sama
+    # dua kali. Baris terpisah ini hanya dipakai kalau narasi penuh tidak
+    # sempat dirender (mis. cuma ringkasan pendek yang tersedia).
+    if bagian.get("kesimpulan") and not narasi_penuh:
         baris.append("")
         baris.append("<b>Kesimpulan:</b> " + esc(_potong(bagian["kesimpulan"], 400)))
     if bagian.get("katalis_berikutnya"):

@@ -49,9 +49,14 @@ Tidak ada satu pun angka di output yang dihitung oleh LLM. Prinsipnya tegas: **k
 - **Sinyal palsu & pemain besar** — divergensi posisi top trader versus ritel, ditambah pola candle yang sering menandai pergerakan tidak tulus.
 - **Pernyataan tokoh berpengaruh** — ucapan pejabat dan tokoh yang berpotensi menggerakkan pasar, lengkap dengan status keasliannya.
 - **Makro & geopolitik** — DXY, yield UST 10Y, minyak, emas, VIX, dan **USD/JPY** ditelusuri rantai transmisinya ke BTC (dolar menguat menekan aset berisiko; yen menguat tajam mengindikasikan pelepasan carry trade dolar-yen). Ini bukan bagian terpisah — prompt sintesis dan outlook diwajibkan menimbang data makro ini, bukan cuma berita dan harga.
-- **Pandangan ke depan** — skenario menguat/melemah beserta pemicunya, faktor geopolitik, keputusan besar yang dipantau (FOMC, rilis data ekonomi dari `agenda_mendatang`), dan risiko utama.
+- **Pandangan ke depan** — skenario menguat/melemah beserta pemicunya, keputusan besar yang dipantau (FOMC, rilis data ekonomi dari `agenda_mendatang`), dan risiko utama.
+- **Geopolitik & regulasi** — ditulis sebagai **paragraf naratif** (`ai.outlook.narasi_geopolitik`), bukan daftar potongan. Prompt mewajibkan rantai transmisinya ditelusuri sampai ke harga BTC: bukan "ada pertemuan Gedung Putih soal kripto", tapi "pertemuan itu berpotensi menurunkan premi risiko regulasi yang ditanggung institusi AS, jalur yang sama yang menggerakkan arus ETF". Daftar `faktor_geopolitik` tetap ada sebagai butir penopang, bukan pengulangan narasinya.
 
 **Urutan tampilan** (web dan Telegram): narasi utama → penyebab pergerakan → **pandangan ke depan (makro, geopolitik, agenda)** → pembacaan teknikal → whale. Geopolitik dan agenda sengaja ditempatkan tepat setelah penyebab pergerakan, bukan di paling bawah — faktor-faktor itu levelnya strategis dan sering lebih menentukan arah pasar dibanding detail teknikal harian.
+
+**Tanpa nama field yang bocor.** Konteks yang dilihat LLM berbentuk JSON, jadi model kerap menyalin nama field dan nilai enum apa adanya ke dalam narasi — pembaca disuguhi `"pola short_covering"`, `"invalidasi_turun di $64.314"`, `"buy_sell_ratio taker 1,785"`. Prompt melarangnya, tapi larangan saja tidak cukup: `src/utils/istilah.py` menggantinya lagi lewat **kode** setelah LLM selesai menulis (`short_covering` → "penutupan posisi short", `invalidasi_turun` → "batas pembatalan skenario turun"), plus aturan generik yang mengubah garis bawah jadi spasi untuk field yang belum masuk kamus. Deterministik, tidak bergantung kepatuhan model, dan tidak pernah menyentuh angka.
+
+**Satu peristiwa dibahas sekali.** Tiap bagian punya tugas berbeda — `penyebab` menjelaskan apa yang menggerakkan harga, `data_pendukung` menyuplai angkanya (bukan menceritakan ulang peristiwanya), `yang_diwaspadai` mengangkat yang belum tercermin di harga. Prompt melarang menceritakan ulang berita yang sama antar bagian; kalau sudah dibahas, cukup dirujuk singkat.
 
 ### Kenapa hanya candle harian
 
