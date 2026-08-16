@@ -34,6 +34,13 @@
 <style>
   [x-cloak] { display: none !important; }
 
+  /* Scroll anchoring bawaan browser mencoba mengoreksi sendiri saat tinggi
+     konten berubah, tapi cuma sebagian dan bertabrakan dengan koreksi kita
+     sendiri di gantiHalaman*() (lihat _pindahHalamanTerjaga di app.js) —
+     hasilnya malah dobel-koreksi dan tombol tetap bergeser. Dimatikan di
+     sini supaya satu-satunya yang mengoreksi posisi scroll adalah kode kita. */
+  html { overflow-anchor: none; }
+
   /* Header lengket menutupi target anchor tanpa offset ini.
      Di ponsel header lebih tinggi karena ada baris nav lompat. */
   section[id] { scroll-margin-top: 12.5rem; }
@@ -165,6 +172,10 @@
                   <span class="text-3xl sm:text-4xl font-bold tracking-tight" x-text="uang(data.price.last)"></span>
                   <span class="text-lg font-semibold" :class="warnaAngka(data.price.change_24h_pct)"
                         x-text="persen(data.price.change_24h_pct, 2)"></span>
+                </div>
+                <div class="mt-1 flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                  <i data-lucide="clock" class="w-3 h-3 shrink-0"></i>
+                  <span>Harga saat data ditarik (<span x-text="data?.generated_at_wib || '—'"></span>), bukan harga real-time</span>
                 </div>
               </div>
               <i data-lucide="trending-up" class="w-6 h-6 text-slate-300 dark:text-slate-600"></i>
@@ -989,14 +1000,14 @@
 
             <template x-if="totalHalamanAgenda > 1">
               <div class="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-                <button @click="gantiHalamanAgenda(-1)" :disabled="halamanAgenda === 1"
+                <button @click="gantiHalamanAgenda(-1, $event)" :disabled="halamanAgenda === 1"
                         class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                   <i data-lucide="chevron-left" class="w-4 h-4"></i>
                   <span class="hidden sm:inline">Sebelumnya</span>
                 </button>
                 <span class="text-sm text-slate-500 dark:text-slate-400 text-center"
                       x-text="'Halaman ' + halamanAgenda + ' dari ' + totalHalamanAgenda"></span>
-                <button @click="gantiHalamanAgenda(1)" :disabled="halamanAgenda === totalHalamanAgenda"
+                <button @click="gantiHalamanAgenda(1, $event)" :disabled="halamanAgenda === totalHalamanAgenda"
                         class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                   <span class="hidden sm:inline">Berikutnya</span>
                   <i data-lucide="chevron-right" class="w-4 h-4"></i>
@@ -1152,14 +1163,14 @@
 
           <template x-if="totalHalamanBerita > 1">
             <div class="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-              <button @click="gantiHalamanBerita(-1)" :disabled="halamanBerita === 1"
+              <button @click="gantiHalamanBerita(-1, $event)" :disabled="halamanBerita === 1"
                       class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                 <i data-lucide="chevron-left" class="w-4 h-4"></i>
                 <span class="hidden sm:inline">Sebelumnya</span>
               </button>
               <span class="text-sm text-slate-500 dark:text-slate-400 text-center"
                     x-text="'Halaman ' + halamanBerita + ' dari ' + totalHalamanBerita + ' · ' + beritaTersaring.length + ' berita'"></span>
-              <button @click="gantiHalamanBerita(1)" :disabled="halamanBerita === totalHalamanBerita"
+              <button @click="gantiHalamanBerita(1, $event)" :disabled="halamanBerita === totalHalamanBerita"
                       class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                 <span class="hidden sm:inline">Berikutnya</span>
                 <i data-lucide="chevron-right" class="w-4 h-4"></i>
@@ -1240,14 +1251,14 @@
 
             <template x-if="totalHalamanPernyataan > 1">
               <div class="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-                <button @click="gantiHalamanPernyataan(-1)" :disabled="halamanPernyataan === 1"
+                <button @click="gantiHalamanPernyataan(-1, $event)" :disabled="halamanPernyataan === 1"
                         class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                   <i data-lucide="chevron-left" class="w-4 h-4"></i>
                   <span class="hidden sm:inline">Sebelumnya</span>
                 </button>
                 <span class="text-sm text-slate-500 dark:text-slate-400 text-center"
                       x-text="'Halaman ' + halamanPernyataan + ' dari ' + totalHalamanPernyataan + ' · ' + pernyataanTersaring.length + ' pernyataan'"></span>
-                <button @click="gantiHalamanPernyataan(1)" :disabled="halamanPernyataan === totalHalamanPernyataan"
+                <button @click="gantiHalamanPernyataan(1, $event)" :disabled="halamanPernyataan === totalHalamanPernyataan"
                         class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                   <span class="hidden sm:inline">Berikutnya</span>
                   <i data-lucide="chevron-right" class="w-4 h-4"></i>

@@ -53,6 +53,7 @@ function briefApp() {
     halamanPernyataan: 1,
     halamanAgenda: 1,
     perHalaman: 3,
+    perHalamanAgenda: 5,
     grafik: null,
     _jam: null,
     _detak: 0,          // dinaikkan tiap menit supaya waktu relatif ikut menyegar
@@ -674,12 +675,40 @@ function briefApp() {
       return this.beritaTersaring.slice(mulai, mulai + this.perHalaman);
     },
 
-    gantiHalamanBerita(arah) {
+    /* Ganti halaman pada tabel berpaginasi mengubah tinggi daftar di
+       atasnya (halaman terakhir bisa lebih pendek dari halaman penuh).
+       Browser lalu menggeser posisi scroll begitu saja supaya tetap valid
+       — di ponsel ini terasa seperti "berpindah fokus" karena jari sudah
+       terlanjur diam di tombol yang baru ditekan, tapi tombolnya sudah
+       bergeser dari bawah jari. Diatasi dengan mengunci posisi tombol itu
+       sendiri di layar: ukur jaraknya ke atas viewport sebelum & sesudah
+       render, lalu kompensasi selisihnya lewat scrollBy. Bukan animasi,
+       murni koreksi supaya tombol yang baru ditekan tidak pernah pindah. */
+    _pindahHalamanTerjaga(evt, aksi) {
+      const tombol = evt?.currentTarget || null;
+      const sebelum = tombol ? tombol.getBoundingClientRect().top : null;
+      aksi();
+      if (this.$nextTick) {
+        this.$nextTick(() => {
+          // Ikon Lucide diganti (elemen <i> -> <svg>) SEBELUM posisi diukur:
+          // penggantian itu sendiri bisa mengubah tinggi baris, jadi kalau
+          // diukur duluan kompensasinya jadi ketinggalan satu langkah.
+          this.gambarIkon();
+          if (tombol && sebelum !== null) {
+            const sesudah = tombol.getBoundingClientRect().top;
+            // `behavior: 'instant'` wajib eksplisit — halaman ini memakai
+            // scroll-behavior:smooth (untuk nav lompat), dan tanpa ini
+            // koreksinya jadi teranimasi pelan alih-alih langsung pas.
+            if (sesudah !== sebelum) window.scrollBy({ top: sesudah - sebelum, left: 0, behavior: 'instant' });
+          }
+        });
+      }
+    },
+
+    gantiHalamanBerita(arah, evt) {
       const tujuan = this.halamanBerita + arah;
       if (tujuan < 1 || tujuan > this.totalHalamanBerita) return;
-      this.halamanBerita = tujuan;
-      // Ikon Lucide perlu digambar ulang untuk baris yang baru muncul.
-      if (this.$nextTick) this.$nextTick(() => this.gambarIkon());
+      this._pindahHalamanTerjaga(evt, () => { this.halamanBerita = tujuan; });
     },
 
     get pernyataanTersaring() {
@@ -700,36 +729,34 @@ function briefApp() {
       return this.pernyataanTersaring.slice(mulai, mulai + this.perHalaman);
     },
 
-    gantiHalamanPernyataan(arah) {
+    gantiHalamanPernyataan(arah, evt) {
       const tujuan = this.halamanPernyataan + arah;
       if (tujuan < 1 || tujuan > this.totalHalamanPernyataan) return;
-      this.halamanPernyataan = tujuan;
-      if (this.$nextTick) this.$nextTick(() => this.gambarIkon());
+      this._pindahHalamanTerjaga(evt, () => { this.halamanPernyataan = tujuan; });
     },
 
     /* Agenda dipaginasi juga: dengan horizon 30 hari daftarnya bisa panjang,
        dan bagian di bawahnya jadi sulit dijangkau kalau digelar semua. */
     get agendaTersaring() {
       const hasil = this.data?.calendar || [];
-      const maks = Math.max(1, Math.ceil(hasil.length / this.perHalaman));
+      const maks = Math.max(1, Math.ceil(hasil.length / this.perHalamanAgenda));
       if (this.halamanAgenda > maks) this.halamanAgenda = 1;
       return hasil;
     },
 
     get totalHalamanAgenda() {
-      return Math.max(1, Math.ceil(this.agendaTersaring.length / this.perHalaman));
+      return Math.max(1, Math.ceil(this.agendaTersaring.length / this.perHalamanAgenda));
     },
 
     get agendaTampil() {
-      const mulai = (this.halamanAgenda - 1) * this.perHalaman;
-      return this.agendaTersaring.slice(mulai, mulai + this.perHalaman);
+      const mulai = (this.halamanAgenda - 1) * this.perHalamanAgenda;
+      return this.agendaTersaring.slice(mulai, mulai + this.perHalamanAgenda);
     },
 
-    gantiHalamanAgenda(arah) {
+    gantiHalamanAgenda(arah, evt) {
       const tujuan = this.halamanAgenda + arah;
       if (tujuan < 1 || tujuan > this.totalHalamanAgenda) return;
-      this.halamanAgenda = tujuan;
-      if (this.$nextTick) this.$nextTick(() => this.gambarIkon());
+      this._pindahHalamanTerjaga(evt, () => { this.halamanAgenda = tujuan; });
     },
 
     /* Berpindah tab berita/pernyataan: ikon Lucide pada isi yang baru muncul
