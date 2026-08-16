@@ -21,15 +21,16 @@ llm:
   # kalau model pertama error / rate limit / kehabisan kapasitas.
   #
   # ISI SENDIRI setelah mengecek katalog https://openrouter.ai/models
-  # Aturan praktis:
-  #   filter    -> model paling murah (tugasnya cuma memberi skor 0-100)
-  #   classify  -> model kecil tapi patuh JSON
-  #   format    -> model murah, cuma menata pesan Telegram
-  #   agenda    -> model murah, ekstraksi teks-ke-JSON dari investing.com
-  #   riset     -> model murah, mengusulkan kueri pencarian berita hari ini
-  #   agenda_dampak -> model menengah, menilai dampak agenda ke kripto
-  #   mechanism -> model menengah (butuh penalaran sebab-akibat)
-  #   statements-> model menengah (menyaring pernyataan tokoh dari derau berita)
+  # Aturan praktis — PENGAMBILAN/PENYIAPAN DATA memakai DeepSeek saja,
+  # PENULISAN ANALISA memakai model kuat (di situlah kualitas terasa):
+  #   filter    -> DeepSeek (tugasnya cuma memberi skor 0-100)
+  #   classify  -> DeepSeek (JSON terstruktur per artikel)
+  #   format    -> DeepSeek, cuma menata pesan Telegram
+  #   agenda    -> DeepSeek, ekstraksi teks-ke-JSON dari investing.com
+  #   riset     -> DeepSeek, mengusulkan kueri pencarian berita hari ini
+  #   agenda_dampak -> DeepSeek, menilai dampak agenda ke kripto
+  #   mechanism -> DeepSeek, keterangan pendek per berita
+  #   statements-> DeepSeek (menyaring pernyataan tokoh dari derau berita)
   #   technical -> model menengah/kuat (MENAFSIRKAN indikator, bukan menghitung)
   #   whale     -> model menengah/kuat (membaca posisi whale vs ritel)
   #   synthesis -> model kuat (menulis analisa panjang bersebab-akibat)
@@ -43,31 +44,42 @@ llm:
   # sebelahnya, dan kalau dua-duanya gagal step-nya dilewati tanpa
   # menggagalkan brief.
 
-  # Tugas murah dan berulang: skor 0-100 dan klasifikasi terstruktur.
-  filter:     ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
-  classify:   ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+  # ------------------------------------------------------------------
+  # LANGKAH PENGAMBILAN & PENYIAPAN DATA — DEEPSEEK SAJA.
+  # Semua langkah di blok ini cuma mengubah data jadi data: memberi skor,
+  # mengklasifikasi, mengekstrak jadwal, mengusulkan kueri pencarian.
+  # Tidak ada satupun yang menulis prosa yang dibaca pengguna, jadi model
+  # termurah sudah cukup dan tidak ada cadangan lintas-vendor di sini.
+  # Kalau DeepSeek sedang bermasalah, langkahnya dilewati dan pipeline
+  # tetap jalan dengan jalur cadangan masing-masing (mis. filter jatuh ke
+  # skor kata kunci yang dihitung kode).
+  # ------------------------------------------------------------------
+  filter:     ["deepseek/deepseek-v3.2"]
+  classify:   ["deepseek/deepseek-v3.2"]
 
   # Perapi pesan Telegram. Murni tata letak — tidak boleh menyentuh angka,
   # dan hasilnya diverifikasi kode sebelum dipakai. Model murah sudah cukup.
-  format:     ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+  format:     ["deepseek/deepseek-v3.2"]
 
   # Mengusulkan kueri pencarian berita berdasarkan kondisi hari ini. Model
   # hanya menentukan ARAH pencarian; artikelnya diambil kode lewat Google
   # News RSS, jadi tidak ada peluang mengarang sumber. Tugas ringan.
-  riset:      ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+  riset:      ["deepseek/deepseek-v3.2"]
 
   # Ekstraksi teks kalender ekonomi investing.com jadi JSON. Tugasnya
   # sekadar "baca teks berantakan, temukan baris jadwal event" — tidak
   # perlu penalaran, model murah cukup. Sumber ini opsional (lihat
   # src/collectors/investing.py); gagal di sini tidak menggagalkan brief.
-  agenda:     ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+  agenda:     ["deepseek/deepseek-v3.2"]
 
-  # Butuh penalaran sebab-akibat, tapi keluarannya pendek.
-  mechanism:  ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
-  # Menilai relevansi tiap agenda ke BTC dan menjelaskan jalur transmisinya.
-  # Sifatnya sama dengan mechanism: penalaran sebab-akibat, keluaran pendek.
-  agenda_dampak: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
-  statements: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  # Ketiganya menghasilkan keterangan pendek per item (mekanisme berita,
+  # jalur dampak agenda, penyaringan pernyataan tokoh) — bukan prosa utama
+  # laporan. Sebelumnya memakai Haiku; dipindah ke DeepSeek karena ini juga
+  # bagian dari penyiapan data, dan biayanya di sini paling terasa (langkah
+  # statements saja bisa 4 panggilan per run).
+  mechanism:  ["deepseek/deepseek-v3.2"]
+  agenda_dampak: ["deepseek/deepseek-v3.2"]
+  statements: ["deepseek/deepseek-v3.2"]
 
   # Menafsirkan data dan menulis panjang: di sini kualitas model paling terasa.
   technical:  ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
@@ -89,7 +101,9 @@ news:
   # Dinaikkan seiring bertambahnya feed. Langkah filter relevansi yang
   # menyaring; menambah feed berarti menambah kandidat, bukan menambah
   # berita yang lolos ke brief (itu dibatasi max_after_filter).
-  max_fetch: 260
+  # Langkah filter sudah dibatch (60 artikel/panggilan), jadi menaikkan
+  # angka ini tidak lagi berisiko membuat balasan model terpotong.
+  max_fetch: 420
   # Tambahkan feed hasil riset LLM di samping daftar tetap di bawah.
   # Matikan (false) kalau ingin sumbernya benar-benar tetap.
   riset_dinamis: true
@@ -108,6 +122,14 @@ news:
     - https://cryptoslate.com/feed/
     - https://news.bitcoin.com/feed/
     - https://protos.com/feed/
+    - https://www.dlnews.com/arc/outboundfeeds/rss/
+    - https://cryptobriefing.com/feed/
+    - https://beincrypto.com/feed/
+    - https://ambcrypto.com/feed/
+    - https://coinjournal.net/feed/
+    - https://bitcoinist.com/feed/
+    - https://www.newsbtc.com/feed/
+    - https://u.today/rss
 
     # --- Makro & geopolitik: media ---
     # Sebagian besar isinya tidak relevan bagi BTC dan memang akan dibuang
@@ -118,6 +140,10 @@ news:
     - https://feeds.bbci.co.uk/news/world/rss.xml
     - https://www.aljazeera.com/xml/rss/all.xml
     - https://feeds.content.dowjones.io/public/rss/mw_topstories
+    - https://rss.nytimes.com/services/xml/rss/nyt/Business.xml
+    - https://feeds.bbci.co.uk/news/technology/rss.xml
+    - https://www.cnbc.com/id/10000664/device/rss/rss.html
+    - https://seekingalpha.com/market_currents.xml
 
     # --- Sumber PRIMER regulator & pemerintah AS ---
     # Ini yang paling menentukan akurasi analisa geopolitik/regulasi: bukan
@@ -127,6 +153,16 @@ news:
     - https://www.sec.gov/news/pressreleases.rss
     - https://www.cftc.gov/RSS/RSSGP/rssgp.xml
     - https://home.treasury.gov/rss/press.xml
+    - https://www.federalreserve.gov/feeds/speeches.xml
+    - https://www.justice.gov/news/rss?type=press_release
+    - https://www.fdic.gov/news/press-releases/rss.xml
+
+    # --- Bank sentral & lembaga keuangan global ---
+    # Keputusan di luar AS ikut menggerakkan likuiditas global, dan selama
+    # ini brief cuma melihat sisi AS.
+    - https://www.ecb.europa.eu/rss/press.html
+    - https://www.bis.org/list/press_rlsereleases/rss.xml
+    - https://www.imf.org/en/News/RSS?Language=ENG
 
 # Tier kredibilitas sumber untuk pembobotan skor sentimen.
 # tier 1 = 1.0, tier 2 = 0.7, tier 3 = 0.4 (default tier 3 kalau tidak terdaftar)
@@ -138,6 +174,11 @@ source_tiers:
   cftc.gov: 1
   treasury.gov: 1
   whitehouse.gov: 1
+  justice.gov: 1
+  fdic.gov: 1
+  ecb.europa.eu: 1
+  bis.org: 1
+  imf.org: 1
   reuters.com: 1
   bloomberg.com: 1
   wsj.com: 1
@@ -147,16 +188,26 @@ source_tiers:
   bbc.co.uk: 1
   bbc.com: 1
   aljazeera.com: 1
+  nytimes.com: 1
   marketwatch.com: 2
   coindesk.com: 2
   theblock.co: 2
   blockworks.co: 2
   cointelegraph.com: 2
   decrypt.co: 2
+  dlnews.com: 2
+  seekingalpha.com: 3
   cryptoslate.com: 3
   news.bitcoin.com: 3
   protos.com: 3
   bitcoinmagazine.com: 3
+  cryptobriefing.com: 3
+  beincrypto.com: 3
+  ambcrypto.com: 3
+  coinjournal.net: 3
+  bitcoinist.com: 3
+  newsbtc.com: 3
+  u.today: 3
 
 # Tanggal FOMC (UTC). Perbarui sekali setahun dari kalender resmi The Fed.
 fomc_dates:

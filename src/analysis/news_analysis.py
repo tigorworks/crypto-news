@@ -47,12 +47,30 @@ BOBOT_TIER = {1: 1.0, 2: 0.7, 3: 0.4}
 # --------------------------------------------------------------------------
 # LLM #1 — filter relevansi
 # --------------------------------------------------------------------------
+def _bonus_tier(tier: Optional[int]) -> float:
+    """Pengali ringan untuk kredibilitas sumber: tier 1 ×1,30 … tier 3 ×1,00.
+
+    Sengaja RINGAN, bukan BOBOT_TIER (1,0/0,7/0,4) yang dipakai skor sentimen.
+    Brief ini soal Bitcoin, dan berita Bitcoin paling banyak datang dari media
+    kripto yang kebanyakan tier 2-3; memakai bobot penuh akan membuat berita
+    makro tier 1 yang cuma menyerempet BTC menggusur berita kripto yang justru
+    jadi pokok laporan. Yang diinginkan di sini cuma pemecah imbang: pada
+    relevansi setara, sumber yang lebih bisa dipertanggungjawabkan menang.
+    """
+    try:
+        t = int(tier)
+    except (TypeError, ValueError):
+        t = 3
+    return 1.0 + 0.15 * max(0, 3 - max(1, min(3, t)))
+
+
 def filter_relevansi(
     client: LLMClient,
     models: List[str],
     articles: List[Dict[str, Any]],
     min_score: int = 40,
     max_keep: int = 25,
+    batch_size: int = 60,
 ) -> List[Dict[str, Any]]:
     if not articles:
         return []
@@ -65,28 +83,50 @@ def filter_relevansi(
         "gosip selebritas, siaran pers proyek kecil.\n\n"
         "Balas array JSON: [{\"id\": \"...\", \"relevansi_btc\": 0-100}]\n\n" + ATURAN_DASAR
     )
-    daftar = [
-        {"id": a["id"], "judul": a["judul"], "ringkasan": a["ringkasan"][:250]}
-        for a in articles
-    ]
-    user = "Nilai relevansi setiap artikel berikut:\n\n" + json.dumps(daftar, ensure_ascii=False)
 
-    try:
-        hasil = client.chat_json(models, system, user, step="filter", max_tokens=6000)
-    except (LLMError, BudgetExceeded) as exc:
-        log.warning("Filter relevansi gagal (%s), pakai skor prioritas kata kunci", exc)
+    # Dibatch: satu panggilan untuk SELURUH artikel pernah nyaris menyentuh
+    # batas max_tokens (132 artikel -> 3027 token keluaran). Dengan daftar feed
+    # yang lebih panjang, sekali terpotong berarti seluruh penilaian hilang dan
+    # brief jatuh ke fallback kata kunci. Batch juga membuat satu batch yang
+    # gagal tidak menjatuhkan yang lain.
+    skor: Dict[str, int] = {}
+    total_batch = (len(articles) + batch_size - 1) // batch_size
+    for i in range(0, len(articles), batch_size):
+        batch = articles[i : i + batch_size]
+        daftar = [
+            {"id": a["id"], "judul": a["judul"], "ringkasan": a["ringkasan"][:250]}
+            for a in batch
+        ]
+        try:
+            hasil = client.chat_json(
+                models,
+                system,
+                "Nilai relevansi setiap artikel berikut:\n\n"
+                + json.dumps(daftar, ensure_ascii=False),
+                step="filter",
+                max_tokens=4000,
+            )
+        except BudgetExceeded as exc:
+            log.warning("Filter relevansi berhenti di batch %d/%d: %s",
+                        i // batch_size + 1, total_batch, exc)
+            break
+        except LLMError as exc:
+            log.warning("Batch filter %d/%d gagal: %s", i // batch_size + 1, total_batch, exc)
+            continue
+
+        for item in hasil if isinstance(hasil, list) else []:
+            try:
+                skor[str(item["id"])] = int(item["relevansi_btc"])
+            except (KeyError, TypeError, ValueError):
+                continue
+
+    if not skor:
+        log.warning("Filter relevansi tidak menghasilkan skor, pakai skor prioritas kata kunci")
         # Fallback deterministik: pakai skor kata kunci yang sudah dihitung kode.
         fallback = sorted(articles, key=lambda a: a["skor_prioritas"], reverse=True)[:max_keep]
         for a in fallback:
             a["relevansi_btc"] = a["skor_prioritas"]
         return fallback
-
-    skor = {}
-    for item in hasil if isinstance(hasil, list) else []:
-        try:
-            skor[str(item["id"])] = int(item["relevansi_btc"])
-        except (KeyError, TypeError, ValueError):
-            continue
 
     terpilih = []
     for a in articles:
@@ -96,9 +136,48 @@ def filter_relevansi(
         a["relevansi_btc"] = nilai
         terpilih.append(a)
 
-    terpilih.sort(key=lambda a: a["relevansi_btc"], reverse=True)
-    log.info("Filter relevansi: %d dari %d artikel lolos", len(terpilih), len(articles))
-    return terpilih[:max_keep]
+    # Urutan pakai skor gabungan (relevansi × bonus tier), tapi relevansi_btc
+    # yang dilaporkan tetap penilaian mentah model — supaya angka yang tampil
+    # di web/critic tidak berbeda dari yang dinilai.
+    terpilih.sort(
+        key=lambda a: a["relevansi_btc"] * _bonus_tier(a.get("kredibilitas_sumber")),
+        reverse=True,
+    )
+
+    # Isi bergiliran per domain: ronde 0 mengambil artikel terbaik dari tiap
+    # domain, ronde 1 yang terbaik kedua, dan seterusnya. Urutan skor tetap
+    # dihormati DI DALAM tiap ronde, tapi satu outlet yang rajin menerbitkan
+    # (Blockworks pernah 50 artikel dalam satu tarikan) tidak bisa memborong
+    # kuota semata-mata karena jumlahnya banyak. Cara ini juga tidak pernah
+    # menyisakan slot kosong: kalau kandidat memang terkonsentrasi di sedikit
+    # outlet, ronde berikutnya mengambil lagi dari outlet yang sama.
+    hasil_akhir: List[Dict[str, Any]] = []
+    per_domain: Dict[str, int] = {}
+    diambil: set = set()
+    ronde = 0
+    while len(hasil_akhir) < max_keep:
+        maju = False
+        for idx, a in enumerate(terpilih):
+            if len(hasil_akhir) >= max_keep:
+                break
+            if idx in diambil:
+                continue
+            domain = a.get("domain") or ""
+            if per_domain.get(domain, 0) != ronde:
+                continue
+            per_domain[domain] = ronde + 1
+            diambil.add(idx)
+            hasil_akhir.append(a)
+            maju = True
+        if not maju:
+            break
+        ronde += 1
+
+    log.info(
+        "Filter relevansi: %d dari %d artikel lolos, %d dipakai dari %d outlet",
+        len(terpilih), len(articles), len(hasil_akhir), len(per_domain),
+    )
+    return hasil_akhir
 
 
 # --------------------------------------------------------------------------
@@ -781,7 +860,9 @@ def interpretasi_teknikal(
             system,
             "Tafsirkan kondisi teknikal berikut:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
             step="technical",
-            temperature=0.3,
+            # Disamakan dengan sintesis/outlook: pembacaan indikator yang sama
+            # harus menghasilkan kesimpulan yang sama.
+            temperature=0.2,
             max_tokens=6000,
         )
     except (LLMError, BudgetExceeded) as exc:
@@ -878,7 +959,7 @@ def analisa_whale(
             system,
             "Analisa kondisi berikut:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
             step="whale",
-            temperature=0.3,
+            temperature=0.2,
             max_tokens=4000,
         )
     except (LLMError, BudgetExceeded) as exc:
@@ -982,7 +1063,9 @@ def outlook(
             system,
             "Data terkini:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
             step="outlook",
-            temperature=0.4,
+            # Sama seperti synthesis: pandangan ke depan tidak boleh berayun
+            # hanya karena sampling model, harus berayun karena datanya berubah.
+            temperature=0.2,
             max_tokens=7000,
         )
     except (LLMError, BudgetExceeded) as exc:
@@ -1238,7 +1321,11 @@ def sintesis(
             system,
             "Data hari ini:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
             step="synthesis",
-            temperature=0.4,
+            # Turun dari 0,4: pada 0,4 dua run dengan data yang nyaris sama
+            # bisa menghasilkan penekanan dan kesimpulan yang terasa berbeda,
+            # dan brief harian justru dibaca untuk melihat APA YANG BERUBAH.
+            # Variasi gaya di sini tidak menambah nilai, cuma bikin ragu.
+            temperature=0.2,
             max_tokens=10000,
         )
     except (LLMError, BudgetExceeded) as exc:
@@ -1350,6 +1437,27 @@ _POLA_AKUI_FAKTA_ADA = re.compile(
     r"(?:\btapi\b|\bnamun\b|\btanpa\b|tidak\s+ada\s+pernyataan|tidak\s+menyatakan|"
     r"tidak\s+menyebut|belum\s+menyebut)",
     re.IGNORECASE | re.DOTALL,
+)
+
+# Pembantah kedua, untuk keberatan yang intinya "faktanya ada, tapi TAFSIRNYA
+# tidak tertulis". Dua penanda yang terbukti berulang di log produksi:
+#
+#   A. Kata "eksplisit" dalam konteks negatif — "tidak dinyatakan eksplisit",
+#      "tidak ada secara eksplisit", "tidak tertulis eksplisit". Kalau
+#      keberatannya soal EKSPLISITAS, critic sedang mengakui bahan faktanya
+#      ada dan yang kurang cuma kalimat penegasnya. Itu persis definisi
+#      sebab_akibat. pengetahuan_luar berarti faktanya TIDAK ADA sama sekali —
+#      dan alasan untuk kasus itu tidak berbicara soal eksplisit, melainkan
+#      "tidak ada satu pun berita yang menyebut ...".
+#   B. Subjek kalimat alasannya sendiri sebuah kata benda tafsir
+#      ("Interpretasi/Klaim/Penjelasan/Keterkaitan/... bahwa X ... tidak ...").
+#      Kalau critic harus menyebut temuannya sebagai 'interpretasi' atau
+#      'klaim', dia sedang menilai penalaran, bukan keberadaan fakta.
+_POLA_KEBERATAN_TAFSIR = re.compile(
+    r"tidak\s+(?:\w+\s+){0,3}eksplisit"
+    r"|(?:^|\.\s+)\s*(?:interpretasi|klaim|penjelasan|keterkaitan|kesimpulan|"
+    r"anggapan|penilaian|frasa|narasi|pernyataan\s+bahwa)\b[^.]{0,200}?\btidak\b",
+    re.IGNORECASE,
 )
 
 # Angka pendek (≤2 digit) hampir selalu hasil turunan: persentase, jumlah
@@ -1691,6 +1799,14 @@ def critic(
                     "Tuduhan pengetahuan_luar dibatalkan, alasan critic sendiri mengakui faktanya ada di data: %s",
                     kutipan[:80],
                 )
+            elif _POLA_KEBERATAN_TAFSIR.search(alasan_asli):
+                jenis = "sebab_akibat"
+                keparahan = "minor"
+                alasan = "[dibantah kode: keberatannya soal tafsir/eksplisitas, bukan keberadaan fakta] " + alasan
+                log.info(
+                    "Tuduhan pengetahuan_luar dibatalkan, keberatannya soal tafsir bukan fakta: %s",
+                    kutipan[:80],
+                )
 
         # 2. Hanya kesalahan fakta yang boleh menahan. Sisanya jadi tanda:
         #    analisanya tetap tampil, cuma diberi keterangan.
@@ -1726,3 +1842,55 @@ def critic(
         )
 
     return {"passed": passed, "corrections": bersih, "tanda": tanda, "dijalankan": True}
+
+
+def longgarkan_setelah_revisi(hasil_critic: Dict[str, Any]) -> Dict[str, Any]:
+    """Setelah SATU putaran revisi, hanya kesalahan ANGKA yang masih menahan.
+
+    Alasannya empiris: temuan `pengetahuan_luar` yang bertahan sampai putaran
+    kedua di produksi terbukti hampir selalu salah kategori — kalimat tafsir
+    yang divonis sebagai fakta karangan. Ongkos dua jenis kesalahan ini tidak
+    setara: menahan SELURUH analisa (narasi + outlook + skenario sekaligus)
+    karena satu kalimat tafsir jauh lebih merugikan pembaca daripada
+    membiarkan kalimat itu lewat dengan tanda editorial.
+
+    Angka karangan TETAP menahan, tanpa pengecualian: angka yang salah
+    menyesatkan secara langsung, dan kode sudah memverifikasinya sendiri
+    lewat `_semua_angka_didukung` — jadi yang lolos ke sini memang angka yang
+    tidak ditemukan di data mana pun.
+    """
+    fatal_tersisa = [
+        c for c in hasil_critic.get("corrections") or []
+        if c.get("keparahan") == "fatal"
+    ]
+    if not fatal_tersisa:
+        return hasil_critic
+
+    masih_menahan = [c for c in fatal_tersisa if c.get("jenis") == "angka_karangan"]
+    diturunkan = [c for c in fatal_tersisa if c.get("jenis") != "angka_karangan"]
+    if not diturunkan:
+        return hasil_critic
+
+    for c in diturunkan:
+        c["keparahan"] = "tanda"
+        c["alasan"] = "[diturunkan: bertahan setelah revisi, bukan kesalahan angka] " + (c.get("alasan") or "")
+        log.info(
+            "Temuan non-angka diturunkan jadi tanda setelah revisi: %s | %s",
+            c.get("jenis"), (c.get("kutipan") or "")[:80],
+        )
+
+    hasil_critic["tanda"] = [
+        c for c in hasil_critic.get("corrections") or [] if c.get("keparahan") == "tanda"
+    ]
+    hasil_critic["passed"] = not masih_menahan
+    if masih_menahan:
+        log.warning(
+            "Masih ada %d kesalahan ANGKA setelah revisi; bagian terkait tetap ditahan",
+            len(masih_menahan),
+        )
+    else:
+        log.info(
+            "Setelah revisi tidak ada kesalahan angka tersisa; analisa dikirim "
+            "dengan %d tanda editorial", len(diturunkan),
+        )
+    return hasil_critic
