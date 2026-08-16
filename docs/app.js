@@ -43,6 +43,7 @@ function briefApp() {
     tabKonten: 'berita',
     halamanBerita: 1,
     halamanPernyataan: 1,
+    halamanAgenda: 1,
     perHalaman: 3,
     grafik: null,
     _jam: null,
@@ -641,6 +642,31 @@ function briefApp() {
       const tujuan = this.halamanPernyataan + arah;
       if (tujuan < 1 || tujuan > this.totalHalamanPernyataan) return;
       this.halamanPernyataan = tujuan;
+      if (this.$nextTick) this.$nextTick(() => this.gambarIkon());
+    },
+
+    /* Agenda dipaginasi juga: dengan horizon 30 hari daftarnya bisa panjang,
+       dan bagian di bawahnya jadi sulit dijangkau kalau digelar semua. */
+    get agendaTersaring() {
+      const hasil = this.data?.calendar || [];
+      const maks = Math.max(1, Math.ceil(hasil.length / this.perHalaman));
+      if (this.halamanAgenda > maks) this.halamanAgenda = 1;
+      return hasil;
+    },
+
+    get totalHalamanAgenda() {
+      return Math.max(1, Math.ceil(this.agendaTersaring.length / this.perHalaman));
+    },
+
+    get agendaTampil() {
+      const mulai = (this.halamanAgenda - 1) * this.perHalaman;
+      return this.agendaTersaring.slice(mulai, mulai + this.perHalaman);
+    },
+
+    gantiHalamanAgenda(arah) {
+      const tujuan = this.halamanAgenda + arah;
+      if (tujuan < 1 || tujuan > this.totalHalamanAgenda) return;
+      this.halamanAgenda = tujuan;
       if (this.$nextTick) this.$nextTick(() => this.gambarIkon());
     },
 

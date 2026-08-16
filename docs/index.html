@@ -926,12 +926,13 @@
           <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
             <h2 class="font-semibold flex items-center gap-2 mb-3">
               <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i> Agenda 30 Hari
+              <span class="text-sm font-normal text-slate-400" x-text="'(' + agendaTersaring.length + ')'"></span>
             </h2>
-            <template x-if="!data.calendar?.length">
-              <p class="text-sm text-slate-500">Tidak ada agenda besar dalam 7 hari ke depan.</p>
+            <template x-if="!agendaTersaring.length">
+              <p class="text-sm text-slate-500">Tidak ada agenda besar dalam 30 hari ke depan.</p>
             </template>
             <ul class="space-y-2.5">
-              <template x-for="(a, i) in (data.calendar || [])" :key="i">
+              <template x-for="(a, i) in agendaTampil" :key="a.waktu_utc + a.nama">
                 <li class="flex items-start justify-between gap-3 text-sm">
                   <div>
                     <div class="font-medium">
@@ -948,6 +949,23 @@
                 </li>
               </template>
             </ul>
+
+            <template x-if="totalHalamanAgenda > 1">
+              <div class="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <button @click="gantiHalamanAgenda(-1)" :disabled="halamanAgenda === 1"
+                        class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                  <span class="hidden sm:inline">Sebelumnya</span>
+                </button>
+                <span class="text-sm text-slate-500 dark:text-slate-400 text-center"
+                      x-text="'Halaman ' + halamanAgenda + ' dari ' + totalHalamanAgenda"></span>
+                <button @click="gantiHalamanAgenda(1)" :disabled="halamanAgenda === totalHalamanAgenda"
+                        class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                  <span class="hidden sm:inline">Berikutnya</span>
+                  <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </template>
           </div>
 
           <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">

@@ -135,6 +135,10 @@ _KATA_KUNCI_KATEGORI = {
     "cpi": ("cpi",),
     "nfp": ("non-farm", "nonfarm", "nfp", "payroll"),
     "pce": ("pce",),
+    # FOMC dari config sudah akurat (disalin dari kalender resmi Fed), tapi
+    # kalender pihak ketiga memuat event yang sama. Tanpa dicocokkan, satu
+    # keputusan suku bunga tampil dua kali dengan nama berbeda.
+    "fomc": ("fomc", "federal funds rate", "interest rate decision"),
 }
 
 
