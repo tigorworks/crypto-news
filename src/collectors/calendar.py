@@ -120,16 +120,55 @@ def _candidates(today: date, fomc_dates: List[str]) -> List[Dict[str, Any]]:
     return events
 
 
-def collect(fomc_dates: List[str], days_ahead: int = 7) -> List[Dict[str, Any]]:
-    """Agenda dalam `days_ahead` hari ke depan, terurut dari yang terdekat."""
+# Kalau investing.com melaporkan tanggal SUNGGUHAN untuk kategori ini pada
+# hari yang sama, dugaan pola bulanan kita untuk kategori itu dibuang —
+# data konfirmasi menggantikan tebakan, bukan menduplikasinya. Kata kunci
+# dicocokkan longgar terhadap nama event investing.com karena penamaannya
+# tidak seragam ("CPI m/m", "Core CPI", dst).
+_KATA_KUNCI_KATEGORI = {
+    "cpi": ("cpi",),
+    "nfp": ("non-farm", "nonfarm", "nfp", "payroll"),
+    "pce": ("pce",),
+}
+
+
+def _gabung_konfirmasi(kandidat: List[Dict[str, Any]], konfirmasi: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Buang dugaan pola bulanan yang sudah dikonfirmasi oleh sumber luar."""
+    if not konfirmasi:
+        return kandidat
+
+    hasil = []
+    for e in kandidat:
+        kata_kunci = _KATA_KUNCI_KATEGORI.get(e["kategori"])
+        if kata_kunci:
+            tergantikan = any(
+                k["waktu_utc"].date() == e["waktu_utc"].date()
+                and any(kw in k["nama"].lower() for kw in kata_kunci)
+                for k in konfirmasi
+            )
+            if tergantikan:
+                continue
+        hasil.append(e)
+    return hasil + konfirmasi
+
+
+def collect(
+    fomc_dates: List[str], days_ahead: int = 7, konfirmasi: List[Dict[str, Any]] = None
+) -> List[Dict[str, Any]]:
+    """Agenda dalam `days_ahead` hari ke depan, terurut dari yang terdekat.
+
+    `konfirmasi` (opsional): event tambahan dari sumber luar dalam bentuk
+    yang sama seperti hasil `_candidates()` — dipakai untuk MENGGANTIKAN
+    dugaan pola bulanan (CPI/NFP/PCE) dengan tanggal sungguhan kalau ada,
+    bukan sekadar ditambahkan sebagai baris duplikat. FOMC dan expiry opsi
+    tidak pernah digantikan karena keduanya sudah pasti, bukan dugaan.
+    """
     now = now_utc()
     today = now.date()
     horizon = now + timedelta(days=days_ahead)
 
-    upcoming = [
-        e for e in _candidates(today, fomc_dates)
-        if now <= e["waktu_utc"] <= horizon
-    ]
+    kandidat = _gabung_konfirmasi(_candidates(today, fomc_dates), konfirmasi or [])
+    upcoming = [e for e in kandidat if now <= e["waktu_utc"] <= horizon]
     upcoming.sort(key=lambda e: e["waktu_utc"])
 
     out: List[Dict[str, Any]] = []

@@ -177,6 +177,14 @@ Tugas utama langkah LLM di sini adalah **membuang derau**: pencarian berita untu
 
 Daftar akun dan query bisa diubah di `config.yaml` bagian `statements` — menambah tokoh lain (misalnya ketua bank sentral) cukup menambah query, tanpa mengubah kode.
 
+### Agenda ekonomi: dugaan pola + pelengkap dari investing.com
+
+Kalender bawaan (`calendar.py`) tidak membaca sumber luar sama sekali — FOMC diambil dari config, sisanya (CPI, NFP, PCE) dihitung dari pola tanggal rilis yang biasanya stabil tiap bulan ("Rabu ke-2", "Jumat pertama"), makanya ditandai `perkiraan: true`. Ini tahan lama tapi bisa meleset kalau BLS/BEA menggeser jadwal.
+
+Sebagai pelengkap, `investing.py` mencoba scrape halaman kalender ekonomi investing.com dan mengekstrak tanggal SUNGGUHAN lewat model LLM murah (step `agenda` di config, bukan regex) — tabelnya dirender lewat JavaScript dengan markup yang rumit dan gampang berubah, jadi LLM jauh lebih tahan banting dibanding parser regex. Kalau berhasil, event yang dikonfirmasi **menggantikan** dugaan pola bulanan untuk kategori dan tanggal yang sama (bukan ditambahkan sebagai duplikat).
+
+Sumber ini murni pelengkap dan sering gagal — investing.com berada di belakang proteksi anti-bot yang berat (mirip Farside), IP runner GitHub Actions kemungkinan besar ditolak. Kalau gagal, tidak ada error: kalender bawaan yang tetap dipakai, sama seperti sebelum fitur ini ada.
+
 ### Tautan tambahan
 
 Tombol di kartu harga diatur lewat `tautan_luar` di `config.yaml` — label, URL, dan nama ikon [Lucide](https://lucide.dev/icons):
@@ -410,7 +418,8 @@ src/
 │   ├── onchain.py          # valuasi on-chain: MVRV, NVT, alamat aktif
 │   ├── flows.py            # premium Coinbase, pasokan stablecoin
 │   ├── statements.py       # pernyataan tokoh berpengaruh
-│   └── calendar.py         # agenda ekonomi 7 hari
+│   ├── calendar.py         # agenda ekonomi 7 hari (dugaan pola bulanan)
+│   └── investing.py        # pelengkap agenda: tanggal sungguhan via LLM murah
 ├── analysis/
 │   ├── technical.py        # indikator + deteksi sinyal palsu — murni kode
 │   ├── llm.py              # klien OpenRouter + budget + logging biaya
@@ -469,6 +478,9 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 
 | Gejala | Penyebab & solusi |
 |---|---|
+| Agenda cuma berisi FOMC + tanggal "perkiraan" | Wajar. investing.com sering diblokir dari IP runner; kalender bawaan (dugaan pola bulanan) yang jadi cadangan. Cek log untuk "investing.com tidak terjangkau". |
+| Pesan Telegram terasa berhenti di tengah kalimat | Kalau itu hasil rapian LLM (`rapikan_dengan_llm: true`), gerbang verifikasinya sekarang memastikan disclaimer benar-benar ada di ~300 karakter terakhir — balasan yang terpotong otomatis ditolak dan pesan asli (utuh) yang dikirim. Kalau tetap terlihat terpotong, cek dulu apakah itu cuma potongan tangkapan layar (scroll ke bawah) sebelum melapor sebagai bug. |
+| Log `Balasan step 'revisi' terpotong di batas max_tokens` | Step revisi menulis ulang SELURUH narasi (bukan cuma bagian yang salah), jadi butuh ruang sebanyak sintesis sendiri. Kalau masih terpotong meski sudah dinaikkan, naikkan lagi `max_tokens` di `revisi_narasi()` (`src/analysis/news_analysis.py`). |
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |
 | `failed_sources` memuat `etf_flow` | Farside (di belakang Cloudflare) menolak atau strukturnya berubah. Kalau brief sebelumnya punya angka ETF, angka itu dipakai ulang lengkap dengan tanggal aslinya dan ditandai `etf_flow_kedaluwarsa`. |
 | Funding/OI kosong | Binance (451) dan Bybit (CloudFront) sama-sama memblokir IP runner AS. Deribit dipakai sebagai lapis ketiga. |

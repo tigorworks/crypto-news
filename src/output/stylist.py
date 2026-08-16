@@ -80,6 +80,18 @@ def periksa(asli: str, hasil: str) -> Optional[str]:
         if penanda.lower() not in hasil.lower():
             return f"penanda wajib hilang: '{penanda}'"
 
+    # Disclaimer harus ada di dekat AKHIR pesan, bukan cuma di suatu tempat.
+    # Kalau balasan LLM terpotong di tengah (token habis, reasoning model
+    # menghabiskan budget sebelum sampai ke isi) tapi kebetulan sudah
+    # menyebut "bukan saran investasi" lebih awal, pemeriksaan penanda di
+    # atas tidak akan menangkapnya — pesan yang terpotong bisa lolos dan
+    # terkirim ke pembaca berhenti di tengah kalimat. Disclaimer memang
+    # selalu ditulis sebagai baris penutup di pesan asli, jadi kalau tidak
+    # ada di ~300 karakter terakhir, kemungkinan besar isinya kepotong.
+    ekor = hasil[-300:].lower()
+    if "bukan saran investasi" not in ekor:
+        return "disclaimer tidak berada di dekat akhir pesan (kemungkinan terpotong)"
+
     # Inti pemeriksaan: tidak boleh ada angka yang tidak ada di pesan asli.
     angka_asli = _angka_dinormalkan(asli)
     angka_baru = _angka_dinormalkan(hasil) - angka_asli
@@ -149,13 +161,16 @@ def rapikan(
         return gagal
 
     try:
+        # 3900 karakter ~ 1000 token keluaran, tapi beberapa model menghitung
+        # token penalaran dari budget yang sama sebelum sampai ke isi —
+        # ruang ekstra ini jaga-jaga supaya isi sungguhannya tidak kepotong.
         hasil = client.chat(
             models,
             _prompt(),
             "Tata ulang pesan berikut:\n\n" + pesan,
             step="format",
             temperature=0.3,
-            max_tokens=4000,
+            max_tokens=6000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Perapian pesan gagal (%s), pakai format asli", exc)

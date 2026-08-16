@@ -924,8 +924,12 @@ def revisi_narasi(
         "DATA MENTAH:\n" + json.dumps(konteks, ensure_ascii=False, default=str)
     )
     try:
+        # Keluarannya adalah SELURUH narasi hasil sintesis (400-700 kata) yang
+        # ditulis ulang, bukan cuma bagian yang diperbaiki — jadi butuh ruang
+        # sebanyak langkah sintesis sendiri (10000). 10000 pernah terpotong di
+        # produksi; dinaikkan dengan margin ekstra.
         hasil = client.chat_json(
-            models, system, user, step="revisi", temperature=0.2, max_tokens=10000
+            models, system, user, step="revisi", temperature=0.2, max_tokens=16000
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Revisi narasi gagal: %s", exc)
