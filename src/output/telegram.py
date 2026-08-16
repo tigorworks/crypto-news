@@ -444,6 +444,35 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
             if p.get("dasar"):
                 baris.append(f"   <i>{esc(_potong(p['dasar'], 160))}</i>")
 
+    # Ke depan (makro, geopolitik, agenda) ditempatkan TEPAT SETELAH penyebab
+    # pergerakan, sebelum teknikal dan whale — faktor-faktor ini sedang
+    # sangat menentukan arah pasar belakangan ini, jadi tidak pantas terkubur
+    # di bawah pembacaan yang levelnya lebih taktis. faktor_geopolitik dan
+    # keputusan_besar sebelumnya malah tidak pernah ditulis ke Telegram sama
+    # sekali meski datanya sudah dihasilkan outlook — sekarang ikut tampil.
+    ol = ai.get("outlook") or {}
+    if outlook_ai:
+        baris.append("")
+        horizon = f" ({esc(ol['horizon'])})" if ol.get("horizon") else ""
+        baris.append(f"<b>Ke depan{horizon}:</b> " + esc(_potong(outlook_ai, 400)))
+        if ol.get("faktor_geopolitik"):
+            baris.append("🌍 <b>Geopolitik:</b> " + esc(
+                _potong("; ".join(ol["faktor_geopolitik"][:3]), 300)))
+        if ol.get("keputusan_besar"):
+            for k in ol["keputusan_besar"][:2]:
+                apa = k.get("apa", "")
+                kapan = f" ({esc(k['kapan'])})" if k.get("kapan") else ""
+                baris.append(f"📅 <b>{esc(apa)}{kapan}:</b> " + esc(_potong(k.get("kenapa_penting", ""), 200)))
+        for nama, kunci, panah in (("Menguat", "skenario_naik", "↑"), ("Melemah", "skenario_turun", "↓")):
+            sk = ol.get(kunci) or {}
+            pemicu = sk.get("pemicu") or []
+            if pemicu:
+                baris.append(f"{panah} <b>{nama}:</b> " + esc(_potong(", ".join(pemicu[:3]), 200)))
+                if sk.get("kondisi"):
+                    baris.append(f"   <i>syarat: {esc(_potong(sk['kondisi'], 130))}</i>")
+        if ol.get("risiko_utama"):
+            baris.append("⚠ <b>Risiko:</b> " + esc(_potong(ol["risiko_utama"][0], 200)))
+
     tek = ai.get("teknikal") or {}
     if teknikal_ai:
         baris.append("")
@@ -461,21 +490,6 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
         for sp in (whale_ai.get("sinyal_palsu") or [])[:2]:
             if sp.get("keyakinan") in ("tinggi", "sedang"):
                 baris.append(f"• {esc(sp.get('pola',''))}: {esc(_potong(sp.get('arti',''), 150))}")
-
-    ol = ai.get("outlook") or {}
-    if outlook_ai:
-        baris.append("")
-        horizon = f" ({esc(ol['horizon'])})" if ol.get("horizon") else ""
-        baris.append(f"<b>Ke depan{horizon}:</b> " + esc(_potong(outlook_ai, 400)))
-        for nama, kunci, panah in (("Menguat", "skenario_naik", "↑"), ("Melemah", "skenario_turun", "↓")):
-            sk = ol.get(kunci) or {}
-            pemicu = sk.get("pemicu") or []
-            if pemicu:
-                baris.append(f"{panah} <b>{nama}:</b> " + esc(_potong(", ".join(pemicu[:3]), 200)))
-                if sk.get("kondisi"):
-                    baris.append(f"   <i>syarat: {esc(_potong(sk['kondisi'], 130))}</i>")
-        if ol.get("risiko_utama"):
-            baris.append("⚠ <b>Risiko:</b> " + esc(_potong(ol["risiko_utama"][0], 200)))
 
     bagian = ai.get("bagian") or {}
     if bagian.get("kesimpulan"):
