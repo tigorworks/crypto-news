@@ -601,7 +601,16 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
                         client, model_critic, teks_diperiksa, konteks_sintesis
                     )
                     if hasil_critic["passed"]:
-                        log.info("Revisi lolos pemeriksaan critic")
+                        # "passed" juga true saat critic gagal dijalankan (fail-open,
+                        # lihat news_analysis.critic) — dibedakan di log supaya "lolos"
+                        # tidak diam-diam berarti "tidak sempat diperiksa ulang".
+                        if hasil_critic.get("dijalankan", True):
+                            log.info("Revisi lolos pemeriksaan critic")
+                        else:
+                            log.warning(
+                                "Revisi TIDAK sempat diverifikasi ulang (critic gagal "
+                                "dijalankan pada putaran kedua), dipakai apa adanya"
+                            )
                         catatan.append("Narasi AI melewati satu putaran revisi otomatis.")
                     else:
                         log.warning("Revisi masih belum lolos critic")
