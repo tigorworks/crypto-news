@@ -194,9 +194,12 @@ Horizonnya **30 hari**, bukan 7. Dengan 7 hari agenda kerap kosong sama sekali �
 
 Kalender bawaan (`calendar.py`) tidak membaca sumber luar sama sekali — FOMC diambil dari config, sisanya (CPI, NFP, PCE) dihitung dari pola tanggal rilis yang biasanya stabil tiap bulan ("Rabu ke-2", "Jumat pertama"), makanya ditandai `perkiraan: true`. Ini tahan lama tapi bisa meleset kalau BLS/BEA menggeser jadwal.
 
-Sebagai pelengkap, `investing.py` mencoba scrape halaman kalender ekonomi investing.com dan mengekstrak tanggal SUNGGUHAN lewat model LLM murah (step `agenda` di config, bukan regex) — tabelnya dirender lewat JavaScript dengan markup yang rumit dan gampang berubah, jadi LLM jauh lebih tahan banting dibanding parser regex. Kalau berhasil, event yang dikonfirmasi **menggantikan** dugaan pola bulanan untuk kategori dan tanggal yang sama (bukan ditambahkan sebagai duplikat).
+Dua sumber luar dicoba untuk mengganti dugaan itu dengan tanggal sungguhan, berurutan dari yang paling bisa diandalkan:
 
-Sumber ini murni pelengkap dan sering gagal — investing.com berada di belakang proteksi anti-bot yang berat (mirip Farside), IP runner GitHub Actions kemungkinan besar ditolak. Kalau gagal, tidak ada error: kalender bawaan yang tetap dipakai, sama seperti sebelum fitur ini ada.
+1. **`ff_calendar.py` — feed JSON ForexFactory** (`nfs.faireconomy.media`). Terstruktur, tanpa API key, tanpa proteksi anti-bot, dan **tanpa LLM sama sekali** — parsingnya deterministik, jadi tidak ada yang bisa dikarang. Tiga jendela (minggu ini, minggu depan, bulan ini) digabung lalu disaring: hanya USD/EUR/CNY dengan dampak High/Medium, duplikat antar-berkas dibuang.
+2. **`investing.py` — scrape investing.com lewat LLM murah**, dipakai hanya kalau feed di atas kosong. Tabelnya dirender JavaScript dengan markup rumit, jadi ekstraksinya diserahkan ke model (step `agenda` di config) yang jauh lebih tahan banting dibanding regex. Halamannya kerap diblokir dari IP pusat data, jadi wajar kalau sering kembali kosong.
+
+Event yang dikonfirmasi **menggantikan** dugaan pola bulanan untuk kategori dan tanggal yang sama (bukan ditambahkan sebagai duplikat) — termasuk FOMC, supaya satu keputusan suku bunga tidak tampil dua kali dengan nama berbeda. Kalau dua-duanya gagal, kalender bawaan tetap menghasilkan agenda dan pipeline lanjut tanpa keluhan.
 
 ### Tautan tambahan
 
@@ -221,7 +224,7 @@ Halaman dirancang mobile-first dan diuji di lebar 360px, 390px, dan 430px:
 - **Target sentuh minimal 44px** pada perangkat sentuh, sesuai pedoman iOS dan Android
 - **Ukuran teks minimal 11px** di ponsel; ukuran yang lebih kecil hanya dipakai mulai breakpoint `sm`
 - **Nav lompat** khusus ponsel di bawah header — halaman ini panjang, jadi ada baris pintasan yang bisa digulir ke samping menuju tiap bagian
-- **Daftar panjang dipaginasi** 3 baris per halaman — berita dan pernyataan tokoh berbagi satu bagian dengan dua tab, jadi halaman tidak memanjang dan bagian di bawahnya tetap terjangkau
+- **Daftar panjang dipaginasi** 3 baris per halaman — berlaku untuk berita, pernyataan tokoh, dan agenda. Berita dan pernyataan berbagi satu bagian dengan dua tab, jadi halaman tidak memanjang dan bagian di bawahnya tetap terjangkau
 - Tabel indikator dan grid makro menyusun ulang jadi satu kolom
 
 ---
@@ -432,7 +435,8 @@ src/
 │   ├── flows.py            # premium Coinbase, pasokan stablecoin
 │   ├── statements.py       # pernyataan tokoh berpengaruh
 │   ├── calendar.py         # agenda ekonomi 30 hari (dugaan pola bulanan)
-│   └── investing.py        # pelengkap agenda: tanggal sungguhan via LLM murah
+│   ├── ff_calendar.py      # agenda sungguhan: feed JSON ForexFactory
+│   └── investing.py        # cadangan agenda: scrape investing.com via LLM
 ├── analysis/
 │   ├── technical.py        # indikator + deteksi sinyal palsu — murni kode
 │   ├── llm.py              # klien OpenRouter + budget + logging biaya
@@ -495,7 +499,7 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 | Critic menahan narasi karena "volume 24 jam" dianggap karangan | Ada dua angka volume yang berbeda: `harga.volume_24h` (rolling 24 jam sungguhan) vs `teknikal_1d.volume.terakhir`/`.rata_20` (volume per candle harian, bisa jauh berbeda karena batas UTC candle). Prompt sudah diperjelas soal ini; kalau masih terjadi, cek apakah model yang dipakai benar-benar mengikuti instruksi sistemnya. |
 | Judul "Ringkasan Pasar Bitcoin" hilang dari pesan Telegram yang dirapikan | Sudah diperbaiki — judul dan timestamp sekarang selalu ditambahkan oleh KODE setelah perapian, tidak pernah dikirim ke LLM sama sekali (`telegram.render_terpisah()`). Kalau masih hilang, berarti bukan dari jalur ini. |
 | Analisa AI di Telegram terasa lebih singkat dari biasanya | Kalau itu hasil rapian LLM, verifikasinya sekarang menolak hasil yang panjangnya kurang dari 60% pesan asli (`stylist.RASIO_PANJANG_MINIMAL`) — perapi cuma boleh menata, bukan meringkas. Hasil yang ditolak otomatis jatuh ke pesan asli (lebih panjang, tidak dirapikan). |
-| Agenda cuma berisi FOMC + tanggal "perkiraan" | Wajar. investing.com sering diblokir dari IP runner; kalender bawaan (dugaan pola bulanan) yang jadi cadangan. Cek log untuk "investing.com tidak terjangkau". |
+| Agenda cuma berisi FOMC + tanggal "perkiraan" | Kedua sumber luar (feed ForexFactory dan investing.com) tidak terjangkau, jadi kalender bawaan (dugaan pola bulanan) yang dipakai. Cek log untuk "Kalender ekonomi ForexFactory tidak terjangkau". |
 | Pesan Telegram terasa berhenti di tengah kalimat | Kalau itu hasil rapian LLM (`rapikan_dengan_llm: true`), gerbang verifikasinya sekarang memastikan disclaimer benar-benar ada di ~300 karakter terakhir — balasan yang terpotong otomatis ditolak dan pesan asli (utuh) yang dikirim. Kalau tetap terlihat terpotong, cek dulu apakah itu cuma potongan tangkapan layar (scroll ke bawah) sebelum melapor sebagai bug. |
 | Log `Balasan step 'revisi' terpotong di batas max_tokens` | Step revisi menulis ulang SELURUH narasi (bukan cuma bagian yang salah), jadi butuh ruang sebanyak sintesis sendiri. Kalau masih terpotong meski sudah dinaikkan, naikkan lagi `max_tokens` di `revisi_narasi()` (`src/analysis/news_analysis.py`). |
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |

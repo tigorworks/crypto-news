@@ -20,6 +20,7 @@ from .analysis.llm import LLMClient
 from .collectors import (
     binance,
     calendar as calendar_collector,
+    ff_calendar,
     flows,
     investing,
     macro,
@@ -424,13 +425,22 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     # -- Kalender (dibutuhkan sebagai konteks outlook) ---------------------
     # Kalender bawaan menghitung CPI/NFP/PCE dari pola bulanan (dugaan,
     # ditandai `perkiraan: true`) karena tidak membaca sumber luar sama
-    # sekali. investing.com dicoba sebagai pelengkap untuk tanggal
-    # sungguhan — lewat LLM murah karena tabelnya susah diregex dan
-    # halamannya kerap diblokir (sama seperti Farside), jadi wajar kalau
-    # sering kembali kosong dan kalender bawaan yang dipakai.
-    konfirmasi_agenda = investing.collect(
-        client, cfg.llm_models("agenda"), format_wib(now_utc())
-    ) if client else []
+    # sekali. Dua sumber luar dicoba untuk menggantinya dengan tanggal
+    # sungguhan, berurutan dari yang paling bisa diandalkan:
+    #
+    #   1. Feed JSON ForexFactory — terstruktur, tanpa API key, tanpa LLM.
+    #      Parsingnya deterministik, jadi tidak ada yang bisa dikarang.
+    #   2. Scrape investing.com lewat LLM murah — cadangan kalau feed di
+    #      atas mati. Halamannya kerap diblokir dari IP pusat data, jadi
+    #      wajar kalau sering kembali kosong.
+    #
+    # Kalau dua-duanya gagal, kalender bawaan tetap menghasilkan agenda
+    # (dengan tanggal dugaan) dan pipeline lanjut tanpa keluhan.
+    konfirmasi_agenda = ff_calendar.collect()
+    if not konfirmasi_agenda and client:
+        konfirmasi_agenda = investing.collect(
+            client, cfg.llm_models("agenda"), format_wib(now_utc())
+        )
     agenda = calendar_collector.collect(cfg.fomc_dates, konfirmasi=konfirmasi_agenda)
 
     # -- 12-15. Rangkaian LLM analitis -------------------------------------
