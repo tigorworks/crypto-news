@@ -47,6 +47,93 @@ _NILAI_ROMAWI = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5}
 _POLA_ROMAWI_NILAI = re.compile(r"(:\s*)(I{1,3}|IV|V)(\s*[,}\]])")
 
 
+# Karakter kontrol yang ILEGAL mentah-mentah di dalam string JSON. Spesifikasi
+# JSON mewajibkan semuanya di-escape; model yang menulis narasi berparagraf
+# kerap menaruh line break SUNGGUHAN di dalam nilai string, dan satu saja
+# menggugurkan seluruh balasan.
+_KONTROL_KE_ESCAPE = {
+    "\n": "\\n", "\r": "\\r", "\t": "\\t", "\b": "\\b", "\f": "\\f",
+}
+
+
+def _escape_kontrol_dalam_string(teks: str) -> str:
+    """Escape karakter kontrol mentah yang berada DI DALAM nilai string.
+
+    Ini akar dari kegagalan parse yang paling merusak di proyek ini: langkah
+    sintesis diminta menulis narasi 6-9 paragraf, dan model memisahkan
+    paragrafnya dengan newline SUNGGUHAN, bukan `\\n`. Hasilnya JSON tidak
+    sah ("Invalid control character") dan SELURUH narasi hangus — bukan cuma
+    satu field.
+
+    Pemindaian dilakukan per karakter dengan melacak status di-dalam-string,
+    bukan lewat regex: batas string hanya bisa ditentukan dengan menghitung
+    escape secara berurutan, dan regex tidak bisa melakukannya dengan benar.
+    Struktur di LUAR string (newline antar field) sengaja tidak disentuh.
+    """
+    hasil: List[str] = []
+    dalam_string = False
+    escape = False
+    for ch in teks:
+        if escape:
+            hasil.append(ch)
+            escape = False
+            continue
+        if ch == "\\":
+            hasil.append(ch)
+            escape = True
+            continue
+        if ch == '"':
+            dalam_string = not dalam_string
+            hasil.append(ch)
+            continue
+        if dalam_string:
+            pengganti = _KONTROL_KE_ESCAPE.get(ch)
+            if pengganti is not None:
+                hasil.append(pengganti)
+                continue
+            if ord(ch) < 0x20:
+                hasil.append(f"\\u{ord(ch):04x}")
+                continue
+        hasil.append(ch)
+    return "".join(hasil)
+
+
+def _cacah_alnum(teks: str) -> int:
+    return sum(1 for c in teks if c.isalnum())
+
+
+def _isi_terjaga(asli: str, hasil: Any, ambang: float = 0.70) -> bool:
+    """True kalau hasil perbaikan masih memuat sebagian besar isi aslinya.
+
+    Pengaman terhadap kegagalan DIAM-DIAM, yang jauh lebih berbahaya daripada
+    error: sebuah perbaikan bisa saja menghasilkan JSON yang sah tapi isinya
+    sudah terpotong — misalnya string multi-baris ditutup lebih awal sehingga
+    tiga dari empat paragraf hilang, namun sisanya kebetulan tetap bisa
+    diparse. Tanpa pemeriksaan ini, brief akan terbit dengan analisa yang
+    terpangkas TANPA satu pun peringatan.
+
+    Dibandingkan lewat jumlah karakter alfanumerik supaya perbedaan tanda
+    baca, escape, dan spasi tidak ikut terhitung.
+    """
+    asli_n = _cacah_alnum(asli)
+    if asli_n == 0:
+        return True
+    hasil_n = _cacah_alnum(json.dumps(hasil, ensure_ascii=False))
+    rasio = hasil_n / asli_n
+    if rasio < ambang:
+        log.warning(
+            "Perbaikan JSON ditolak: isinya menyusut jadi %.0f%% dari balasan asli "
+            "(kemungkinan sebagian konten terpotong diam-diam)", rasio * 100,
+        )
+        return False
+    if rasio < 0.95:
+        log.warning(
+            "Perbaikan JSON dipakai, tapi isinya %.0f%% dari aslinya — periksa "
+            "kalau ada bagian yang terasa hilang", rasio * 100,
+        )
+    return True
+
+
 def _perbaiki_json(teks: str) -> str:
     """Perbaiki kerusakan JSON yang lazim dari keluaran model.
 
@@ -175,14 +262,34 @@ def _extract_json(text: str) -> Any:
 
     cleaned = _strip_fences(text)
 
-    # Perbaikan string dicoba lebih dulu di SELURUH teks: kalau berhasil,
+    # Perbaikan dicoba pada SELURUH teks lebih dulu: kalau berhasil,
     # strukturnya utuh dan tidak perlu menebak-nebak potongan mana yang benar.
-    try:
-        hasil = json.loads(_rapikan_string_baris(cleaned))
-        log.warning("JSON model rusak pada nilai string, berhasil dirapikan")
+    #
+    # Urutannya dari yang paling aman ke yang paling agresif:
+    #   1. escape karakter kontrol   — deterministik, tidak menebak apa pun
+    #   2. rapikan nilai string      — memakai heuristik batas string
+    #   3. keduanya digabung         — untuk balasan yang rusak berlapis
+    #
+    # Tiap hasil WAJIB lolos _isi_terjaga(): sebuah perbaikan yang menghasilkan
+    # JSON sah tapi isinya terpangkas lebih berbahaya daripada gagal parse,
+    # karena brief akan terbit dengan analisa terpotong tanpa peringatan.
+    perbaikan = (
+        ("karakter kontrol mentah di dalam string", _escape_kontrol_dalam_string),
+        ("nilai string rusak", _rapikan_string_baris),
+        (
+            "karakter kontrol + nilai string rusak",
+            lambda t: _rapikan_string_baris(_escape_kontrol_dalam_string(t)),
+        ),
+    )
+    for nama, perbaiki in perbaikan:
+        try:
+            hasil = json.loads(perbaiki(cleaned))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if not _isi_terjaga(cleaned, hasil):
+            continue
+        log.warning("JSON model rusak (%s), berhasil dipulihkan utuh", nama)
         return hasil
-    except (json.JSONDecodeError, TypeError):
-        pass
 
     potongan = []
     # Urutan mengikuti kurung yang muncul lebih dulu di teks. Kalau balasan
@@ -207,17 +314,25 @@ def _extract_json(text: str) -> Any:
             # Penutup tidak ada sama sekali: balasan terpotong di tengah.
             potongan.append(cleaned[start:])
 
+    # Jalur terakhir: memotong blok kurung terluar lalu menambal. Paling
+    # agresif, jadi ambang isi-terjaganya dinaikkan — pemulihan "sebagian"
+    # yang menyisakan seperempat isi bukan pemulihan, itu kehilangan data
+    # yang menyamar jadi keberhasilan.
     for bagian in potongan:
         try:
-            return json.loads(bagian)
+            hasil = json.loads(bagian)
+            if _isi_terjaga(cleaned, hasil):
+                return hasil
         except json.JSONDecodeError:
             pass
         try:
             hasil = json.loads(_perbaiki_json(bagian))
-            log.warning("JSON model rusak tapi berhasil dipulihkan sebagian")
-            return hasil
         except json.JSONDecodeError:
             continue
+        if not _isi_terjaga(cleaned, hasil, ambang=0.80):
+            continue
+        log.warning("JSON model rusak tapi berhasil dipulihkan sebagian")
+        return hasil
 
     # Run produksi jalan di level INFO (lihat main.py), jadi log.debug tidak
     # pernah tercatat di sana — kegagalan macam ini jadi mustahil didiagnosis
