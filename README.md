@@ -171,6 +171,17 @@ Kalau ada temuan yang benar-benar menahan:
 
 **Batas `pengetahuan_luar` vs `sebab_akibat` diperjelas tegas.** Critic sempat memvonis kalimat seperti *"pergerakan hari ini tampak lebih terkait dengan mekanika teknikal — squeeze volatilitas, taker sell dominan"* sebagai `pengetahuan_luar` (fatal, menahan) padahal ketiga fakta yang dirujuknya (squeeze, taker ratio, short buildup) semuanya ADA di data — itu cuma model MENGHUBUNGKAN data yang ada, persis tugas seorang analis, seharusnya `sebab_akibat` (minor, tidak menahan). Prompt sekarang eksplisit: `pengetahuan_luar` hanya untuk fakta/angka/entitas yang **tidak ada di mana pun** dalam data; menafsirkan atau menghubungkan data yang sudah ada selalu `sebab_akibat`, tidak pernah fatal.
 
+### Perbaikan analis pasar (Agustus 2026)
+
+Serangkaian penambahan berdasar audit "apa yang bisa membuat insight-nya lebih berguna":
+
+- **Riwayat OI lewat OKX** — cadangan KETIGA untuk riwayat open interest setelah Binance dan Bybit gagal (keduanya diblokir dari IP runner GitHub Actions). Sebelumnya satu-satunya jalan saat itu terjadi adalah membandingkan OI hari ini dengan OI di brief kemarin — valid tapi cuma satu titik pembanding sehari. OKX memberi granularitas per jam.
+- **Tren funding, bukan cuma titik terakhir** — funding positif SATU KALI nyaris tidak berarti; funding yang bertahan berhari-hari di sisi yang sama (long/short crowded) adalah sinyal jauh lebih kuat. `funding_persisten_jam` menghitung berapa lama funding bertahan di tanda yang sama, lewat riwayat 7 hari OKX (interval 8 jam).
+- **Volatilitas realized vs DVOL (implied)** — dihitung dari candle harian yang SUDAH ADA (log return 30 hari, dianualisasi), dibandingkan dengan DVOL Deribit. Rasio IV/RV menandakan opsi mahal (>1,15×) atau murah (<0,85×) relatif terhadap volatilitas yang SUNGGUHAN terjadi — bukan cuma angka DVOL telanjang tanpa konteks.
+- **Dominasi BTC** (`market.btc_dominance_pct`, dari CoinGecko `/global`) — penanda rezim: dominance naik + harga BTC naik berarti uang mengalir KE BTC (altcoin melemah relatif); dominance turun + harga naik berarti risk-on lebih luas ke seluruh pasar kripto.
+- **Field yang sudah dikumpulkan tapi tak pernah ditampilkan** kini muncul di web: rentang DVOL 7 hari (bukan cuma titik terakhir), expiry opsi dengan OI terbesar (indikasi pinning/gamma menjelang jatuh tempo), tren posisi whale vs ritel dalam periode pemantauan, rincian kapitalisasi per stablecoin, neraca The Fed dan M2 (skala makro, likuiditas dolar), serta fee mempool.
+- **Bug satuan FRED yang ditemukan sekaligus dibetulkan**: WALCL (neraca Fed) dilaporkan FRED dalam JUTAAN dolar dan M2SL dalam MILIAR dolar — bukan dolar mentah. Tanpa penskalaan, `fed_balance_sheet` bernilai ~6.500.000 yang gampang salah dibaca sebagai "$6,5 juta" padahal sebenarnya $6,5 TRILIUN. Diskalakan di `src/collectors/macro.py`, di sumbernya — supaya konteks yang dibaca LLM maupun tampilan web sama-sama memakai dolar sungguhan.
+
 ### Data tingkat institusional
 
 Sebagian besar dashboard kripto berhenti di harga, RSI, dan Fear & Greed — semuanya data retail. Yang berikut ini biasanya dijual berlangganan mahal, padahal tersedia gratis lewat API publik:
@@ -256,6 +267,17 @@ tautan_luar:
 Kosongkan daftarnya kalau tidak ingin ada tombol.
 
 ---
+
+## Perbaikan UI/UX (Agustus 2026)
+
+Serangkaian penambahan berdasar audit "apa yang perlu diperbaiki dari sisi UI/UX yang paham market":
+
+- **Ringkasan (TL;DR) paling atas** — vonis satu kalimat (`ai.bagian.judul`) tampil sebagai panel indigo tepat setelah kartu harga, sebelum pembaca perlu scroll melewati lima bagian data mentah. Pembaca yang cuma punya 10 detik dapat MAKNA, bukan cuma angka.
+- **"Perubahan vs Brief Sebelumnya" dipindah ke dekat TL;DR** — sebelumnya di bagian bawah, ditemani agenda. Untuk laporan HARIAN, "apa yang berubah sejak kemarin" adalah pertanyaan intinya, bukan bagian pelengkap.
+- **Analisa AI dipindah ke urutan kedua** (setelah harga, sebelum teknikal/pasar/institusional/whale) — sebelumnya di urutan keenam, terkubur di bawah lima bagian angka mentah. Nav lompat ponsel ikut disesuaikan urutannya.
+- **Skor sentimen diperbaiki labelnya** — skalanya -100 (bearish penuh) sampai +100 (bullish penuh), tapi label lama menulis "/100" yang gampang salah dibaca seolah skornya selalu positif, apalagi saat angkanya negatif. Sekarang eksplisit "dari -100..+100" dengan tanda `+`/`-` pada angkanya.
+- **Sumber gagal ditulis terang-terangan** — sebelumnya cuma tersembunyi di tooltip badge kualitas data, nyaris tak berguna di ponsel (tanpa hover) dan gampang terlewat bahkan di desktop. Sekarang muncul sebagai baris terpisah di header dalam bahasa manusia ("Arus ETF harian", bukan `etf_flow`) setiap kali ada sumber yang gagal run itu.
+- **Support/resistance digambar di grafik harga** — sebelumnya cuma angka telanjang di kartu sebelah; sekarang garis putus-putus hijau (support) dan merah (resistance) langsung di atas grafik, jadi "harga lagi di mana relatif ke level" terlihat sekali pandang tanpa mencocokkan dua angka secara mental.
 
 ## Tampilan Mobile
 

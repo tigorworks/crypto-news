@@ -46,6 +46,9 @@ _KANDIDAT_TAKER = [
     ("/api/v5/rubik/stat/taker-volume",
      {"ccy": "BTC", "instType": "CONTRACTS", "period": "1H"}),
 ]
+_KANDIDAT_OI_HISTORY = [
+    ("/api/v5/rubik/stat/contracts/open-interest-volume", {"ccy": "BTC", "period": "1H"}),
+]
 
 
 def _angka(nilai: Any) -> Optional[float]:
@@ -184,4 +187,90 @@ def fetch_taker_ratio() -> Dict[str, Any]:
             else "jual menguat" if akhir < awal * 0.97
             else "seimbang"
         ),
+    }
+
+
+def fetch_open_interest_history(limit: int = 30) -> List[Dict[str, Any]]:
+    """Riwayat OI per jam — cadangan KETIGA setelah Binance dan Bybit gagal.
+
+    Sebelum ini ada, satu-satunya jalan saat kedua bursa itu gagal adalah
+    membandingkan OI hari ini dengan OI di brief KEMARIN (lihat main.py) —
+    valid tapi cuma satu titik pembanding, jadi tidak bisa mendeteksi tren
+    dalam sehari. Endpoint ini memberi granularitas per jam.
+
+    Satuan OI dari OKX (kontrak vs USD) tidak dipastikan sama dengan Binance/
+    Bybit, dan itu TIDAK masalah di sini: oi_price_signal() cuma memakai
+    persentase perubahan, bukan nilai mutlaknya, jadi konsisten antar-baris
+    sudah cukup.
+    """
+    baris = _urut_lama_ke_baru(_ambil(_KANDIDAT_OI_HISTORY, "riwayat OI"))
+    hasil: List[Dict[str, Any]] = []
+    for b in baris[-limit:]:
+        if len(b) < 2:
+            continue
+        ts, oi = _angka(b[0]), _angka(b[1])
+        if ts is None or oi is None:
+            continue
+        hasil.append({"timestamp": int(ts), "open_interest": oi})
+    return hasil
+
+
+def fetch_funding_rate_history(limit: int = 24) -> List[Dict[str, Any]]:
+    """Riwayat funding rate (fraksi, bukan persen), lama ke baru.
+
+    Dipakai untuk membedakan funding yang persisten (long/short crowded
+    berhari-hari — sinyal kuat) dari lonjakan satu kali yang nyaris tidak
+    berarti. Endpoint publik OKX, tidak butuh API key.
+    """
+    try:
+        resp = get_json(
+            f"{BASE}/api/v5/public/funding-rate-history",
+            params={"instId": INST_ID, "limit": min(limit, 100)},
+            timeout=10,
+            retries=1,
+        )
+    except (HttpError, ValueError) as exc:
+        log.warning("Riwayat funding rate OKX gagal: %s", exc)
+        return []
+    if not isinstance(resp, dict) or str(resp.get("code", "0")) != "0":
+        return []
+
+    hasil: List[Dict[str, Any]] = []
+    for r in resp.get("data") or []:
+        if not isinstance(r, dict):
+            continue
+        rate = _angka(r.get("fundingRate"))
+        waktu = _angka(r.get("fundingTime"))
+        if rate is None or waktu is None:
+            continue
+        hasil.append({"timestamp": int(waktu), "funding_rate": rate})
+    hasil.sort(key=lambda r: r["timestamp"])
+    return hasil[-limit:]
+
+
+def tren_funding(history: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Berapa lama funding bertahan di sisi yang sama — bukan cuma titik terakhir.
+
+    Funding positif SATU KALI nyaris tidak berarti; funding positif yang
+    bertahan berhari-hari (long crowded, dibayar terus-menerus) adalah sinyal
+    yang jauh lebih kuat. OKX BTC funding tiap 8 jam, jadi count periode
+    dikonversi ke perkiraan hari lewat pembagi 3.
+    """
+    if not history:
+        return {"funding_persisten_jam": None, "funding_rata_7h_pct": None}
+
+    tanda_terakhir = history[-1]["funding_rate"] >= 0
+    berturut = 0
+    for h in reversed(history):
+        if (h["funding_rate"] >= 0) != tanda_terakhir:
+            break
+        berturut += 1
+
+    tujuh_hari = history[-21:]  # ~7 hari pada interval 8 jam
+    rata = sum(h["funding_rate"] for h in tujuh_hari) / len(tujuh_hari)
+
+    return {
+        # 8 jam/periode adalah interval funding BTC OKX.
+        "funding_persisten_jam": berturut * 8,
+        "funding_rata_7h_pct": round(rata * 100, 4),
     }

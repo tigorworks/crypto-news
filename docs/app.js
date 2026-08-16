@@ -147,21 +147,45 @@ function briefApp() {
       isian.addColorStop(0, naik ? 'rgba(16,185,129,0.25)' : 'rgba(244,63,94,0.25)');
       isian.addColorStop(1, 'rgba(0,0,0,0)');
 
+      const datasets = [{
+        label: 'Harga',
+        data: deret.map((d) => d.c),
+        borderColor: warna,
+        backgroundColor: isian,
+        borderWidth: 2,
+        fill: true,
+        tension: 0.25,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: warna,
+      }];
+
+      // Support/resistance terdekat digambar sebagai garis putus-putus datar
+      // di atas grafik harga: sebelumnya cuma angka telanjang di kartu
+      // sebelah, sekarang pembaca langsung lihat "harga lagi di mana relatif
+      // ke level" tanpa mencocokkan dua angka secara mental.
+      const levelKunci = this.data.technical?.key_levels || {};
+      const support = levelKunci.support?.[0];
+      const resistance = levelKunci.resistance?.[0];
+      const garisLevel = (label, nilai, warnaGaris) => ({
+        label,
+        data: deret.map(() => nilai),
+        borderColor: warnaGaris,
+        borderWidth: 1,
+        borderDash: [5, 4],
+        pointRadius: 0,
+        pointHitRadius: 0,
+        fill: false,
+        tension: 0,
+      });
+      if (support) datasets.push(garisLevel('Support', support, 'rgba(16,185,129,0.65)'));
+      if (resistance) datasets.push(garisLevel('Resistance', resistance, 'rgba(244,63,94,0.65)'));
+
       this.grafik = new Chart(kanvas, {
         type: 'line',
         data: {
           labels: deret.map((d) => this.tanggalSingkat(d.t)),
-          datasets: [{
-            data: deret.map((d) => d.c),
-            borderColor: warna,
-            backgroundColor: isian,
-            borderWidth: 2,
-            fill: true,
-            tension: 0.25,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            pointHoverBackgroundColor: warna,
-          }],
+          datasets,
         },
         options: {
           responsive: true,
@@ -171,7 +195,10 @@ function briefApp() {
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: (ctx) => `$${formatAngka(ctx.parsed.y, 0)}`,
+                label: (ctx) => {
+                  const nama = ctx.dataset.label !== 'Harga' ? `${ctx.dataset.label} ` : '';
+                  return `${nama}$${formatAngka(ctx.parsed.y, 0)}`;
+                },
               },
             },
           },
@@ -204,6 +231,7 @@ function briefApp() {
       if (nilai === null || nilai === undefined) return '—';
       const tanda = pakaiTanda && nilai > 0 ? '+' : (nilai < 0 ? '-' : '');
       const abs = Math.abs(nilai);
+      if (abs >= 1e12) return `${tanda}$${formatAngka(abs / 1e12, 2)} triliun`;
       if (abs >= 1e9) return `${tanda}$${formatAngka(abs / 1e9, 2)} miliar`;
       if (abs >= 1e6) return `${tanda}$${formatAngka(abs / 1e6, 1)} jt`;
       if (abs >= 1e3) return `${tanda}$${formatAngka(abs / 1e3, 1)} rb`;
@@ -246,6 +274,15 @@ function briefApp() {
       const persenNilai = nilai * 100;
       if (Math.abs(persenNilai) < 0.00005) return 'mendekati 0% (netral)';
       return this.persen(persenNilai, 4);
+    },
+
+    /* Funding SATU TITIK nyaris tidak berarti — yang membedakan sinyal kuat
+       dari derau adalah sudah berapa lama bertahan di sisi yang sama. */
+    labelPersistensiFunding(jam) {
+      if (!jam) return '';
+      if (jam < 24) return `bertahan ${jam} jam`;
+      const hari = Math.round(jam / 24 * 10) / 10;
+      return `bertahan ~${hari} hari`;
     },
 
     persen(nilai, desimal = 2) {
@@ -397,6 +434,34 @@ function briefApp() {
       return `${Math.floor(jam / 24)} hari lalu`;
     },
 
+    /* Nama sumber gagal dalam bahasa manusia. Sebelumnya cuma tersembunyi di
+       tooltip badge kualitas — tidak berguna di ponsel (tanpa hover) dan
+       gampang terlewat bahkan di desktop. Sumber yang tidak masuk kamus
+       (nama domain, dsb) diberi fallback generik: garis bawah/titik dua
+       diganti spasi, huruf awal dikapital. */
+    labelSumberGagal(kode) {
+      const KAMUS = {
+        etf_flow: 'Arus ETF harian', funding_oi: 'Funding rate / open interest',
+        technical: 'Indikator teknikal', news: 'Berita', whale: 'Posisi whale/ritel',
+        whale_posisi: 'Posisi whale', ritel_posisi: 'Posisi ritel', taker_flow: 'Rasio taker',
+        macro: 'Data makro', fred: 'Data Fed (M2/neraca)', options: 'Data opsi Deribit',
+        dvol: 'Indeks volatilitas opsi', onchain: 'Data on-chain', onchain_fees: 'Fee mempool',
+        onchain_valuasi: 'Valuasi on-chain (MVRV/NVT)', fear_greed: 'Indeks Fear & Greed',
+        flows: 'Aliran dana', premium_coinbase: 'Premium Coinbase', stablecoin: 'Kapitalisasi stablecoin',
+        btc_dominance: 'Dominasi BTC', statements: 'Pernyataan tokoh', feed_resmi: 'Feed resmi Gedung Putih',
+        google_news: 'Pencarian Google News',
+      };
+      if (KAMUS[kode]) return KAMUS[kode];
+      if (kode.startsWith('truth_social:')) return `Truth Social @${kode.split(':')[1]}`;
+      if (kode.startsWith('x_grok:')) return `X (Grok) @${kode.split(':')[1]}`;
+      return kode.replace(/[_:]/g, ' ').replace(/^./, (c) => c.toUpperCase());
+    },
+
+    get sumberGagalTampil() {
+      const kode = this.data?.data_quality?.failed_sources || [];
+      return kode.map((k) => this.labelSumberGagal(k));
+    },
+
     get kelasKualitas() {
       const c = this.data?.data_quality?.confidence;
       if (c === 'baik') return 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300';
@@ -519,8 +584,20 @@ function briefApp() {
       if (ada(o.dvol)) {
         const d = ada(o.dvol_perubahan_7h_pp)
           ? ` (${o.dvol_perubahan_7h_pp > 0 ? '+' : ''}${this.angka(o.dvol_perubahan_7h_pp, 1)} pp/7h)` : '';
-        b.push({ label: 'DVOL', nilai: this.angka(o.dvol, 1) + d,
+        // Rentang 7 hari jadi acuan: 35 itu tinggi atau rendah TANPA konteks
+        // ini tidak bisa dijawab pembaca.
+        const rentang = (ada(o.dvol_min_7h) && ada(o.dvol_maks_7h))
+          ? ` · rentang 7h ${this.angka(o.dvol_min_7h, 1)}–${this.angka(o.dvol_maks_7h, 1)}` : '';
+        b.push({ label: 'DVOL', nilai: this.angka(o.dvol, 1) + d + rentang,
                  jelas: 'Indeks volatilitas implied — "VIX"-nya Bitcoin' });
+      }
+      if (ada(o.realized_vol_30hari_pct)) {
+        const rasio = ada(o.iv_rv_ratio)
+          ? ` (IV/RV ${this.angka(o.iv_rv_ratio, 2)}× — ${
+              o.iv_rv_ratio > 1.15 ? 'opsi relatif mahal' : o.iv_rv_ratio < 0.85 ? 'opsi relatif murah' : 'wajar'
+            })` : '';
+        b.push({ label: 'Volatilitas realized (30 hari)', nilai: this.angka(o.realized_vol_30hari_pct, 1) + '%' + rasio,
+                 jelas: 'Volatilitas yang SUNGGUHAN terjadi, dari candle harian — dibandingkan dengan DVOL (implied) untuk menilai opsi mahal/murah' });
       }
       if (ada(o.put_call_ratio_oi)) {
         b.push({ label: 'Put/Call (OI)', nilai: this.angka(o.put_call_ratio_oi, 2),
@@ -542,6 +619,10 @@ function briefApp() {
         b.push({ label: 'OI put/call (BTC)',
                  nilai: `${this.angka(o.oi_put_btc, 0)} / ${this.angka(o.oi_call_btc, 0)}`,
                  jelas: 'Total open interest opsi dalam BTC' });
+      }
+      if (ada(o.expiry_oi_terbesar) && ada(o.oi_pada_expiry_terbesar_btc)) {
+        b.push({ label: 'Expiry OI terbesar', nilai: `${o.expiry_oi_terbesar} (${this.angka(o.oi_pada_expiry_terbesar_btc, 0)} BTC)`,
+                 jelas: 'Tanggal jatuh tempo dengan open interest terbanyak — biasanya menarik harga mendekati max pain-nya menjelang expiry (efek pinning)' });
       }
       return b;
     },
@@ -606,6 +687,14 @@ function briefApp() {
         b.push({ label: 'Kapitalisasi stablecoin', nilai: this.ringkasUang(f.stablecoin_cap_usd),
                  jelas: 'Total USDT + USDC — likuiditas yang siap masuk pasar' });
       }
+      const LABEL_STABLECOIN = { tether: 'USDT', 'usd-coin': 'USDC' };
+      if (f.stablecoin_rincian && Object.keys(f.stablecoin_rincian).length) {
+        const bagian = Object.entries(f.stablecoin_rincian)
+          .map(([id, cap]) => `${LABEL_STABLECOIN[id] || id} ${this.ringkasUang(cap)}`)
+          .join(' · ');
+        b.push({ label: 'Rincian stablecoin', nilai: bagian,
+                 jelas: 'Kapitalisasi tiap stablecoin utama' });
+      }
       if (ada(f.stablecoin_perubahan_24j_usd)) {
         b.push({ label: 'Perubahan stablecoin 24j',
                  nilai: this.ringkasUang(f.stablecoin_perubahan_24j_usd, true),
@@ -628,11 +717,17 @@ function briefApp() {
       const w = this.data?.whale || {};
       const baris = [];
       if (w.whale_long_pct !== null && w.whale_long_pct !== undefined) {
-        baris.push({ label: 'Top trader (pemain besar)', long: w.whale_long_pct, short: w.whale_short_pct });
+        const tren = w.whale_tren_long_pp
+          ? ` · ${w.whale_tren_long_pp > 0 ? '+' : ''}${this.angka(w.whale_tren_long_pp, 1)} pp selama ${w.jam_dipantau || 24}j`
+          : '';
+        baris.push({ label: 'Top trader (pemain besar)', long: w.whale_long_pct, short: w.whale_short_pct, tren });
       }
       if (w.ritel_long_pct !== null && w.ritel_long_pct !== undefined) {
         const via = w.sumber_ritel === 'bybit' ? ' · via Bybit' : '';
-        baris.push({ label: 'Seluruh akun (ritel)' + via, long: w.ritel_long_pct, short: w.ritel_short_pct });
+        const tren = w.ritel_tren_long_pp
+          ? ` · ${w.ritel_tren_long_pp > 0 ? '+' : ''}${this.angka(w.ritel_tren_long_pp, 1)} pp selama ${w.jam_dipantau || 24}j`
+          : '';
+        baris.push({ label: 'Seluruh akun (ritel)' + via, long: w.ritel_long_pct, short: w.ritel_short_pct, tren });
       }
       return baris;
     },
@@ -669,11 +764,11 @@ function briefApp() {
       if (!d) return [];
       const item = [
         { id: 's-harga', label: 'Harga', ada: true },
+        { id: 's-ai', label: 'Analisa AI', ada: true },
         { id: 's-teknikal', label: 'Teknikal', ada: !!d.technical?.['1d'] },
         { id: 's-pasar', label: 'Pasar', ada: true },
         { id: 's-institusional', label: 'Opsi & Valuasi', ada: this.adaDataInstitusional },
         { id: 's-whale', label: 'Whale', ada: this.adaDataWhale || !!d.technical?.sinyal_palsu?.length },
-        { id: 's-ai', label: 'Analisa AI', ada: true },
         { id: 's-agenda', label: 'Agenda', ada: true },
         { id: 's-berita', label: 'Berita', ada: !!d.news?.length || !!d.statements?.length },
       ];

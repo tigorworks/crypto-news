@@ -24,6 +24,13 @@ TICKERS = {
 
 FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 FRED_SERIES = {"fed_balance_sheet": "WALCL", "m2": "M2SL"}
+# FRED melaporkan WALCL dalam JUTAAN dolar dan M2SL dalam MILIAR dolar —
+# bukan dolar mentah. Tanpa penskalaan ini, "fed_balance_sheet" bernilai
+# ~6.500.000 yang bisa gampang salah dibaca sebagai $6,5 juta padahal
+# sebenarnya $6,5 TRILIUN. Diskalakan di sini, di sumbernya, supaya baik
+# konteks yang dibaca LLM maupun tampilan web memakai dolar sungguhan —
+# bukan ditambal belakangan di tiap tempat yang memakainya.
+FRED_PENGALI_DOLAR = {"fed_balance_sheet": 1_000_000, "m2": 1_000_000_000}
 
 
 def _fetch_yfinance() -> Dict[str, Any]:
@@ -89,7 +96,7 @@ def _fetch_fred(api_key: str) -> Dict[str, Any]:
             )
             obs = [o for o in (data.get("observations") or []) if o.get("value") not in (".", None)]
             if obs:
-                out[key] = float(obs[0]["value"])
+                out[key] = float(obs[0]["value"]) * FRED_PENGALI_DOLAR.get(key, 1)
         except (HttpError, ValueError, KeyError, TypeError) as exc:
             log.warning("FRED %s gagal: %s", series_id, exc)
     return out

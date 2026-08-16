@@ -27,6 +27,7 @@ from .collectors import (
     macro,
     market,
     news,
+    okx,
     onchain,
     options,
     statements as statements_collector,
@@ -266,9 +267,15 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     log.info("[3/21] Ambil data pasar dan posisi whale")
     hasil_pasar = market.collect(cfg.symbol)
     gagal.extend(hasil_pasar["failed"])
+    # Funding rate SAAT INI bisa positif/negatif tanpa berarti apa-apa; yang
+    # membedakan sinyal kuat dari derau adalah SUDAH BERAPA LAMA bertahan di
+    # sisi yang sama. best-effort: gagal di sini tidak menggagalkan apa pun,
+    # cuma funding_persisten_jam/funding_rata_7h_pct jadi None.
+    funding_tren = okx.tren_funding(okx.fetch_funding_rate_history())
     pasar = {
         "funding_rate": funding,
         "open_interest": open_interest,
+        **funding_tren,
         **hasil_pasar["data"],
     }
 
@@ -314,6 +321,18 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     hasil_opsi = options.collect()
     opsi = hasil_opsi["data"]
     gagal.extend(hasil_opsi["failed"])
+
+    # Volatilitas realized dari candle harian yang SUDAH ADA (tanpa sumber
+    # tambahan), dibandingkan dengan DVOL (implied) — rasio IV/RV menandakan
+    # opsi mahal/murah relatif terhadap volatilitas yang sungguhan terjadi.
+    # Nama field pakai "30hari" secara eksplisit, BUKAN "30h" — singkatan itu
+    # pernah terbaca "30 hours" oleh LLM dan membuat narasi salah tulis
+    # jangka waktu (lihat PR pembetulan _perubahan_30hari_pct).
+    opsi["realized_vol_30hari_pct"] = technical.volatilitas_realized_tahunan(
+        klines_analisa.get("1d", [])
+    )
+    if opsi.get("dvol") is not None and opsi.get("realized_vol_30hari_pct"):
+        opsi["iv_rv_ratio"] = round(opsi["dvol"] / opsi["realized_vol_30hari_pct"], 2)
 
     hasil_onchain = onchain.collect()
     onchain_data = hasil_onchain["data"]

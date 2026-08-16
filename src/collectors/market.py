@@ -18,6 +18,7 @@ FNG_URL = "https://api.alternative.me/fng/?limit=2"
 HASHRATE_URL = "https://mempool.space/api/v1/mining/hashrate/3d"
 FEES_URL = "https://mempool.space/api/v1/fees/recommended"
 FARSIDE_URL = "https://farside.co.uk/bitcoin-etf-flow-all-data/"
+GLOBAL_URL = "https://api.coingecko.com/api/v3/global"
 
 # Farside di belakang Cloudflare: User-Agent skrip ditolak, browser diterima.
 HEADER_BROWSER = {
@@ -128,6 +129,22 @@ def _etf_flow() -> Dict[str, Any]:
     raise ValueError("tidak menemukan baris arus ETF yang bisa diparsing")
 
 
+def _dominasi_btc() -> Dict[str, Any]:
+    """Porsi kapitalisasi BTC dari total kapitalisasi seluruh kripto.
+
+    Penanda rezim: dominance naik + harga BTC naik = uang mengalir KE BTC
+    (altcoin melemah relatif). Dominance turun + harga BTC naik = risk-on
+    lebih luas, uang mengalir ke seluruh pasar termasuk altcoin. Tanpa angka
+    ini, brief tidak bisa membedakan "ini gerakan BTC" dari "ini gerakan
+    seluruh kripto yang BTC ikut terbawa".
+    """
+    data = get_json(GLOBAL_URL, timeout=15, retries=1)
+    persen = ((data.get("data") or {}).get("market_cap_percentage") or {}).get("btc")
+    if persen is None:
+        raise ValueError("respons CoinGecko /global tidak memuat market_cap_percentage.btc")
+    return {"btc_dominance_pct": round(float(persen), 2)}
+
+
 def collect(symbol: str) -> Dict[str, Any]:
     """Kumpulkan semua data pasar. Return dict + daftar sumber yang gagal."""
     result: Dict[str, Any] = {
@@ -141,6 +158,7 @@ def collect(symbol: str) -> Dict[str, Any]:
         # Ditandai True oleh pipeline kalau angkanya dipakai ulang dari brief
         # sebelumnya karena scrape hari ini gagal.
         "etf_flow_kedaluwarsa": False,
+        "btc_dominance_pct": None,
     }
     failed: List[str] = []
 
@@ -170,5 +188,11 @@ def collect(symbol: str) -> Dict[str, Any]:
     except (HttpError, ValueError, KeyError, TypeError) as exc:
         log.warning("Arus ETF gagal diparsing: %s", exc)
         failed.append("etf_flow")
+
+    try:
+        result.update(_dominasi_btc())
+    except (HttpError, ValueError, KeyError, TypeError) as exc:
+        log.warning("Dominasi BTC gagal: %s", exc)
+        failed.append("btc_dominance")
 
     return {"data": result, "failed": failed}
