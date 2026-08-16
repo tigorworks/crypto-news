@@ -305,23 +305,24 @@ Kesembilan step sudah terisi model yang wajar sebagai titik awal, jadi bisa lang
 
 | Step | Model utama | Cadangan | Alasan |
 |---|---|---|---|
-| `filter` | `deepseek/deepseek-v3.2` | — | murah, tugasnya cuma skor 0–100 |
-| `classify` | `deepseek/deepseek-v3.2` | — | patuh JSON, keluaran pendek |
-| `format` | `deepseek/deepseek-v3.2` | — | menata tampilan pesan Telegram |
-| `riset` | `deepseek/deepseek-v3.2` | — | mengusulkan kueri pencarian berita |
-| `agenda` | `deepseek/deepseek-v3.2` | — | ekstraksi teks kalender jadi JSON |
-| `agenda_dampak` | `deepseek/deepseek-v3.2` | — | menilai dampak agenda ke kripto |
-| `mechanism` | `deepseek/deepseek-v3.2` | — | keterangan pendek per berita |
-| `statements` | `deepseek/deepseek-v3.2` | — | menyaring pernyataan dari derau |
+| `filter` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | murah, tugasnya cuma skor 0–100 |
+| `classify` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | patuh JSON, keluaran pendek |
+| `format` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | menata tampilan pesan Telegram |
+| `riset` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | mengusulkan kueri pencarian berita |
+| `agenda` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | ekstraksi teks kalender jadi JSON |
+| `agenda_dampak` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | menilai dampak agenda ke kripto |
+| `mechanism` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | keterangan pendek per berita |
+| `statements` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | menyaring pernyataan dari derau |
+| `x_posts` | `x-ai/grok-4` | `x-ai/grok-3` | **wajib Grok** — cuma xAI yang bisa mencari di X |
 | `technical` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menafsirkan indikator candle harian |
 | `whale` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | membaca divergensi posisi |
 | `synthesis` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menulis analisa panjang |
 | `outlook` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menggabungkan banyak sumber |
 | `critic` | `openai/gpt-5.1` | `google/gemini-3.1-flash-lite-preview` | **beda keluarga** dari `synthesis` |
 
-**Semua langkah pengambilan & penyiapan data memakai DeepSeek saja.** Langkah-langkah itu cuma mengubah data jadi data — memberi skor, mengklasifikasi, mengekstrak jadwal — dan tidak satupun menulis prosa yang dibaca pengguna, jadi model termurah sudah cukup. Yang tetap memakai model kuat hanya langkah yang MENULIS analisa (`technical`, `whale`, `synthesis`, `outlook`) dan `critic` yang memeriksanya.
+**Langkah pengambilan & penyiapan data memakai Haiku, dengan DeepSeek sebagai cadangan.** Langkah-langkah itu cuma mengubah data jadi data — memberi skor, mengklasifikasi, mengekstrak jadwal — dan tidak satupun menulis prosa yang dibaca pengguna, jadi model kecil sudah cukup. Yang memakai model kuat hanya langkah yang MENULIS analisa (`technical`, `whale`, `synthesis`, `outlook`) dan `critic` yang memeriksanya.
 
-Konsekuensinya: langkah DeepSeek tidak punya cadangan lintas-vendor. Kalau DeepSeek bermasalah, langkahnya dilewati dan pipeline tetap jalan lewat jalur cadangan masing-masing — misalnya `filter` jatuh ke skor kata kunci yang dihitung kode.
+Blok ini sempat dipindah ke DeepSeek demi hemat, lalu dikembalikan ke Haiku karena kepatuhan formatnya lebih bisa diandalkan: DeepSeek pernah menulis skala 1–5 sebagai angka Romawi (`"kekuatan": III`) dan menggugurkan satu batch pernyataan utuh. DeepSeek tetap terpasang sebagai cadangan supaya satu vendor bermasalah tidak mematikan langkahnya.
 
 Satu run terukur di produksi sekitar **$0,26**, di bawah plafon `max_cost_usd_per_run: 0.60`. Satu run per hari berarti sekitar **$8 per bulan**.
 
@@ -552,6 +553,7 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 | Agenda cuma berisi FOMC + tanggal "perkiraan" | Kedua sumber luar (feed ForexFactory dan investing.com) tidak terjangkau, jadi kalender bawaan (dugaan pola bulanan) yang dipakai. Cek log untuk "Kalender ekonomi ForexFactory tidak terjangkau". |
 | Pesan Telegram terasa berhenti di tengah kalimat | Kalau itu hasil rapian LLM (`rapikan_dengan_llm: true`), gerbang verifikasinya sekarang memastikan disclaimer benar-benar ada di ~300 karakter terakhir — balasan yang terpotong otomatis ditolak dan pesan asli (utuh) yang dikirim. Kalau tetap terlihat terpotong, cek dulu apakah itu cuma potongan tangkapan layar (scroll ke bawah) sebelum melapor sebagai bug. |
 | Narasi menyebut jangka waktu yang salah ("turun -10,43% dalam **30 jam**") | Nama field yang ambigu ikut masuk konteks LLM. Metrik on-chain dulu bernama `_perubahan_30h_pct` di mana "h" berarti *hari*, tapi model membacanya sebagai *hours*. Sudah diganti jadi `_perubahan_30hari_pct`. Kalau menambah field berjangka waktu baru, tulis satuannya utuh — jangan disingkat. |
+| Log `Balasan yang gagal diparse` pada balasan panjang (sintesis/outlook) | Dua kerusakan yang paling sering: kutip di dalam nilai string yang lupa di-escape (`label tren "jual menguat"`) dan string yang lupa ditutup di ujung. Keduanya lolos dari penyeimbang kutip/kurung — yang pertama jumlah kutipnya genap, yang kedua menelan sisa dokumen. `_rapikan_string_baris()` di `src/analysis/llm.py` merapikan keduanya per baris. Kalau muncul bentuk kerusakan lain, tambahkan di situ. |
 | Log `Balasan yang gagal diparse` berisi `"kekuatan": III` | Model menulis skala 1-5 sebagai angka Romawi, yang bukan JSON valid — satu kemunculan menggugurkan seluruh batch. Terjadi di produksi pada langkah `statements` setelah pindah ke DeepSeek. `_perbaiki_json()` sekarang menerjemahkan angka Romawi telanjang (I..V) yang berdiri sebagai nilai, dan prompt-nya juga sudah diperjelas. Kalau muncul di luar jangkauan I..V, perluas `_POLA_ROMAWI_NILAI` di `src/analysis/llm.py`. |
 | Log `Balasan step 'revisi' terpotong di batas max_tokens` | Step revisi menulis ulang SELURUH narasi (bukan cuma bagian yang salah), jadi butuh ruang sebanyak sintesis sendiri. Kalau masih terpotong meski sudah dinaikkan, naikkan lagi `max_tokens` di `revisi_narasi()` (`src/analysis/news_analysis.py`). |
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |
