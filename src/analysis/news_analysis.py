@@ -838,9 +838,21 @@ def outlook(
         "karangan.\n\n"
         "Balas objek JSON:\n"
         "  ringkasan: 2-3 kalimat pandangan umum ke depan\n"
+        "  narasi_geopolitik: 3-5 kalimat MENGALIR (bukan daftar) yang "
+        "menjelaskan kaitan situasi geopolitik/regulasi/makro saat ini dengan "
+        "pasar kripto. Ini bagian yang paling dibaca — tulis sebagai paragraf "
+        "utuh, bukan potongan poin. Wajib menelusuri RANTAI TRANSMISI sampai "
+        "ke harga BTC, bukan sekadar menyebut peristiwanya: bukan 'ada "
+        "pertemuan Gedung Putih soal kripto', tapi 'pertemuan Gedung Putih "
+        "soal kripto berpotensi menurunkan premi risiko regulasi yang selama "
+        "ini ditanggung institusi AS, dan itu jalur yang sama yang menggerakkan "
+        "arus ETF'. Kalau data memang tidak memuat isu geopolitik sama sekali, "
+        "katakan begitu terus terang dalam satu kalimat — jangan mengarang.\n"
         "  skenario_naik: {\"pemicu\": [array faktor], \"kondisi\": \"level/kondisi dari data yang harus bertahan\"}\n"
         "  skenario_turun: {\"pemicu\": [array faktor], \"kondisi\": \"level/kondisi dari data yang harus bertahan\"}\n"
-        "  faktor_geopolitik: array string, isu geopolitik yang relevan bagi BTC (array kosong kalau tidak ada di data)\n"
+        "  faktor_geopolitik: array string PENDEK (maksimal 5), masing-masing "
+        "satu isu — ini penopang butir dari narasi_geopolitik di atas, bukan "
+        "pengulangannya. Jangan menyalin kalimat yang sama.\n"
         "  keputusan_besar: array objek {\"apa\": \"...\", \"kapan\": \"...\", \"kenapa_penting\": \"...\"}\n"
         "  risiko_utama: array string, hal yang paling bisa mengubah gambaran\n"
         "  horizon: string, rentang waktu yang dibahas (contoh \"1-2 minggu ke depan\")\n\n"
@@ -887,9 +899,13 @@ def outlook(
 
     return {
         "ringkasan": str(hasil["ringkasan"]).strip(),
+        "narasi_geopolitik": (
+            str(hasil["narasi_geopolitik"]).strip()[:1500]
+            if hasil.get("narasi_geopolitik") else ""
+        ),
         "skenario_naik": skenario("skenario_naik"),
         "skenario_turun": skenario("skenario_turun"),
-        "faktor_geopolitik": [str(x)[:300] for x in (hasil.get("faktor_geopolitik") or [])[:6]],
+        "faktor_geopolitik": [str(x)[:300] for x in (hasil.get("faktor_geopolitik") or [])[:5]],
         "keputusan_besar": keputusan,
         "risiko_utama": [str(x)[:300] for x in (hasil.get("risiko_utama") or [])[:6]],
         "horizon": str(hasil.get("horizon", ""))[:100],
@@ -1039,6 +1055,30 @@ def sintesis(
         "'laporan 13F SEC mengonfirmasi...' kecuali kata-kata itu MEMANG ada di "
         "ringkasannya. Angka boleh benar tapi kalau kamu mengarang DARI MANA "
         "angka itu berasal, itu tetap karangan.\n\n"
+
+        "8. SATU PERISTIWA DIBAHAS SATU KALI SAJA.\n"
+        "   Tiap bagian punya tugas berbeda, jadi jangan menceritakan ulang "
+        "berita yang sama di beberapa bagian. Bagi begini:\n"
+        "     penyebab       -> peristiwa yang MENGGERAKKAN harga hari ini\n"
+        "     data_pendukung -> ANGKA yang menopang klaim di penyebab, bukan "
+        "menceritakan ulang peristiwanya\n"
+        "     yang_diwaspadai-> hal yang BELUM tercermin di harga\n"
+        "     kesimpulan     -> penilaian akhir, TANPA mengulang angka yang "
+        "sudah disebut di atas\n"
+        "   Kalau sebuah berita sudah dibahas di `penyebab`, di bagian lain "
+        "cukup dirujuk singkat ('katalis regulasi tadi'), bukan diceritakan "
+        "ulang dari awal. Pembaca sedang membaca satu tulisan utuh, bukan "
+        "beberapa ringkasan terpisah yang kebetulan digabung.\n\n"
+
+        "9. JANGAN MENULIS NAMA FIELD ATAU KODE INTERNAL.\n"
+        "   Data yang kamu terima berbentuk JSON, tapi pembacamu tidak pernah "
+        "melihat JSON itu. Tulis dalam bahasa manusia:\n"
+        "     `short_covering`    -> \"penutupan posisi short\"\n"
+        "     `invalidasi_turun`  -> \"batas pembatalan skenario turun\"\n"
+        "     `buy_sell_ratio`    -> \"rasio beli-jual\"\n"
+        "     `sinyal_oi`         -> \"sinyal open interest\"\n"
+        "   Singkatan teknis (OBV, MVRV, NVT, DVOL, IV, ATR) dijelaskan sekali "
+        "saat pertama muncul, lalu boleh dipakai singkat.\n\n"
 
         "STRUKTUR — isi setiap field ini:\n"
         "  judul: temuan utama, BUKAN 'Update Harga BTC'. Mulai dari temuannya.\n"

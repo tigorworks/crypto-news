@@ -32,6 +32,7 @@ from .collectors import (
 )
 from .config import Config, SUBSCRIBERS_PATH, load_config
 from .output import builder, stylist, subscribers, telegram
+from .utils import istilah
 from .utils.timezone import format_wib, iso_utc, now_utc
 
 log = logging.getLogger("brief")
@@ -586,12 +587,18 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
                     c.get("bagian", "") for c in hasil_critic["corrections"]
                     if c.get("keparahan") == "fatal"
                 }
+                # `outlook_skenario` (skenario naik/turun) dipisah dari
+                # `outlook` (prosa pandangan ke depan + geopolitik + agenda).
+                # Sebelumnya keduanya dipetakan ke "outlook", jadi satu
+                # kesalahan angka di skenario ikut menghapus seluruh
+                # pembahasan geopolitik — bagian yang justru paling penting
+                # dan sering tidak ada hubungannya dengan angka yang salah.
                 peta = {
                     "narasi_utama": "narasi",
                     "interpretasi_teknikal": "teknikal",
                     "analisa_whale": "whale",
                     "outlook": "outlook",
-                    "outlook_skenario": "outlook",
+                    "outlook_skenario": "outlook_skenario",
                 }
                 ditahan = {peta.get(b) for b in bermasalah if peta.get(b)}
                 # Temuan tanpa nama bagian tidak bisa dilokalisasi; amannya
@@ -608,8 +615,13 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
                     ai["teknikal"] = hasil_teknikal
                 if "whale" not in ditahan:
                     ai["whale"] = hasil_whale_ai
-                if "outlook" not in ditahan:
-                    ai["outlook"] = hasil_outlook
+                # Skenario ditahan sendiri tanpa ikut membuang prosa outlook,
+                # geopolitik, dan agenda di sekitarnya.
+                if "outlook" not in ditahan and hasil_outlook:
+                    ai["outlook"] = dict(hasil_outlook)
+                    if "outlook_skenario" in ditahan:
+                        ai["outlook"]["skenario_naik"] = {"pemicu": [], "kondisi": ""}
+                        ai["outlook"]["skenario_turun"] = {"pemicu": [], "kondisi": ""}
 
                 ai["bagian_ditahan"] = sorted(ditahan)
                 pesan = "Bagian AI yang ditahan critic: " + ", ".join(sorted(ditahan))
@@ -618,6 +630,13 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
 
             ai["model_used"] = ", ".join(client.models_used) or None
             ai["generated_at"] = iso_utc(now_utc())
+
+            # Konteks yang dilihat LLM berbentuk JSON, jadi model kerap
+            # menyalin nama field dan nilai enum apa adanya ke dalam narasi
+            # ("pola short_covering", "invalidasi_turun di $64.314"). Prompt
+            # saja tidak cukup untuk mencegahnya, jadi penggantian dilakukan
+            # kode di sini — deterministik dan tidak menyentuh angka.
+            ai = istilah.manusiakan_dalam(ai)
         else:
             catatan.append("Analisa AI tidak tersedia pada run ini.")
 

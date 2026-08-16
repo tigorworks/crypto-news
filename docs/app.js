@@ -424,11 +424,11 @@ function briefApp() {
     get adaKontenAiTampil() {
       const ai = this.data?.ai;
       if (!ai) return false;
-      return (
+      return !!(
         (this.bagianAiTampil('narasi') && (this.adaBagianTerstruktur || ai.narrative)) ||
-        (this.bagianAiTampil('teknikal') && !!ai.teknikal) ||
-        (this.bagianAiTampil('whale') && !!ai.whale) ||
-        (this.bagianAiTampil('outlook') && !!ai.outlook)
+        (this.bagianAiTampil('teknikal') && ai.teknikal) ||
+        (this.bagianAiTampil('whale') && ai.whale) ||
+        (this.bagianAiTampil('outlook') && ai.outlook)
       );
     },
 

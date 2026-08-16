@@ -1,0 +1,160 @@
+"""Ubah istilah internal jadi bahasa manusia.
+
+MASALAHNYA: konteks yang dikirim ke LLM berbentuk JSON, jadi model melihat
+nama field dan nilai enum apa adanya — `sinyal_oi`, `short_covering`,
+`invalidasi_turun`, `buy_sell_ratio`. Model lalu menyalinnya bulat-bulat ke
+dalam narasi, dan pembaca disuguhi potongan kode alih-alih kalimat:
+
+    "Sinyal open interest menunjukkan pola short_covering"
+    "invalidasi_turun di $64.314 adalah titik yang..."
+    "buy_sell_ratio taker 1,785 (dominan buy)"
+
+Melarangnya lewat prompt saja tidak cukup — model tetap tergelincir, dan
+kalau gagal hasilnya baru ketahuan setelah terkirim ke pembaca. Karena itu
+penggantian dilakukan KODE, setelah LLM selesai menulis: deterministik,
+tidak bergantung kepatuhan model, dan tidak pernah mengubah angka.
+
+Ini murni transformasi tampilan. Tidak ada fakta yang berubah — `62.790`
+tetap `62.790`, cuma `invalidasi_turun` yang jadi "batas pembatalan
+skenario turun".
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Any, Dict, List
+
+# Istilah yang butuh terjemahan sungguhan, bukan sekadar hapus garis bawah.
+# Diurutkan dari yang paling panjang saat dipakai supaya `taker_buy_sell_ratio`
+# tidak keburu tertangkap pola `buy_sell_ratio`.
+KAMUS: Dict[str, str] = {
+    # Sinyal open interest vs harga
+    "short_covering": "penutupan posisi short",
+    "long_liquidation": "likuidasi posisi long",
+    "short_buildup": "penumpukan posisi short",
+    "long_buildup": "penumpukan posisi long",
+    # Level kunci
+    "invalidasi_turun": "batas pembatalan skenario turun",
+    "invalidasi_naik": "batas pembatalan skenario naik",
+    "level_kunci": "level kunci",
+    "key_levels": "level kunci",
+    # Derivatif & aliran
+    "taker_buy_sell_ratio": "rasio beli-jual taker",
+    "buy_sell_ratio": "rasio beli-jual",
+    "put_call_ratio_oi": "rasio put/call",
+    "funding_rate": "funding rate",
+    "open_interest": "open interest",
+    "oi_change_pct": "perubahan open interest",
+    "sinyal_oi": "sinyal open interest",
+    "max_pain_expiry_terdekat": "max pain jatuh tempo terdekat",
+    # Posisi whale vs ritel
+    "whale_distribusi": "whale mengurangi posisi lebih cepat dari ritel",
+    "whale_akumulasi": "whale menambah posisi lebih cepat dari ritel",
+    "posisi_whale_vs_ritel": "posisi whale dibanding ritel",
+    "whale_long_pct": "porsi long whale",
+    "ritel_long_pct": "porsi long ritel",
+    "divergensi_label": "arah divergensi",
+    # Teknikal
+    "bb_squeeze": "penyempitan Bollinger Band",
+    "bb_bandwidth": "lebar Bollinger Band",
+    "stoch_rsi_k": "Stochastic RSI %K",
+    "stoch_rsi_d": "Stochastic RSI %D",
+    "divergensi_rsi": "divergensi RSI",
+    "macd_histogram": "histogram MACD",
+    "rasio_vs_rata": "rasio terhadap rata-rata",
+    "vwap_harian": "VWAP harian",
+    "obv_arah": "arah OBV",
+    "jenuh_beli": "jenuh beli",
+    "jenuh_jual": "jenuh jual",
+    "kualitas_tren": "kualitas tren",
+    "sinyal_palsu": "sinyal yang perlu diwaspadai",
+    "cross_50_200": "persilangan EMA 50 dan 200",
+    "cross_20_50": "persilangan EMA 20 dan 50",
+    # Harga & pasar
+    "volume_24h": "volume 24 jam",
+    "change_24h_pct": "perubahan 24 jam",
+    "high_24h": "tertinggi 24 jam",
+    "low_24h": "terendah 24 jam",
+    "etf_flow_usd": "arus ETF",
+    "fear_greed": "indeks Fear & Greed",
+    "premium_coinbase_pct": "premium Coinbase",
+    "stablecoin_cap_usd": "kapitalisasi stablecoin",
+    # Valuasi on-chain
+    "mvrv_zona": "zona MVRV",
+    "realized_cap_usd": "realized cap",
+    "alamat_aktif": "alamat aktif",
+    "pasokan_diam_1thn_pct": "pasokan yang diam lebih dari setahun",
+    # Klasifikasi berita
+    "status_kepastian": "status kepastian",
+    "jalur_transmisi": "jalur transmisi",
+    "sudah_priced_in": "sudah tercermin di harga",
+    "belum_dikonfirmasi": "belum dikonfirmasi",
+    "sudah_terjadi": "sudah terjadi",
+    "dilaporkan_media": "dilaporkan media",
+    "tipe_klaim": "tipe klaim",
+    "risk_appetite": "selera risiko",
+    "supply_demand": "pasokan dan permintaan",
+    # Struktur keluaran AI
+    "penyebab_pergerakan": "penyebab pergerakan",
+    "data_pendukung": "data pendukung",
+    "peta_level": "peta level",
+    "yang_diwaspadai": "yang perlu diwaspadai",
+    "katalis_berikutnya": "katalis berikutnya",
+    "posisi_harga": "posisi harga",
+    "faktor_geopolitik": "faktor geopolitik",
+    "keputusan_besar": "keputusan besar",
+    "risiko_utama": "risiko utama",
+    "skenario_naik": "skenario menguat",
+    "skenario_turun": "skenario melemah",
+    "narrative_shift": "pergeseran narasi",
+    "dominant_themes": "tema dominan",
+    "tingkat_kewaspadaan": "tingkat kewaspadaan",
+    "momentum_volume": "momentum dan volume",
+    "teknikal_1d": "teknikal harian",
+    "sentimen_agregat": "sentimen agregat",
+    "perubahan_vs_sebelumnya": "perubahan dibanding brief sebelumnya",
+    "pernyataan_tokoh": "pernyataan tokoh",
+    "valuasi_onchain": "valuasi on-chain",
+    "aliran_dana": "aliran dana",
+    "opsi_deribit": "opsi Deribit",
+    "posisi_whale": "posisi whale",
+}
+
+# Kata bergaris bawah apa pun yang tersisa. Ditangani generik: garis bawah
+# jadi spasi. Lebih baik "sinyal terdeteksi" daripada "sinyal_terdeteksi",
+# dan ini menangkap field baru yang belum sempat masuk kamus.
+_POLA_SISA = re.compile(r"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
+
+# Dibangun sekali: pola gabungan seluruh kunci kamus, terpanjang lebih dulu
+# supaya `taker_buy_sell_ratio` menang atas `buy_sell_ratio`.
+_POLA_KAMUS = re.compile(
+    r"\b(" + "|".join(sorted(map(re.escape, KAMUS), key=len, reverse=True)) + r")\b"
+)
+
+
+def manusiakan(teks: Any) -> Any:
+    """Ganti istilah internal dalam satu string dengan padanan manusiawi.
+
+    Nilai non-string dikembalikan apa adanya supaya fungsi ini aman dipanggil
+    pada struktur campuran tanpa perlu pengecekan tipe di sisi pemanggil.
+    """
+    if not isinstance(teks, str) or "_" not in teks:
+        return teks
+    hasil = _POLA_KAMUS.sub(lambda m: KAMUS[m.group(1)], teks)
+    return _POLA_SISA.sub(lambda m: m.group(0).replace("_", " "), hasil)
+
+
+def manusiakan_dalam(obj: Any) -> Any:
+    """Terapkan `manusiakan()` ke SETIAP string di dalam struktur bersarang.
+
+    Dipakai pada objek `ai` sebelum brief disusun, jadi apa pun yang ditulis
+    LLM — narasi, ringkasan, butir daftar, alasan critic — sudah bersih dari
+    nama field sebelum sampai ke web maupun Telegram.
+    """
+    if isinstance(obj, str):
+        return manusiakan(obj)
+    if isinstance(obj, dict):
+        return {k: manusiakan_dalam(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [manusiakan_dalam(v) for v in obj]
+    return obj
