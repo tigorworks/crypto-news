@@ -94,8 +94,8 @@
                menampilkan tombol MULAI yang langsung mengirim /start, jadi
                pembaca tidak perlu mengetiknya sendiri. Parameternya diabaikan
                parser perintah kita, yang cuma membaca kata pertama. -->
-          <template x-if="data?.bot_telegram">
-            <a :href="'https://t.me/' + data.bot_telegram + '?start=web'"
+          <template x-if="botTelegram">
+            <a :href="'https://t.me/' + botTelegram + '?start=web'"
                target="_blank" rel="noopener noreferrer"
                title="Berlangganan ringkasan harian lewat Telegram"
                class="tap inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium
@@ -144,7 +144,7 @@
         <h2 class="mt-3 font-semibold text-lg">Data belum bisa dimuat</h2>
         <p class="mt-1 text-sm text-slate-600 dark:text-slate-300 max-w-md mx-auto" x-text="error"></p>
         <p class="mt-2 text-sm text-slate-500">
-          Brief dibuat otomatis dua kali sehari. Kalau baru saja dipasang, tunggu jadwal berikutnya.
+          Brief dibuat otomatis setiap pagi. Kalau baru saja dipasang atau baru direset, tunggu jadwal berikutnya.
         </p>
         <button @click="muat()" class="mt-4 px-4 py-2 rounded-lg bg-slate-900 dark:bg-white dark:text-slate-900 text-white text-sm font-medium">
           Coba lagi
@@ -1275,7 +1275,7 @@
 
       <!-- Ajakan berlangganan versi lengkap. Tombol di header sengaja ringkas
            (labelnya hilang di ponsel), jadi di sini dijelaskan utuh. -->
-      <template x-if="data?.bot_telegram">
+      <template x-if="botTelegram">
         <div class="rounded-xl border border-sky-200 dark:border-sky-800/60 bg-sky-50 dark:bg-sky-900/20 p-4
                     flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div>
@@ -1288,12 +1288,12 @@
               kapan saja untuk berhenti.
             </p>
           </div>
-          <a :href="'https://t.me/' + data.bot_telegram + '?start=web'"
+          <a :href="'https://t.me/' + botTelegram + '?start=web'"
              target="_blank" rel="noopener noreferrer"
              class="tap inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium
                     bg-sky-500 hover:bg-sky-600 text-white transition shrink-0">
             <span>Berlangganan</span>
-            <span class="opacity-80" x-text="'@' + data.bot_telegram"></span>
+            <span class="opacity-80" x-text="'@' + botTelegram"></span>
           </a>
         </div>
       </template>

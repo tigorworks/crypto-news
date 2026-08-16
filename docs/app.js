@@ -7,6 +7,14 @@ const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
 const BULAN_SINGKAT_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
   'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
+/* Username bot Telegram. Nilai ini juga dikirim lewat brief
+   (`data.bot_telegram`, dari config.yaml) dan itu yang dipakai kalau tersedia
+   — konstanta di sini murni cadangan supaya tombol berlangganan tetap muncul
+   saat latest.json belum ada. Justru di saat itulah tombolnya paling
+   dibutuhkan: pengunjung yang datang sebelum brief pertama terbit tidak punya
+   apa pun untuk dibaca, jadi setidaknya bisa berlangganan dulu. */
+const BOT_TELEGRAM = 'tmmcrypto_bot';
+
 const LABEL_MAKRO = {
   dxy: 'DXY', ust10y: 'Yield UST 10Y', wti: 'Minyak WTI',
   gold: 'Emas', nasdaq: 'Nasdaq', sp500: 'S&P 500', vix: 'VIX',
@@ -195,6 +203,12 @@ function briefApp() {
       if (abs >= 1e6) return `${tanda}$${formatAngka(abs / 1e6, 1)} jt`;
       if (abs >= 1e3) return `${tanda}$${formatAngka(abs / 1e3, 1)} rb`;
       return `${tanda}$${formatAngka(abs, 0)}`;
+    },
+
+    /* Nama bot untuk tombol berlangganan. Sengaja TIDAK bergantung pada
+       `data`: tombolnya harus tetap tampil walau latest.json belum ada. */
+    get botTelegram() {
+      return this.data?.bot_telegram || BOT_TELEGRAM;
     },
 
     /* Funding rate kerap sangat kecil; dibulatkan biasa bisa tampil "0,0000%"
