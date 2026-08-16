@@ -190,7 +190,7 @@ def _prompt_klasifikasi() -> str:
         "  id (string, sama persis dengan input)\n"
         f"  kategori: salah satu dari {KATEGORI}\n"
         f"  sentimen: salah satu dari {SENTIMEN} (dampak terhadap harga BTC)\n"
-        "  kekuatan: 1-5 (seberapa besar potensi dampaknya)\n"
+        "  kekuatan: angka Arab 1-5 (seberapa besar potensi dampaknya) — tulis 3, JANGAN III\n"
         f"  horizon: salah satu dari {HORIZON}\n"
         f"  status_kepastian: salah satu dari {STATUS_KEPASTIAN}\n"
         "  entitas: array nama lembaga/perusahaan/orang yang disebut (maksimal 4)\n"
@@ -704,7 +704,7 @@ def analisa_pernyataan(
         f"  topik: salah satu dari {TOPIK_PERNYATAAN}\n"
         f"  sikap_kripto: salah satu dari {SIKAP_PERNYATAAN} (sikap terhadap kripto/aset berisiko)\n"
         "  dampak_btc: bullish | bearish | netral\n"
-        "  kekuatan: 1-5 (potensi dampak ke harga BTC)\n"
+        "  kekuatan: angka Arab 1-5 (potensi dampak ke harga BTC) — tulis 3, JANGAN III\n"
         f"  status: salah satu dari {STATUS_PERNYATAAN}\n"
         "  jalur_transmisi: likuiditas | risk_appetite | supply_demand | regulasi\n"
         "  mekanisme: satu kalimat rantai sebab-akibat menuju harga BTC\n"
@@ -760,7 +760,10 @@ def analisa_pernyataan(
         if not analisa:
             continue
         try:
-            relevansi = int(analisa.get("relevansi_btc") or 0)
+            # Dijepit ke 0-100 seperti `kekuatan`: model pernah mengembalikan
+            # -85 untuk berita yang jelas-jelas relevan (salah tanda), dan
+            # nilai di luar jangkauan ikut terbawa ke pembobotan di hilir.
+            relevansi = max(0, min(100, int(analisa.get("relevansi_btc") or 0)))
         except (TypeError, ValueError):
             relevansi = 0
         if relevansi < min_relevansi:
