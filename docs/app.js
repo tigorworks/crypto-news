@@ -1004,6 +1004,93 @@ function briefApp() {
       return Math.max(1, Math.ceil(this.agendaTersaring.length / this.perHalamanAgenda));
     },
 
+    /* Indeks hari kalender WIB dari sebuah waktu — dipakai membandingkan
+       "hari ke berapa", bukan "berapa jam lagi". */
+    _hariWIB(tanggal) {
+      const w = keWIB(tanggal);
+      return Math.floor(Date.UTC(w.getFullYear(), w.getMonth(), w.getDate()) / 86400000);
+    },
+
+    /* SATU agenda paling berdampak dalam 3 hari ke depan — isi kartu teratas
+       halaman.
+
+       Jendelanya dihitung per HARI KALENDER WIB, bukan 72 jam mentah. Bukan
+       detail sepele: brief terbit sekitar 00:30 WIB, dan FOMC Meeting Minutes
+       tiga hari kemudian jatuh di `jam_lagi` 72,6 — lewat 36 menit dari batas
+       72 jam, padahal siapa pun yang membaca "3 hari ke depan" jelas
+       mengharapkannya muncul. Menghitung hari menghapus seluruh kelas
+       kesalahan tepi itu.
+
+       Ambangnya `relevansi_kripto >= 4` ("dampak besar"), sama dengan ambang
+       filter agenda dan notice <24 jam: kalau "besar" berarti hal berbeda di
+       tiap tempat, pembaca tidak bisa mempercayai satu pun.
+
+       Urutan pemilihan: relevansi ke kripto dulu (itu yang ditanyakan —
+       dampak TERBESAR, bukan yang terdekat), lalu bobot dampak ekonominya,
+       baru waktu sebagai pemutus. Dengan begitu FOMC Minutes tiga hari lagi
+       tetap menang atas rilis kelas menengah besok. */
+    get agendaSorot() {
+      const acuan = this.data?.generated_at ? new Date(this.data.generated_at) : null;
+      if (!acuan || Number.isNaN(acuan.getTime())) return null;
+      const hariAcuan = this._hariWIB(acuan);
+
+      const bobotDampak = { tinggi: 3, menengah: 2, rendah: 1 };
+      const layak = (this.data?.calendar || []).filter((a) => {
+        if ((a.relevansi_kripto || 0) < 4 || !a.waktu_utc) return false;
+        const t = new Date(a.waktu_utc);
+        if (Number.isNaN(t.getTime())) return false;
+        const selisihHari = this._hariWIB(t) - hariAcuan;
+        if (selisihHari < 0 || selisihHari > 3) return false;
+        // Agenda yang jamnya sudah lewat hari ini bukan lagi pengingat.
+        return a.jam_lagi === null || a.jam_lagi === undefined || a.jam_lagi >= 0;
+      });
+      if (!layak.length) return null;
+
+      return layak.slice().sort((a, b) =>
+        (b.relevansi_kripto || 0) - (a.relevansi_kripto || 0)
+        || (bobotDampak[b.dampak] || 0) - (bobotDampak[a.dampak] || 0)
+        || (a.jam_lagi ?? Infinity) - (b.jam_lagi ?? Infinity)
+      )[0];
+    },
+
+    /* Hitung mundur dalam bahasa manusia. Jam mentah ("61,8 jam lagi") benar
+       tapi tidak terbayang; "2 hari 14 jam lagi" langsung terasa. */
+    hitungMundurAgenda(jam) {
+      if (jam === null || jam === undefined) return '';
+      if (jam < 1) return 'kurang dari 1 jam lagi';
+      const bulat = Math.floor(jam);
+      if (bulat < 24) return `${bulat} jam lagi`;
+      const hari = Math.floor(bulat / 24);
+      const sisa = bulat % 24;
+      return sisa ? `${hari} hari ${sisa} jam lagi` : `${hari} hari lagi`;
+    },
+
+    /* Warna mengikuti KEDEKATAN waktu, bukan besar dampaknya: yang lolos ke
+       kartu ini semuanya sudah berdampak besar, jadi yang membedakan
+       tinggal seberapa mendesak. */
+    get kelasAgendaSorot() {
+      const jam = this.agendaSorot?.jam_lagi;
+      if (jam === null || jam === undefined) {
+        return {
+          kotak: 'border-slate-300 dark:border-slate-600 bg-slate-100/70 dark:bg-slate-800/40',
+          label: 'text-slate-600 dark:text-slate-300',
+          teks: 'text-slate-700 dark:text-slate-200',
+        };
+      }
+      if (jam < 24) {
+        return {
+          kotak: 'border-rose-300 dark:border-rose-700/70 bg-rose-50/70 dark:bg-rose-900/20',
+          label: 'text-rose-700 dark:text-rose-300',
+          teks: 'text-rose-700 dark:text-rose-300',
+        };
+      }
+      return {
+        kotak: 'border-amber-300 dark:border-amber-700/70 bg-amber-50/70 dark:bg-amber-900/20',
+        label: 'text-amber-700 dark:text-amber-300',
+        teks: 'text-amber-700 dark:text-amber-300',
+      };
+    },
+
     /* Agenda BERDAMPAK BESAR dalam <24 jam — dipakai notice mencolok di
        header, supaya event penting yang sangat dekat tidak terlewat walau
        pembaca tidak sempat scroll ke bagian agenda (atau filternya sedang
