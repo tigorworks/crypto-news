@@ -76,7 +76,13 @@ llm:
   # Verifikasi sesungguhnya ada di kode (src/collectors/x_grok.py), bukan
   # pada kepatuhan model: tiap item wajib punya URL status X berbentuk sah
   # dengan akun yang cocok dan waktu yang masuk akal, atau dibuang.
-  x_posts:    ["x-ai/grok-4", "x-ai/grok-3"]
+  #
+  # grok-4 dipensiunkan xAI (OpenRouter membalas HTTP 404 dengan anjuran
+  # pindah ke 4.3). Katalog model memang berubah cukup sering — kalau
+  # langkah ini gagal 404 lagi, cek https://openrouter.ai/x-ai untuk slug
+  # terbaru. Kegagalan di sini tidak menggagalkan brief: postingan X cuma
+  # dilewati dan sumber pernyataan lain tetap jalan.
+  x_posts:    ["x-ai/grok-4.3", "x-ai/grok-3"]
 
   # Ekstraksi teks kalender ekonomi investing.com jadi JSON. Tugasnya
   # sekadar "baca teks berantakan, temukan baris jadwal event" — tidak

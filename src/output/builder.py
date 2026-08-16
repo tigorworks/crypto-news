@@ -86,6 +86,7 @@ def hitung_kualitas(
     token_masuk: int = 0,
     token_keluar: int = 0,
     durasi_detik: float = 0.0,
+    corong_berita: Optional[Dict[str, int]] = None,
 ) -> Dict[str, Any]:
     """Skor kualitas data, dihitung berbobot.
 
@@ -123,6 +124,10 @@ def hitung_kualitas(
         "llm_token_keluar": int(token_keluar),
         "llm_token_total": int(token_masuk) + int(token_keluar),
         "durasi_detik": round(float(durasi_detik), 1),
+        # Corong berita: terkumpul (kotor, sebelum saringan umur) -> segar ->
+        # unik setelah dedup -> dipakai di brief. Ditampilkan di footer supaya
+        # terlihat seberapa luas jaring yang ditebar dan berapa yang lolos.
+        "berita_corong": dict(corong_berita or {}),
         "catatan": catatan,
     }
 

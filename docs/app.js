@@ -307,6 +307,25 @@ function briefApp() {
           : `${Math.floor(d / 60)} menit ${formatAngka(d % 60, 0)} detik`;
         baris.push({ label: 'Lama proses', nilai });
       }
+      /* Corong berita: berapa yang ditarik dari seluruh feed (kotor) vs
+         berapa yang akhirnya lolos saringan dan dipakai. Angka ini yang
+         menunjukkan apakah menambah feed benar-benar menambah bahan atau
+         cuma menambah derau yang tetap dibuang di langkah filter. */
+      const c = q.berita_corong;
+      if (c && c.terkumpul) {
+        const dipakai = c.dipakai ?? c.unik;
+        baris.push({
+          label: 'Berita terkumpul',
+          nilai: `${formatAngka(c.terkumpul, 0)} artikel`,
+        });
+        if (dipakai !== null && dipakai !== undefined) {
+          const persen = c.terkumpul ? (dipakai / c.terkumpul * 100) : 0;
+          baris.push({
+            label: 'Lolos saringan',
+            nilai: `${formatAngka(dipakai, 0)} artikel (${formatAngka(persen, 1)}%)`,
+          });
+        }
+      }
       return baris;
     },
 

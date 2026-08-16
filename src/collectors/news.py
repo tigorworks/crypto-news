@@ -213,4 +213,16 @@ def collect(feeds: List[str], max_fetch: int = 120, max_age_hours: int = 36) -> 
     deduped.sort(key=lambda a: a["skor_prioritas"], reverse=True)
     log.info("Artikel unik setelah dedup: %d", len(deduped))
 
-    return {"articles": deduped, "failed": failed}
+    return {
+        "articles": deduped,
+        "failed": failed,
+        # Corong penyaringan dilaporkan apa adanya supaya terlihat berapa
+        # banyak yang benar-benar ditarik vs berapa yang akhirnya dipakai.
+        # `terkumpul` adalah jumlah KOTOR sebelum saringan umur — angka
+        # inilah yang menunjukkan seberapa luas jaring yang ditebar.
+        "jumlah": {
+            "terkumpul": len(raw),
+            "segar": len(fresh),
+            "unik": len(deduped),
+        },
+    }
