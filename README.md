@@ -234,7 +234,8 @@ Halaman dirancang mobile-first dan diuji di lebar 360px, 390px, dan 430px:
 - **Target sentuh minimal 44px** pada perangkat sentuh, sesuai pedoman iOS dan Android
 - **Ukuran teks minimal 11px** di ponsel; ukuran yang lebih kecil hanya dipakai mulai breakpoint `sm`
 - **Nav lompat** khusus ponsel di bawah header — halaman ini panjang, jadi ada baris pintasan yang bisa digulir ke samping menuju tiap bagian
-- **Daftar panjang dipaginasi** 3 baris per halaman — berlaku untuk berita, pernyataan tokoh, dan agenda. Berita dan pernyataan berbagi satu bagian dengan dua tab, jadi halaman tidak memanjang dan bagian di bawahnya tetap terjangkau
+- **Daftar panjang dipaginasi** — berita dan pernyataan tokoh 3 baris per halaman, agenda 5 baris per halaman (horizonnya 30 hari, jadi daftarnya lebih panjang). Berita dan pernyataan berbagi satu bagian dengan dua tab, jadi halaman tidak memanjang dan bagian di bawahnya tetap terjangkau
+- **Posisi scroll terjaga saat ganti halaman** — tombol Sebelumnya/Berikutnya dikunci di posisi layar yang sama sebelum dan sesudah diklik (lihat `_pindahHalamanTerjaga` di `docs/app.js`), supaya jari yang baru menekan tidak kehilangan tombolnya saat tinggi daftar berubah
 - Tabel indikator dan grid makro menyusun ulang jadi satu kolom
 
 ---
