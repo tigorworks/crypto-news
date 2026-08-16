@@ -425,6 +425,40 @@ def _blok_sinyal_palsu(brief: Dict[str, Any], maks: int = 2) -> List[str]:
     return baris
 
 
+def _baris_pergerakan(brief: Dict[str, Any], penuh: bool) -> List[str]:
+    """Satu-dua baris arah + jenis pergerakan 24 jam, dari hitungan KODE.
+
+    Selalu ikut dikirim, termasuk saat analisa AI gagal atau ditahan — arah
+    dan sifat pergerakan adalah pertanyaan pertama pembaca, dan jawabannya
+    tidak bergantung pada model mana pun. `penuh` dipakai saat tidak ada
+    prosa AI yang menjelaskannya, jadi kalimat lengkapnya yang dikirim.
+    """
+    p = ((brief.get("technical") or {}).get("pergerakan_24j")) or {}
+    if not p.get("arah"):
+        return []
+
+    if penuh:
+        return [esc(p.get("ringkas") or ""), ""]
+
+    panah = {"naik": "📈", "turun": "📉"}.get(p["arah"], "➖")
+    if p["arah"] == "datar":
+        inti = "Praktis datar dalam 24 jam"
+    else:
+        kata = "Naik" if p["arah"] == "naik" else "Turun"
+        angka = f"{abs(p.get('perubahan_pct') or 0):.2f}".replace(".", ",")
+        inti = f"{kata} {angka}% dalam 24 jam"
+    besaran = {
+        "tipis": "tipis", "wajar": "wajar", "besar": "besar", "ekstrem": "sangat besar",
+    }.get(p.get("besaran"))
+    if besaran:
+        inti += f" · pergerakan {besaran}"
+    hasil = [f"{panah} <b>{esc(inti)}</b>"]
+    if p.get("jenis_ringkas"):
+        hasil.append(f"   <i>{esc('sifatnya: ' + p['jenis_ringkas'])}</i>")
+    hasil.append("")
+    return hasil
+
+
 def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     ai = brief.get("ai") or {}
     critic = ai.get("critic") or {}
@@ -443,11 +477,15 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
 
     if not any([narasi, teknikal_ai, whale_ai.get("ringkasan"), outlook_ai]):
         baris.append("✦ <b>ANALISA AI</b>")
+        # Arah dan sifat pergerakan tetap dikirim: itu hitungan kode, tidak
+        # ikut hilang bersama analisa yang gagal.
+        baris.extend(_baris_pergerakan(brief, penuh=True))
         baris.append("<i>Analisa AI tidak tersedia pada run ini.</i>")
         baris.append(PEMISAH)
         return baris
 
     baris.append("✦ <b>ANALISA AI</b>")
+    baris.extend(_baris_pergerakan(brief, penuh=False))
     # Judul memuat temuan utamanya — itu yang paling ingin dibaca duluan.
     judul = ((ai.get("bagian") or {}).get("judul") or "").strip()
     if judul:
@@ -627,18 +665,19 @@ def render_terpisah(
     )
     penutup = _blok_penutup(brief, site_url)
 
-    # Tangga degradasi: yang dikorbankan lebih dulu adalah yang paling mudah
-    # dibaca ulang di web. Blok AI dipertahankan sampai langkah terakhir
-    # karena justru itu isi utama brief ini.
     # Tangga degradasi. Analisa AI adalah isi utama brief, jadi paragrafnya
     # dipertahankan lama; yang dikorbankan lebih dulu adalah daftar yang
     # gampang dibaca ulang di web.
+    #
+    # Plafon paragraf AI dinaikkan satu tingkat saat `karakter_pergerakan`
+    # ditambahkan ke narasi: tanpa itu, paragraf baru di urutan kedua
+    # mendorong peta level dan kesimpulan keluar dari pesan.
     #  (berita, pernyataan, paragraf_ai, sinyal, whale, agenda, data_tambahan)
     tangga = [
-        (4, 3, 4, True, True, True, True),
-        (3, 3, 4, True, True, True, True),
-        (3, 2, 3, True, True, True, True),
-        (2, 2, 3, True, True, True, True),
+        (4, 3, 5, True, True, True, True),
+        (3, 3, 5, True, True, True, True),
+        (3, 2, 4, True, True, True, True),
+        (2, 2, 4, True, True, True, True),
         (2, 2, 2, True, True, True, True),
         (1, 1, 2, True, True, True, True),
         (0, 1, 2, False, True, True, True),

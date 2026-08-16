@@ -129,6 +129,11 @@ def _konteks_llm(
     """
     return {
         "harga": price,
+        # Klasifikasi pergerakan 24 jam yang SUDAH dihitung kode. Dikirim ke
+        # model bukan supaya ia menghitung ulang, tapi supaya penjelasannya
+        # bertumpu pada arah dan jenis yang sama dengan yang dilihat pembaca
+        # di halaman — dan supaya critic punya patokan untuk memeriksanya.
+        "pergerakan_24j": teknikal.get("pergerakan_24j"),
         # Hanya candle harian. Sebelumnya 4H dan 1H ikut dikirim, dan itu
         # justru menimbulkan masalah: model menulis EMA 1H lalu critic
         # mencocokkannya dengan EMA 4H dan memvonisnya karangan. Untuk laporan
@@ -531,6 +536,16 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     agregat = news_analysis.skor_sentimen(artikel, cfg.tier)
     agregat["dominant_themes"] = news_analysis.tema_dominan(artikel)
     agregat["narrative_shift"] = ""
+
+    # Karakter pergerakan 24 jam: arah, besaran, dan JENISNYA (uang baru vs
+    # posisi ditutup). Dihitung di sini karena butuh berita yang SUDAH
+    # diklasifikasi — sentimen dan kekuatannya dipakai untuk mencari kandidat
+    # pemicu yang searah. Hasilnya masuk ke `technical` supaya ikut tersimpan
+    # di brief, dan diteruskan ke konteks LLM sebagai bahan sintesis.
+    teknikal["pergerakan_24j"] = technical.karakter_pergerakan_24j(
+        price, teknikal, artikel
+    )
+    log.info("Pergerakan 24 jam: %s", teknikal["pergerakan_24j"].get("ringkas") or "tidak diketahui")
 
     # -- 11. Bandingkan dengan brief sebelumnya --------------------------
     log.info("[14/21] Bandingkan dengan brief sebelumnya")

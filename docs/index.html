@@ -447,6 +447,64 @@
             </details>
           </template>
 
+          <!-- ===== PERGERAKAN 24 JAM — dihitung kode, bukan AI =====
+               Arah, besaran, dan JENIS pergerakan (uang baru masuk vs posisi
+               ditutup) punya definisi baku dari kombinasi arah harga dan arah
+               open interest. Karena dihitung kode, jawabannya tetap ada
+               walaupun bagian AI gagal atau ditahan critic — dan tidak
+               berubah-ubah antar run. Prosa AI di bawahnya yang menjelaskan
+               KENAPA. -->
+          <template x-if="pergerakan24j?.arah">
+            <div class="mt-4 p-4 rounded-lg border" :class="kelasPergerakan.kotak">
+              <div class="flex items-start gap-3">
+                <i :data-lucide="kelasPergerakan.ikon" class="w-5 h-5 mt-0.5 shrink-0" :class="kelasPergerakan.teks"></i>
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span class="text-base font-bold" :class="kelasPergerakan.teks" x-text="labelArah24j"></span>
+                    <span class="text-xs px-1.5 py-0.5 rounded-full bg-white/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300"
+                          x-text="'pergerakan ' + labelBesaran24j"></span>
+                    <template x-if="pergerakan24j.jenis_ringkas">
+                      <span class="text-xs px-1.5 py-0.5 rounded-full bg-white/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300"
+                            x-text="pergerakan24j.jenis_ringkas"></span>
+                    </template>
+                  </div>
+                  <p class="mt-1.5 text-sm leading-relaxed text-slate-700 dark:text-slate-200"
+                     x-text="pergerakan24j.ringkas"></p>
+                  <template x-if="pergerakan24j.jenis_arti">
+                    <p class="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-300"
+                       x-text="pergerakan24j.jenis_arti"></p>
+                  </template>
+                  <template x-if="!pergerakan24j.jenis && pergerakan24j.arah !== 'datar'">
+                    <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+                      Data open interest tidak tersedia pada run ini, jadi sifat pergerakannya
+                      (uang baru masuk atau posisi lama ditutup) belum bisa dipastikan.
+                    </p>
+                  </template>
+                  <template x-if="pergerakan24j.berita_pendukung?.length">
+                    <div class="mt-2">
+                      <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Berita searah</div>
+                      <ul class="mt-1 space-y-0.5 text-xs text-slate-600 dark:text-slate-300">
+                        <template x-for="(j, i) in pergerakan24j.berita_pendukung" :key="i">
+                          <li class="flex gap-1.5"><span class="text-slate-300 dark:text-slate-600">→</span><span x-text="j"></span></li>
+                        </template>
+                      </ul>
+                    </div>
+                  </template>
+                  <template x-if="pergerakan24j.berita_berlawanan?.length">
+                    <div class="mt-2">
+                      <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Berita berlawanan arah</div>
+                      <ul class="mt-1 space-y-0.5 text-xs text-slate-600 dark:text-slate-300">
+                        <template x-for="(j, i) in pergerakan24j.berita_berlawanan" :key="i">
+                          <li class="flex gap-1.5"><span class="text-slate-300 dark:text-slate-600">→</span><span x-text="j"></span></li>
+                        </template>
+                      </ul>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+
           <template x-if="bagianAiTampil('narasi') && data.ai.bagian?.judul">
             <h3 class="mt-4 text-lg font-bold leading-snug" x-text="data.ai.bagian.judul"></h3>
           </template>

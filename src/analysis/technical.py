@@ -407,6 +407,207 @@ def oi_price_signal(
     }
 
 
+# Kelas pergerakan harian, dinyatakan sebagai kelipatan ATR harian. Memakai
+# ATR (bukan ambang persen tetap) supaya penilaiannya mengikuti REZIM: -2%
+# pada pasar yang biasa bergerak 1,2% sehari adalah hari yang besar, sementara
+# -2% pada pasar yang biasa bergerak 4% adalah hari yang biasa saja.
+_AMBANG_DATAR_ATR = 0.25
+_AMBANG_BESARAN_ATR = ((0.6, "tipis"), (1.2, "wajar"), (2.2, "besar"))
+
+# Dipakai kalau ATR tidak tersedia (candle kurang dari periode ATR).
+_AMBANG_DATAR_PCT = 0.5
+_AMBANG_BESARAN_PCT = ((1.0, "tipis"), (2.5, "wajar"), (5.0, "besar"))
+
+# Arti tiap kombinasi arah harga x arah open interest. Ini taksonomi baku
+# pasar derivatif, dan yang paling menentukan KUALITAS sebuah pergerakan:
+# harga naik karena uang baru masuk berbeda sifatnya dari harga naik karena
+# posisi jual ditutup paksa, walaupun persentasenya sama.
+_ARTI_JENIS = {
+    "long_baru": (
+        "uang baru masuk ke sisi beli",
+        "Kenaikan disertai open interest bertambah — posisi beli baru masuk, "
+        "bukan sekadar posisi lama ditutup.",
+    ),
+    "short_covering": (
+        "penutupan posisi jual, bukan permintaan baru",
+        "Kenaikan disertai open interest berkurang — pendorongnya penutupan "
+        "posisi jual. Kenaikan jenis ini cenderung kehilangan tenaga setelah "
+        "posisi jual habis tertutup.",
+    ),
+    "short_baru": (
+        "posisi jual baru masuk",
+        "Penurunan disertai open interest bertambah — pelaku pasar membuka "
+        "posisi jual baru, bukan sekadar keluar dari posisi beli.",
+    ),
+    "long_ditutup": (
+        "posisi beli keluar atau dilikuidasi",
+        "Penurunan disertai open interest berkurang — posisi beli ditutup "
+        "atau kena likuidasi. Tekanannya cenderung mereda begitu posisi yang "
+        "rapuh selesai keluar.",
+    ),
+}
+
+_JENIS_DARI_SINYAL_OI = {
+    "long_buildup": "long_baru",
+    "short_covering": "short_covering",
+    "short_buildup": "short_baru",
+    "long_liquidation": "long_ditutup",
+}
+
+
+def _besaran(perubahan_abs: float, atr_pct: Optional[float]) -> str:
+    ambang = _AMBANG_BESARAN_ATR if atr_pct else _AMBANG_BESARAN_PCT
+    satuan = atr_pct if atr_pct else 1.0
+    for batas, nama in ambang:
+        if perubahan_abs < batas * satuan:
+            return nama
+    return "ekstrem"
+
+
+def karakter_pergerakan_24j(
+    price: Dict[str, Any],
+    teknikal: Dict[str, Any],
+    berita: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Klasifikasi pergerakan harga 24 jam: ARAH, BESARAN, dan JENISNYA.
+
+    Dihitung KODE, bukan model. Tiga alasan:
+
+      1. Arah dan besaran adalah aritmetika — tidak ada yang perlu ditafsir,
+         dan menyerahkannya ke model cuma membuka peluang salah baca.
+      2. Jenis pergerakan (uang baru vs posisi ditutup) punya definisi baku
+         dari kombinasi arah harga dan arah open interest. Ini yang paling
+         sering ditanyakan pembaca — "naiknya ini naik apa?" — dan jawabannya
+         tidak boleh berubah-ubah antar run.
+      3. Karena hasilnya deterministik, kalimat naratif model bisa DIPERIKSA
+         terhadapnya, dan pembaca tetap mendapat jawabannya walaupun bagian
+         AI kebetulan gagal atau ditahan.
+
+    Model tetap kebagian tugasnya: MENJELASKAN kenapa, merangkai berita dan
+    data posisi jadi rantai sebab-akibat.
+    """
+    perubahan = price.get("change_24h_pct")
+    if perubahan is None:
+        return {"arah": None}
+    perubahan = float(perubahan)
+
+    harian = teknikal.get("1d") or {}
+    atr_pct = (harian.get("volatilitas") or {}).get("atr_pct")
+    atr_pct = float(atr_pct) if atr_pct else None
+
+    batas_datar = (atr_pct * _AMBANG_DATAR_ATR) if atr_pct else _AMBANG_DATAR_PCT
+    if abs(perubahan) < batas_datar:
+        arah = "datar"
+    else:
+        arah = "naik" if perubahan > 0 else "turun"
+
+    besaran = _besaran(abs(perubahan), atr_pct)
+
+    # Jenis pergerakan hanya bermakna kalau harganya memang bergerak; pada
+    # hari datar, arah open interest tidak menceritakan apa-apa.
+    jenis = jenis_ringkas = jenis_arti = None
+    if arah != "datar":
+        jenis = _JENIS_DARI_SINYAL_OI.get(teknikal.get("oi_price_signal"))
+        if jenis:
+            jenis_ringkas, jenis_arti = _ARTI_JENIS[jenis]
+
+    volume_rasio = ((harian.get("volume") or {}).get("rasio_vs_rata"))
+    volume_rasio = float(volume_rasio) if volume_rasio else None
+    if volume_rasio is None:
+        volume_konfirmasi = None
+    elif volume_rasio >= 1.2:
+        volume_konfirmasi = "dikonfirmasi"
+    elif volume_rasio >= 0.8:
+        volume_konfirmasi = "netral"
+    else:
+        volume_konfirmasi = "tidak_dikonfirmasi"
+
+    # Berita yang SEARAH dan cukup kuat dianggap kandidat pemicu. Sengaja
+    # tidak menyimpulkan sebab-akibat di sini — kode cuma menyodorkan
+    # kandidatnya, model yang merangkai penjelasannya.
+    searah = "bullish" if arah == "naik" else "bearish" if arah == "turun" else None
+    lawan = "bearish" if arah == "naik" else "bullish" if arah == "turun" else None
+    kuat = [
+        b for b in (berita or [])
+        if (b.get("kekuatan") or 0) >= 4 and b.get("status_kepastian") != "rumor"
+    ]
+    pendukung = [b.get("judul_id") or b.get("judul") for b in kuat if b.get("sentimen") == searah]
+    berlawanan = [b.get("judul_id") or b.get("judul") for b in kuat if b.get("sentimen") == lawan]
+
+    if arah == "datar":
+        pendorong = "tidak_ada_pergerakan_berarti"
+    elif pendukung:
+        pendorong = "berita"
+    elif jenis:
+        pendorong = "posisi_derivatif"
+    else:
+        pendorong = "tidak_jelas"
+
+    return {
+        "arah": arah,
+        "perubahan_pct": _f(perubahan),
+        "besaran": besaran,
+        "atr_harian_pct": _f(atr_pct),
+        "jenis": jenis,
+        "jenis_ringkas": jenis_ringkas,
+        "jenis_arti": jenis_arti,
+        "perubahan_oi_pct": teknikal.get("oi_change_pct"),
+        "volume_rasio_vs_rata": _f(volume_rasio),
+        "volume_konfirmasi": volume_konfirmasi,
+        "pendorong": pendorong,
+        "berita_pendukung": [j for j in pendukung if j][:3],
+        "berita_berlawanan": [j for j in berlawanan if j][:3],
+        "ringkas": _kalimat_pergerakan(
+            arah, perubahan, besaran, jenis_ringkas, volume_konfirmasi, pendukung
+        ),
+    }
+
+
+def _kalimat_pergerakan(
+    arah: str,
+    perubahan: float,
+    besaran: str,
+    jenis_ringkas: Optional[str],
+    volume_konfirmasi: Optional[str],
+    pendukung: List[Any],
+) -> str:
+    """Satu kalimat Indonesia yang merangkum klasifikasi di atas.
+
+    Dirakit kode supaya pembaca tetap mendapat jawaban "naik/turun karena apa
+    dan kenaikan/penurunan jenis apa" bahkan pada run yang bagian AI-nya gagal
+    atau ditahan critic.
+    """
+    besar_kata = {
+        "tipis": "tipis", "wajar": "dalam kisaran wajar",
+        "besar": "cukup besar", "ekstrem": "sangat besar",
+    }[besaran]
+    angka = f"{abs(perubahan):.2f}".replace(".", ",")
+
+    if arah == "datar":
+        return (
+            f"Harga praktis datar dalam 24 jam terakhir ({angka}%), bergerak di "
+            "dalam kisaran hariannya yang normal."
+        )
+
+    kata_arah = "naik" if arah == "naik" else "turun"
+    kalimat = f"Harga {kata_arah} {angka}% dalam 24 jam — pergerakan {besar_kata}."
+
+    if jenis_ringkas:
+        kalimat += f" Sifatnya: {jenis_ringkas}."
+    if volume_konfirmasi == "dikonfirmasi":
+        kalimat += " Volume di atas rata-rata, jadi pergerakannya terkonfirmasi."
+    elif volume_konfirmasi == "tidak_dikonfirmasi":
+        kalimat += (
+            " Volume di bawah rata-rata, jadi pergerakannya belum terkonfirmasi "
+            "partisipasi luas."
+        )
+    if pendukung:
+        kalimat += f" Ada {len(pendukung)} berita berdampak kuat yang searah."
+    else:
+        kalimat += " Tidak ada berita berdampak kuat yang searah dengan pergerakan ini."
+    return kalimat
+
+
 def key_levels(per_tf: Dict[str, Dict[str, Any]], price: float, atr_1d: Optional[float]) -> Dict[str, Any]:
     """Gabungkan level dari semua timeframe + hitung level invalidasi.
 

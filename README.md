@@ -146,6 +146,41 @@ Prompt-nya menuntut hal yang sering dilewatkan: menelusuri rantai transmisi alih
 
 Kata-kata hype dilarang, begitu pula prediksi harga sebagai kepastian dan rekomendasi beli/jual langsung.
 
+### Naik atau turun — dan kenaikan/penurunan JENIS APA
+
+Pertanyaan pertama pembaca setiap pagi selalu sama: 24 jam ini naik atau turun, kenapa, dan itu pergerakan jenis apa. Jawabannya sekarang dijamin ada, dan tidak bergantung pada model mana pun.
+
+**Klasifikasinya dihitung kode** (`technical.karakter_pergerakan_24j`), bukan diserahkan ke LLM:
+
+| Bagian | Cara menghitungnya |
+|---|---|
+| `arah` | naik / turun / **datar** — ambang datar diambil dari 0,25 × ATR harian, bukan angka persen tetap |
+| `besaran` | tipis / wajar / besar / ekstrem, sebagai kelipatan ATR harian. Pakai ATR supaya penilaiannya mengikuti REZIM: −2% pada pasar yang biasa bergerak 1,2% sehari adalah hari besar, sementara −2% pada pasar yang biasa bergerak 4% adalah hari biasa saja |
+| `jenis` | kombinasi arah harga × arah open interest — taksonomi baku pasar derivatif |
+| `volume_konfirmasi` | volume candle harian vs rata-rata 20 hari (≥1,2× dikonfirmasi, <0,8× tidak) |
+| `berita_pendukung` / `berita_berlawanan` | berita berkekuatan ≥4 dan bukan rumor, yang sentimennya searah / berlawanan |
+
+Empat jenis pergerakan, dan kenapa bedanya penting:
+
+| Jenis | Artinya | Kenapa berbeda |
+|---|---|---|
+| `long_baru` | naik, open interest bertambah | **Uang baru** masuk ke sisi beli |
+| `short_covering` | naik, open interest berkurang | Naik karena **posisi jual ditutup** — cenderung kehilangan tenaga begitu posisi jual habis tertutup |
+| `short_baru` | turun, open interest bertambah | **Posisi jual baru** masuk, bukan sekadar pembeli keluar |
+| `long_ditutup` | turun, open interest berkurang | **Posisi beli dilikuidasi** — tekanan mereda begitu posisi rapuh selesai keluar |
+
+Naik 3% karena uang baru masuk tidak sama artinya dengan naik 3% karena short tertutup, walaupun angkanya sama persis. Itu yang membuat klasifikasi ini layak dihitung sendiri, bukan disimpulkan ulang tiap hari oleh model.
+
+**Pembagian tugasnya tegas:** kode menjawab *apa* (arah, besaran, jenis), model menjawab *kenapa* — merangkai berita, makro, dan data posisi jadi rantai sebab-akibat. Sintesis punya field wajib `karakter_pergerakan` untuk itu, dan hasilnya tampil sebagai bagian pertama analisa.
+
+Tiga akibat praktis:
+
+1. **Jawabannya tetap ada walaupun bagian AI gagal atau ditahan critic.** Panel di web dan baris di Telegram dirender dari hitungan kode, bukan dari prosa model.
+2. **Tidak berubah-ubah antar run.** Data yang sama selalu menghasilkan klasifikasi yang sama.
+3. **Model tidak bisa salah arah diam-diam.** Prosa yang menyimpang dari klasifikasi akan langsung terlihat bersebelahan dengan panelnya.
+
+Kalau data open interest tidak tersedia pada suatu run, `jenis` bernilai null dan halaman menyatakan terus terang bahwa sifat pergerakannya belum bisa dipastikan — bukan menebak.
+
 ### Kalau critic menemukan masalah
 
 Critic memeriksa seluruh bagian naratif terhadap data mentah yang **persis sama** dengan yang dipakai penulisnya. Yang membedakan: **tidak semua temuan diperlakukan sama.**
