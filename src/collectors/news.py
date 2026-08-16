@@ -8,10 +8,11 @@ import re
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import feedparser
 
+from ..utils.http import get_text
 from ..utils.timezone import iso_utc, now_utc
 
 log = logging.getLogger(__name__)
@@ -63,6 +64,24 @@ def _domain(url: str) -> str:
         return ""
 
 
+def _label_feed(url: str) -> str:
+    """Label ringkas untuk log yang membedakan feed sekalipun berbagi domain —
+    domain saja tidak cukup untuk BBC business vs world (path beda) atau
+    kueri riset Google News (path sama, cuma `q` yang beda), dan tanpa ini
+    log-nya jadi tidak bisa dipakai mengaudit feed mana yang sebenarnya
+    berkontribusi berapa artikel."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return url
+    domain = parsed.netloc.lower().removeprefix("www.")
+    q = parse_qs(parsed.query).get("q")
+    if q:
+        return f"{domain} (q: {q[0]})"
+    path = parsed.path.rstrip("/")
+    return f"{domain}{path}" if path else domain
+
+
 def _source_name(entry: Any, feed_title: str, url: str) -> str:
     for candidate in (getattr(entry, "source", None), feed_title):
         if isinstance(candidate, dict):
@@ -87,7 +106,16 @@ def _article_id(title: str, url: str) -> str:
 
 
 def _fetch_feed(url: str) -> List[Dict[str, Any]]:
-    parsed = feedparser.parse(url)
+    # feedparser.parse(url) mengambil sendiri kontennya lewat urllib polos —
+    # tanpa retry dan dengan User-Agent generik yang kadang membuat CDN
+    # pemerintah/perusahaan balas halaman blokir/challenge (bukan XML) alih-
+    # alih status HTTP yang jelas. Server itu lalu berakhir sebagai error XML
+    # yang kriptik ("not well-formed") padahal sebenarnya blokir biasa.
+    # Diambil lewat http.get_text() supaya dapat retry dan identitas yang
+    # konsisten dengan collector lain, dan supaya blokir semacam itu muncul
+    # sebagai HttpError yang jelas ("HTTP 403 dari ...") kalau memang terjadi.
+    teks = get_text(url, timeout=30)
+    parsed = feedparser.parse(teks)
     if parsed.bozo and not parsed.entries:
         raise ValueError(f"feed tidak bisa diparsing: {parsed.get('bozo_exception')}")
 
@@ -159,7 +187,7 @@ def collect(feeds: List[str], max_fetch: int = 120, max_age_hours: int = 36) -> 
     for feed_url in feeds:
         try:
             items = _fetch_feed(feed_url)
-            log.info("Feed %s: %d artikel", _domain(feed_url), len(items))
+            log.info("Feed %s: %d artikel", _label_feed(feed_url), len(items))
             raw.extend(items)
         except Exception as exc:  # feedparser bisa melempar apa saja
             log.warning("Feed %s gagal: %s", feed_url, exc)
