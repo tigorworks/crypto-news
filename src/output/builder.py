@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import re
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dateutil import parser as date_parser
 
-from ..config import ARCHIVE_DIR, DATA_DIR
+from ..config import ARCHIVE_DIR, DATA_DIR, DOCS_DIR
 from ..utils.format import angka_id
 from ..utils.timezone import (
     format_wib,
@@ -373,6 +375,46 @@ def _perbarui_index(
 
     disimpan.sort(key=lambda i: i.get("waktu_utc", ""), reverse=True)
     return {"updated_at": brief["generated_at"], "items": disimpan}
+
+
+# Pola tag <script> yang memuat app.js, dengan atau tanpa penanda versi.
+_POLA_SKRIP_APP = re.compile(r'(<script\s+src="app\.js)(\?v=[0-9a-f]+)?(")')
+
+
+def segarkan_versi_aset(docs_dir: Path = DOCS_DIR) -> Optional[str]:
+    """Stempel sidik jari app.js ke <script src> di index.html.
+
+    Tanpa ini, `app.js` diminta browser dengan URL yang TIDAK PERNAH berubah,
+    jadi salinan lama bisa terus dipakai walaupun berkasnya sudah diperbarui
+    di server. Akibatnya nyata dan membingungkan: `latest.json` diambil
+    dengan `cache: 'no-store'` sehingga DATANYA selalu baru, tapi KODE yang
+    merendernya bisa tertinggal beberapa versi. Halaman lalu menampilkan
+    elemen yang sudah lama dihapus dari sumber — persis yang terjadi dengan
+    label peringatan yang masih muncul setelah kodenya dibuang.
+
+    Sidik jarinya diambil dari isi app.js, jadi URL-nya berubah HANYA saat
+    berkasnya benar-benar berubah. Dipanggil tiap run: kalau app.js tidak
+    berubah, index.html tidak ikut tersentuh.
+
+    Return versi baru kalau index.html berubah, None kalau sudah mutakhir.
+    """
+    berkas_app = docs_dir / "app.js"
+    berkas_html = docs_dir / "index.html"
+    if not berkas_app.exists() or not berkas_html.exists():
+        return None
+
+    versi = hashlib.sha256(berkas_app.read_bytes()).hexdigest()[:8]
+    html = berkas_html.read_text(encoding="utf-8")
+    baru, jumlah = _POLA_SKRIP_APP.subn(rf'\g<1>?v={versi}\g<3>', html)
+    if not jumlah:
+        log.warning("Tag <script src=\"app.js\"> tidak ditemukan di index.html")
+        return None
+    if baru == html:
+        return None
+
+    berkas_html.write_text(baru, encoding="utf-8")
+    log.info("Versi aset app.js disegarkan: %s", versi)
+    return versi
 
 
 def tulis_output(
