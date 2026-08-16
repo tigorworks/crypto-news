@@ -13,9 +13,10 @@ import json
 import logging
 import re
 import sys
+import time
 from typing import Any, Dict, List, Optional
 
-from .analysis import news_analysis, technical
+from .analysis import news_analysis, riset, technical
 from .analysis.llm import LLMClient
 from .collectors import (
     binance,
@@ -208,6 +209,9 @@ def _kumpulkan_penerima(cfg: Config, dry_run: bool, catatan: List[str]):
 
 
 def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
+    # monotonic(), bukan time(): kebal terhadap jam sistem yang digeser NTP
+    # di tengah run — durasi tidak boleh bisa jadi negatif.
+    mulai_run = time.monotonic()
     gagal: List[str] = []
     catatan: List[str] = []
 
@@ -325,10 +329,50 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     gagal.extend(hasil_makro["failed"])
     makro = hasil_makro["data"]
 
+    # Klien LLM dibuat SEBELUM berita diambil supaya langkah riset di bawah
+    # bisa ikut menentukan sumber apa yang dicari hari ini.
+    client: Optional[LLMClient] = None
+    if cfg.secrets.llm_enabled:
+        client = LLMClient(
+            api_key=cfg.secrets.openrouter_api_key,
+            base_url=cfg.llm_base_url,
+            max_cost_usd=cfg.max_cost_usd,
+            referer=cfg.repo_url,
+        )
+    else:
+        catatan.append("OPENROUTER_API_KEY kosong; seluruh langkah LLM dilewati.")
+        log.warning("OPENROUTER_API_KEY kosong, pipeline berjalan tanpa analisa AI")
+
     # -- 6. Berita -------------------------------------------------------
+    # Feed tetap dari config, ditambah feed hasil riset: model murah
+    # mengusulkan apa yang layak dicari hari ini, lalu KODE yang mengambil
+    # artikelnya lewat Google News RSS. Model tidak pernah menghasilkan
+    # berita, judul, atau URL — semuanya tetap dari feed sungguhan dan
+    # melewati penyaringan yang sama persis dengan feed tetap.
+    query_riset: List[str] = []
+    if client and cfg.news.get("riset_dinamis", True):
+        log.info("[6a/21] LLM riset arah pencarian berita")
+        query_riset = riset.usulkan_query(
+            client,
+            cfg.llm_models("riset"),
+            {
+                "harga_btc": price.get("last"),
+                "perubahan_24j_pct": price.get("change_24h_pct"),
+                "tema_laporan_sebelumnya": (
+                    (sebelumnya or {}).get("aggregate", {}).get("dominant_themes") or []
+                ),
+                "pergeseran_narasi_sebelumnya": (
+                    (sebelumnya or {}).get("aggregate", {}).get("narrative_shift") or ""
+                ),
+                "tanggal_wib": format_wib(now_utc()),
+            },
+        )
+        if query_riset:
+            catatan.append("Riset berita tambahan: " + "; ".join(query_riset))
+
     log.info("[6/21] Ambil berita RSS")
     hasil_berita = news.collect(
-        cfg.news.get("feeds", []),
+        list(cfg.news.get("feeds", [])) + riset.feed_dari_query(query_riset),
         max_fetch=int(cfg.news.get("max_fetch", 120)),
         max_age_hours=int(cfg.news.get("max_age_hours", 36)),
     )
@@ -354,18 +398,6 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     pernyataan: List[Dict[str, Any]] = []
 
     # -- 7-10. Rangkaian LLM untuk berita dan pernyataan ---------------------------------
-    client: Optional[LLMClient] = None
-    if cfg.secrets.llm_enabled and artikel:
-        client = LLMClient(
-            api_key=cfg.secrets.openrouter_api_key,
-            base_url=cfg.llm_base_url,
-            max_cost_usd=cfg.max_cost_usd,
-            referer=cfg.repo_url,
-        )
-    elif not cfg.secrets.llm_enabled:
-        catatan.append("OPENROUTER_API_KEY kosong; seluruh langkah LLM dilewati.")
-        log.warning("OPENROUTER_API_KEY kosong, pipeline berjalan tanpa analisa AI")
-
     if client:
         log.info("[8/21] LLM filter relevansi")
         artikel = news_analysis.filter_relevansi(
@@ -442,6 +474,25 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             client, cfg.llm_models("agenda"), format_wib(now_utc())
         )
     agenda = calendar_collector.collect(cfg.fomc_dates, konfirmasi=konfirmasi_agenda)
+
+    # Kalender cuma menghasilkan daftar mentah; "acara ekonomi" tidak berarti
+    # "berdampak ke BTC". Langkah ini menilai relevansi tiap acara terhadap
+    # kripto secara spesifik dan menjelaskan lewat jalur apa dampaknya sampai
+    # ke harga. Model hanya memberi anotasi — pencocokannya lewat indeks yang
+    # dikirim kode, jadi acara tidak bisa ditambah maupun dibuang.
+    if client and agenda:
+        log.info("[14b/21] LLM analisa dampak agenda ke kripto")
+        agenda = news_analysis.analisa_agenda(
+            client,
+            cfg.llm_models("agenda_dampak"),
+            agenda,
+            {
+                "harga_btc": price.get("last"),
+                "perubahan_24j_pct": price.get("change_24h_pct"),
+                "funding_rate": pasar.get("funding_rate"),
+                "max_pain_opsi": opsi.get("max_pain_expiry_terdekat"),
+            },
+        )
 
     # -- 12-15. Rangkaian LLM analitis -------------------------------------
     ai: Dict[str, Any] = {
@@ -663,7 +714,10 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     # -- Susun brief ------------------------------------------------------
     log.info("Susun brief")
     kualitas = builder.hitung_kualitas(
-        gagal, client.total_cost if client else 0.0, catatan
+        gagal, client.total_cost if client else 0.0, catatan,
+        token_masuk=client.total_token_masuk if client else 0,
+        token_keluar=client.total_token_keluar if client else 0,
+        durasi_detik=round(time.monotonic() - mulai_run, 1),
     )
     brief = builder.build_brief(
         price=price,

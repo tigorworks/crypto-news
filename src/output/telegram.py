@@ -229,7 +229,16 @@ def _blok_agenda(brief: Dict[str, Any], maks: int = 4) -> List[str]:
     baris = ["", "📅 <b>Agenda Terdekat</b>"]
     for acara in agenda[:maks]:
         tanda = "~" if acara.get("perkiraan") else ""
-        baris.append(f"{esc(acara['waktu_wib'])} · {tanda}{esc(acara['nama'])}")
+        # Acara berdampak besar ke kripto diberi penanda supaya tidak
+        # tenggelam di antara rilis data rutin yang nyaris tidak berpengaruh.
+        relevansi = acara.get("relevansi_kripto") or 0
+        awalan = "🔴 " if relevansi >= 4 else ""
+        baris.append(f"{awalan}{esc(acara['waktu_wib'])} · {tanda}{esc(acara['nama'])}")
+        # Jalur transmisinya hanya ditulis untuk yang benar-benar berdampak —
+        # kalau semua acara diberi penjelasan, blok ini jadi terlalu panjang
+        # dan justru mengaburkan mana yang penting.
+        if relevansi >= 4 and acara.get("jalur"):
+            baris.append(f"   <i>{esc(_potong(acara['jalur'], 180))}</i>")
     sisa = len(agenda) - maks
     if sisa > 0:
         baris.append(f"<i>+{sisa} agenda lain dalam 30 hari</i>")

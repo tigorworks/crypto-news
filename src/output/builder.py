@@ -79,7 +79,14 @@ def tulis_json(path: Path, data: Any) -> None:
 # --------------------------------------------------------------------------
 # Kualitas data
 # --------------------------------------------------------------------------
-def hitung_kualitas(failed: List[str], llm_cost: float, catatan: List[str]) -> Dict[str, Any]:
+def hitung_kualitas(
+    failed: List[str],
+    llm_cost: float,
+    catatan: List[str],
+    token_masuk: int = 0,
+    token_keluar: int = 0,
+    durasi_detik: float = 0.0,
+) -> Dict[str, Any]:
     """Skor kualitas data, dihitung berbobot.
 
     Jumlah sumber yang berhasil tetap dilaporkan apa adanya; yang berbobot
@@ -110,6 +117,12 @@ def hitung_kualitas(failed: List[str], llm_cost: float, catatan: List[str]) -> D
         "failed_sources": gagal,
         "confidence": confidence,
         "llm_cost_usd": round(llm_cost, 5),
+        # Ditampilkan di footer web: berapa token yang dihabiskan dan berapa
+        # lama job berjalan. Biayanya sengaja tidak ikut ditampilkan.
+        "llm_token_masuk": int(token_masuk),
+        "llm_token_keluar": int(token_keluar),
+        "llm_token_total": int(token_masuk) + int(token_keluar),
+        "durasi_detik": round(float(durasi_detik), 1),
         "catatan": catatan,
     }
 
