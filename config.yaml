@@ -76,29 +76,55 @@ llm:
   max_cost_usd_per_run: 0.60
 
 news:
-  # Dinaikkan dari 120 karena feed makro/geopolitik ikut masuk.
-  max_fetch: 160
+  # Dinaikkan seiring bertambahnya feed. Langkah filter relevansi yang
+  # menyaring; menambah feed berarti menambah kandidat, bukan menambah
+  # berita yang lolos ke brief (itu dibatasi max_after_filter).
+  max_fetch: 260
   max_after_filter: 25
   max_deep_analysis: 10
   max_age_hours: 36
   min_relevance: 40
   feeds:
-    # Kripto
+    # --- Kripto: media ---
     - https://www.coindesk.com/arc/outboundfeeds/rss/
     - https://cointelegraph.com/rss
     - https://decrypt.co/feed
     - https://bitcoinmagazine.com/feed
     - https://www.theblock.co/rss.xml
-    # Makro & geopolitik — dibutuhkan analisa outlook. Sebagian besar isinya
-    # tidak relevan bagi BTC dan memang akan dibuang oleh langkah filter;
-    # yang dicari adalah kebijakan bank sentral, sanksi, dan guncangan global.
+    - https://blockworks.co/feed
+    - https://cryptoslate.com/feed/
+    - https://news.bitcoin.com/feed/
+    - https://protos.com/feed/
+
+    # --- Makro & geopolitik: media ---
+    # Sebagian besar isinya tidak relevan bagi BTC dan memang akan dibuang
+    # langkah filter; yang dicari adalah kebijakan bank sentral, sanksi,
+    # dan guncangan global.
     - https://www.cnbc.com/id/20910258/device/rss/rss.html
     - https://feeds.bbci.co.uk/news/business/rss.xml
     - https://feeds.bbci.co.uk/news/world/rss.xml
+    - https://www.aljazeera.com/xml/rss/all.xml
+    - https://feeds.content.dowjones.io/public/rss/mw_topstories
+
+    # --- Sumber PRIMER regulator & pemerintah AS ---
+    # Ini yang paling menentukan akurasi analisa geopolitik/regulasi: bukan
+    # laporan tentang kebijakan, tapi pengumuman kebijakannya sendiri.
+    # Semuanya tier 1 dan bebas dari interpretasi pihak ketiga.
+    - https://www.federalreserve.gov/feeds/press_all.xml
+    - https://www.sec.gov/news/pressreleases.rss
+    - https://www.cftc.gov/RSS/RSSGP/rssgp.xml
+    - https://home.treasury.gov/rss/press.xml
 
 # Tier kredibilitas sumber untuk pembobotan skor sentimen.
 # tier 1 = 1.0, tier 2 = 0.7, tier 3 = 0.4 (default tier 3 kalau tidak terdaftar)
 source_tiers:
+  # Sumber primer pemerintah/regulator: bukan laporan tentang kebijakan,
+  # melainkan kebijakannya sendiri. Tidak ada yang lebih tepercaya dari ini.
+  federalreserve.gov: 1
+  sec.gov: 1
+  cftc.gov: 1
+  treasury.gov: 1
+  whitehouse.gov: 1
   reuters.com: 1
   bloomberg.com: 1
   wsj.com: 1
@@ -107,10 +133,16 @@ source_tiers:
   cnbc.com: 1
   bbc.co.uk: 1
   bbc.com: 1
+  aljazeera.com: 1
+  marketwatch.com: 2
   coindesk.com: 2
   theblock.co: 2
+  blockworks.co: 2
   cointelegraph.com: 2
   decrypt.co: 2
+  cryptoslate.com: 3
+  news.bitcoin.com: 3
+  protos.com: 3
   bitcoinmagazine.com: 3
 
 # Tanggal FOMC (UTC). Perbarui sekali setahun dari kalender resmi The Fed.

@@ -626,6 +626,60 @@
             <h3 class="mt-4 text-lg font-bold leading-snug" x-text="data.ai.bagian.judul"></h3>
           </template>
 
+          <!-- ===== GEOPOLITIK & REGULASI — sengaja paling atas =====
+               Pasar belakangan bergerak mengikuti kebijakan dan regulasi
+               lebih dulu daripada indikator teknikal, jadi bagian ini
+               dibaca sebelum apa pun. Sumbernya dicantumkan supaya
+               pembaca bisa memverifikasi sendiri, bukan cuma percaya AI. -->
+          <template x-if="bagianAiTampil('outlook') && (data.ai.outlook?.narasi_geopolitik || data.ai.outlook?.faktor_geopolitik?.length)">
+            <div class="mt-4 p-4 rounded-lg bg-amber-50/70 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800/60">
+              <div class="text-xs font-bold text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-1.5">
+                <i data-lucide="globe" class="w-4 h-4"></i> GEOPOLITIK &amp; REGULASI
+              </div>
+
+              <template x-if="data.ai.outlook.narasi_geopolitik">
+                <div class="space-y-2 text-[15px] leading-relaxed text-slate-800 dark:text-slate-100">
+                  <template x-for="(p, i) in data.ai.outlook.narasi_geopolitik.split(/\n{2,}/)" :key="i">
+                    <p x-text="p"></p>
+                  </template>
+                </div>
+              </template>
+
+              <template x-if="data.ai.outlook.faktor_geopolitik?.length">
+                <ul class="mt-3 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                  <template x-for="(g, i) in data.ai.outlook.faktor_geopolitik" :key="i">
+                    <li class="flex gap-1.5"><span class="text-amber-500 shrink-0">•</span><span x-text="g"></span></li>
+                  </template>
+                </ul>
+              </template>
+
+              <!-- Sumber dipilih KODE dari berita berkategori regulasi/
+                   geopolitik/makro, bukan atribusi karangan AI. -->
+              <template x-if="sumberGeopolitik.length">
+                <div class="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800/60">
+                  <div class="text-[11px] font-semibold uppercase tracking-wide text-amber-800/70 dark:text-amber-300/70 mb-1.5">
+                    Sumber terkait
+                  </div>
+                  <ul class="space-y-1 text-xs">
+                    <template x-for="s in sumberGeopolitik" :key="s.id">
+                      <li class="flex gap-1.5 items-baseline">
+                        <span class="text-amber-500 shrink-0">→</span>
+                        <a :href="s.url" target="_blank" rel="noopener noreferrer"
+                           class="tap hover:underline text-slate-700 dark:text-slate-300">
+                          <span x-text="s.judul_id || s.judul"></span>
+                          <span class="text-slate-400" x-text="' · ' + s.sumber"></span>
+                          <template x-if="s.kredibilitas_sumber === 1">
+                            <span class="ml-1 px-1 py-px rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 text-[10px]">sumber utama</span>
+                          </template>
+                        </a>
+                      </li>
+                    </template>
+                  </ul>
+                </div>
+              </template>
+            </div>
+          </template>
+
           <template x-if="bagianAiTampil('narasi') && adaBagianTerstruktur">
             <div class="mt-3 space-y-4 text-[15px] leading-relaxed text-slate-800 dark:text-slate-100">
               <template x-for="b in bagianAnalis" :key="b.kunci">
@@ -699,57 +753,6 @@
                 </template>
               </h3>
               <p class="text-sm leading-relaxed" x-text="data.ai.outlook.ringkasan"></p>
-
-              <!-- Geopolitik: narasi mengalir lebih dulu, daftar isunya jadi
-                   penopang. Pasar belakangan bergerak mengikuti ini, jadi
-                   bagian ini diberi latar tersendiri supaya tidak tenggelam. -->
-              <template x-if="data.ai.outlook.narasi_geopolitik || data.ai.outlook.faktor_geopolitik?.length">
-                <div class="mt-4 p-3 rounded-lg bg-amber-50/70 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60">
-                  <div class="text-xs sm:text-[11px] font-bold text-amber-800 dark:text-amber-300 mb-1.5 flex items-center gap-1.5">
-                    <i data-lucide="globe" class="w-3.5 h-3.5"></i> GEOPOLITIK &amp; REGULASI
-                  </div>
-                  <template x-if="data.ai.outlook.narasi_geopolitik">
-                    <div class="space-y-2 text-sm leading-relaxed text-slate-800 dark:text-slate-100">
-                      <template x-for="(p, i) in data.ai.outlook.narasi_geopolitik.split(/\n{2,}/)" :key="i">
-                        <p x-text="p"></p>
-                      </template>
-                    </div>
-                  </template>
-                  <template x-if="data.ai.outlook.faktor_geopolitik?.length">
-                    <ul class="mt-2 space-y-1 text-sm sm:text-[13px] text-slate-600 dark:text-slate-300">
-                      <template x-for="(g, i) in data.ai.outlook.faktor_geopolitik" :key="i">
-                        <li class="flex gap-1.5"><span class="text-amber-500 shrink-0">•</span><span x-text="g"></span></li>
-                      </template>
-                    </ul>
-                  </template>
-                </div>
-              </template>
-
-              <template x-if="data.ai.outlook.keputusan_besar?.length">
-                <div class="mt-3">
-                  <div class="text-sm sm:text-[13px] text-slate-500 dark:text-slate-400 mb-1">Keputusan besar yang dipantau</div>
-                  <ul class="space-y-1.5 text-sm sm:text-[13px]">
-                    <template x-for="(k, i) in data.ai.outlook.keputusan_besar" :key="i">
-                      <li>
-                        <span class="font-medium" x-text="k.apa"></span>
-                        <span class="text-slate-400" x-text="k.kapan ? ' · ' + k.kapan : ''"></span>
-                        <div class="text-slate-600 dark:text-slate-400" x-text="k.kenapa_penting"></div>
-                      </li>
-                    </template>
-                  </ul>
-                </div>
-              </template>
-
-              <template x-if="data.ai.outlook.risiko_utama?.length">
-                <div class="mt-3">
-                  <div class="text-sm sm:text-[13px] text-slate-500 dark:text-slate-400 mb-1">Risiko utama</div>
-                  <ul class="space-y-1 text-sm sm:text-[13px]">
-                    <template x-for="(r, i) in data.ai.outlook.risiko_utama" :key="i">
-                      <li class="flex gap-1.5"><span class="text-amber-500">!</span><span x-text="r"></span></li>
-                    </template>
-                  </ul>
-                </div>
-              </template>
 
               <!-- Skenario bisa ditahan sendiri tanpa membuang prosa dan
                    geopolitik di atasnya; kalau kosong, gridnya tidak dirender
@@ -916,6 +919,59 @@
             </ul>
           </section>
         </template>
+
+        <!-- ================= KALENDER + PERUBAHAN ================= -->
+        <section id="s-agenda" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
+            <h2 class="font-semibold flex items-center gap-2 mb-3">
+              <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i> Agenda 30 Hari
+            </h2>
+            <template x-if="!data.calendar?.length">
+              <p class="text-sm text-slate-500">Tidak ada agenda besar dalam 7 hari ke depan.</p>
+            </template>
+            <ul class="space-y-2.5">
+              <template x-for="(a, i) in (data.calendar || [])" :key="i">
+                <li class="flex items-start justify-between gap-3 text-sm">
+                  <div>
+                    <div class="font-medium">
+                      <span x-text="a.nama"></span>
+                      <template x-if="a.perkiraan">
+                        <span class="text-[11px] sm:text-[11px] sm:text-[10px] text-slate-400 ml-1" title="Tanggal perkiraan dari pola rilis bulanan">perkiraan</span>
+                      </template>
+                    </div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400"
+                         x-text="[a.hari, a.waktu_wib].filter(Boolean).join(', ')"></div>
+                  </div>
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 whitespace-nowrap shrink-0"
+                        x-text="hitungMundur(a.jam_lagi)"></span>
+                </li>
+              </template>
+            </ul>
+          </div>
+
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
+            <h2 class="font-semibold flex items-center gap-2 mb-3">
+              <i data-lucide="git-compare-arrows" class="w-4 h-4 text-slate-400"></i> Perubahan vs Brief Sebelumnya
+            </h2>
+            <template x-if="!data.diff_vs_previous?.tersedia">
+              <p class="text-sm text-slate-500" x-text="data.diff_vs_previous?.alasan || 'Belum ada pembanding.'"></p>
+            </template>
+            <template x-if="data.diff_vs_previous?.tersedia">
+              <div>
+                <p class="text-xs text-slate-400 mb-2" x-text="'Dibandingkan dengan brief ' + data.diff_vs_previous.dibanding"></p>
+                <ul class="space-y-1.5 text-sm">
+                  <template x-for="(b, i) in (data.diff_vs_previous.ringkasan || [])" :key="i">
+                    <li class="flex gap-2"><span class="text-slate-300 dark:text-slate-600">•</span><span x-text="b"></span></li>
+                  </template>
+                </ul>
+                <template x-if="!data.diff_vs_previous.ringkasan?.length">
+                  <p class="text-sm text-slate-500">Tidak ada perubahan berarti.</p>
+                </template>
+              </div>
+            </template>
+          </div>
+        </section>
 
         <!-- ============ BERITA & PERNYATAAN (satu bagian, dua tab) ============ -->
         <!-- Digabung karena keduanya menjawab pertanyaan yang sama: "apa yang
@@ -1141,59 +1197,6 @@
                   <span class="hidden sm:inline">Berikutnya</span>
                   <i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
-              </div>
-            </template>
-          </div>
-        </section>
-
-        <!-- ================= KALENDER + PERUBAHAN ================= -->
-        <section id="s-agenda" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
-            <h2 class="font-semibold flex items-center gap-2 mb-3">
-              <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i> Agenda 7 Hari
-            </h2>
-            <template x-if="!data.calendar?.length">
-              <p class="text-sm text-slate-500">Tidak ada agenda besar dalam 7 hari ke depan.</p>
-            </template>
-            <ul class="space-y-2.5">
-              <template x-for="(a, i) in (data.calendar || [])" :key="i">
-                <li class="flex items-start justify-between gap-3 text-sm">
-                  <div>
-                    <div class="font-medium">
-                      <span x-text="a.nama"></span>
-                      <template x-if="a.perkiraan">
-                        <span class="text-[11px] sm:text-[11px] sm:text-[10px] text-slate-400 ml-1" title="Tanggal perkiraan dari pola rilis bulanan">perkiraan</span>
-                      </template>
-                    </div>
-                    <div class="text-xs text-slate-500 dark:text-slate-400"
-                         x-text="[a.hari, a.waktu_wib].filter(Boolean).join(', ')"></div>
-                  </div>
-                  <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 whitespace-nowrap shrink-0"
-                        x-text="hitungMundur(a.jam_lagi)"></span>
-                </li>
-              </template>
-            </ul>
-          </div>
-
-          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
-            <h2 class="font-semibold flex items-center gap-2 mb-3">
-              <i data-lucide="git-compare-arrows" class="w-4 h-4 text-slate-400"></i> Perubahan vs Brief Sebelumnya
-            </h2>
-            <template x-if="!data.diff_vs_previous?.tersedia">
-              <p class="text-sm text-slate-500" x-text="data.diff_vs_previous?.alasan || 'Belum ada pembanding.'"></p>
-            </template>
-            <template x-if="data.diff_vs_previous?.tersedia">
-              <div>
-                <p class="text-xs text-slate-400 mb-2" x-text="'Dibandingkan dengan brief ' + data.diff_vs_previous.dibanding"></p>
-                <ul class="space-y-1.5 text-sm">
-                  <template x-for="(b, i) in (data.diff_vs_previous.ringkasan || [])" :key="i">
-                    <li class="flex gap-2"><span class="text-slate-300 dark:text-slate-600">•</span><span x-text="b"></span></li>
-                  </template>
-                </ul>
-                <template x-if="!data.diff_vs_previous.ringkasan?.length">
-                  <p class="text-sm text-slate-500">Tidak ada perubahan berarti.</p>
-                </template>
               </div>
             </template>
           </div>
