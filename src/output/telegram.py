@@ -326,8 +326,8 @@ def _blok_valuasi(brief: Dict[str, Any]) -> List[str]:
 
     potongan = []
     if oc.get("alamat_aktif") is not None:
-        ubah = oc.get("alamat_aktif_perubahan_30h_pct")
-        tambahan = f" ({_persen(ubah, 1)}/30h)" if ubah is not None else ""
+        ubah = oc.get("alamat_aktif_perubahan_30hari_pct")
+        tambahan = f" ({_persen(ubah, 1)} per 30 hari)" if ubah is not None else ""
         potongan.append(f"Alamat aktif {_angka(oc['alamat_aktif'], 0)}{tambahan}")
     if oc.get("pasokan_diam_1thn_pct") is not None:
         potongan.append(f"Pasokan diam >1thn {_angka(oc['pasokan_diam_1thn_pct'], 1)}%")
