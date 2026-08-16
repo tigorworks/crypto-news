@@ -530,18 +530,6 @@ function briefApp() {
       return kode.map((k) => this.labelSumberGagal(k));
     },
 
-    /* Catatan run (`data_quality.catatan`) selama ini ditulis pipeline tapi
-       TIDAK PERNAH ditampilkan di mana pun — padahal justru di situ tercatat
-       hal yang paling perlu diketahui pembaca: bagian AI yang gagal
-       dihasilkan, harga yang memakai sumber cadangan, arus ETF yang dipakai
-       ulang dari brief kemarin. Yang bersifat administratif (kunci pelanggan,
-       daftar kueri riset) disaring supaya sisanya tidak tenggelam. */
-    get catatanPenting() {
-      const abaikan = ['Fitur pelanggan dimatikan', 'Riset berita tambahan'];
-      return (this.data?.data_quality?.catatan || [])
-        .filter((c) => !abaikan.some((a) => c.startsWith(a)));
-    },
-
     get kelasKualitas() {
       const c = this.data?.data_quality?.confidence;
       if (c === 'baik') return 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300';
@@ -624,10 +612,6 @@ function briefApp() {
       // Tanpa daftar eksplisit, critic gagal berarti semuanya ditahan.
       if (!ditahan.length && ai.critic && ai.critic.passed === false) return false;
       return true;
-    },
-
-    get adaBagianDitahan() {
-      return (this.data?.ai?.bagian_ditahan || []).length > 0;
     },
 
     /* True kalau ADA sesuatu yang bisa ditampilkan di bagian analisa AI —

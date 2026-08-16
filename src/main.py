@@ -14,6 +14,7 @@ import logging
 import re
 import sys
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from .analysis import news_analysis, riset, technical
@@ -68,6 +69,41 @@ def _ringkas_narasi(narasi: str, maks_kalimat: int = 3, maks_karakter: int = 600
     if len(hasil) > maks_karakter:
         hasil = hasil[:maks_karakter].rsplit(" ", 1)[0] + "…"
     return hasil
+
+
+#: Batas umur angka arus ETF yang masih boleh dipakai ulang. Angka ini
+#: terbit harian; memakai ulang selama sumbernya gagal masih jujur karena
+#: tanggalnya ikut ditampilkan, tapi TANPA batas ia bisa bertahan berminggu-
+#: minggu dan terbaca sebagai kondisi hari ini.
+_ETF_MAKS_HARI = 7
+
+
+def _etf_terlalu_tua(tanggal: Optional[str]) -> bool:
+    """True kalau tanggal arus ETF sudah melewati batas pakai ulang.
+
+    Format tanggal mengikuti apa yang discrape market._etf_flow(): "15 Aug
+    2026" atau "2026-08-15". Tanggal yang tidak bisa diparsing TIDAK dianggap
+    tua — lebih baik memakai angka yang mungkin agak lama daripada membuang
+    data karena format sumbernya berubah.
+    """
+    if not tanggal:
+        return False
+    for pola in ("%d %b %Y", "%Y-%m-%d"):
+        try:
+            terbit = datetime.strptime(str(tanggal).strip(), pola).replace(
+                tzinfo=timezone.utc
+            )
+        except ValueError:
+            continue
+        umur = (now_utc() - terbit).days
+        if umur > _ETF_MAKS_HARI:
+            log.warning(
+                "Arus ETF terakhir (%s) sudah %d hari, tidak dipakai ulang lagi",
+                tanggal, umur,
+            )
+            return True
+        return False
+    return False
 
 
 def _konteks_llm(
@@ -229,8 +265,15 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     data_harga = binance.fetch_price_and_klines(cfg.symbol, tf_diambil, cfg.candle_limit)
     price = data_harga["price"]
     klines = data_harga["klines"]
-    if data_harga["source"] != "binance":
-        catatan.append("Harga memakai sumber cadangan CoinGecko; candle merupakan hasil resampling.")
+    # Hanya CoinGecko yang perlu dicatat: candle-nya di-RESAMPLE dari deret
+    # harga, jadi high/low/volume cuma perkiraan dan itu memengaruhi seluruh
+    # indikator teknikal. OKX menyediakan OHLCV sungguhan — setara Binance
+    # untuk keperluan analisa — jadi memakainya bukan penurunan mutu dan
+    # tidak perlu diperingatkan.
+    if data_harga["source"] == "coingecko":
+        catatan.append(
+            "Harga memakai sumber cadangan CoinGecko; candle merupakan hasil resampling."
+        )
 
     # -- 2. Indikator teknikal ------------------------------------------
     log.info("[2/21] Hitung indikator teknikal")
@@ -286,7 +329,9 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     # menampilkannya seolah baru, karena itu ada penanda kedaluwarsa.
     if pasar.get("etf_flow_usd") is None:
         pasar_lama = (sebelumnya or {}).get("market") or {}
-        if pasar_lama.get("etf_flow_usd") is not None:
+        if pasar_lama.get("etf_flow_usd") is not None and not _etf_terlalu_tua(
+            pasar_lama.get("etf_flow_date")
+        ):
             pasar["etf_flow_usd"] = pasar_lama["etf_flow_usd"]
             pasar["etf_flow_date"] = pasar_lama.get("etf_flow_date")
             pasar["etf_flow_kedaluwarsa"] = True
@@ -414,10 +459,17 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     )
     kandidat_pernyataan = hasil_pernyataan["items"]
     gagal.extend(hasil_pernyataan["failed"])
-    if hasil_pernyataan["sumber_gagal"] and not hasil_pernyataan["failed"]:
+    # Truth Social SELALU diblokir Cloudflare dari IP pusat data — itu kondisi
+    # permanen, bukan gangguan, dan pernyataan Trump tetap tertangkap lewat
+    # Google News, feed Gedung Putih, dan X. Mencatatnya tiap run cuma
+    # menghasilkan peringatan abadi yang tidak bisa ditindaklanjuti siapa pun.
+    sumber_gagal_layak_dicatat = [
+        s for s in hasil_pernyataan["sumber_gagal"] if not s.startswith("truth_social:")
+    ]
+    if sumber_gagal_layak_dicatat and not hasil_pernyataan["failed"]:
         catatan.append(
             "Sebagian sumber pernyataan tidak terjangkau: "
-            + ", ".join(hasil_pernyataan["sumber_gagal"])
+            + ", ".join(sumber_gagal_layak_dicatat)
         )
     pernyataan: List[Dict[str, Any]] = []
 
@@ -676,6 +728,24 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
                                 "Narasi AI direvisi otomatis; sebagian kalimat tafsir "
                                 "diberi tanda editorial."
                             )
+                else:
+                    # Langkah revisi TIDAK menghasilkan teks (error LLM, anggaran
+                    # token habis, atau struktur balasan di luar dugaan). Dulu
+                    # cabang ini tidak melakukan apa-apa, sehingga temuan fatal
+                    # bertahan utuh dan SELURUH bagian AI ditahan — padahal
+                    # kegagalan ada di pihak kita, bukan pada isi analisanya.
+                    # Perlakuannya kini sama dengan revisi yang sudah dicoba
+                    # tapi belum lolos: hanya kesalahan angka yang menahan.
+                    log.warning(
+                        "Revisi narasi gagal dihasilkan; temuan non-angka diturunkan "
+                        "jadi tanda agar analisa tidak hilang seluruhnya"
+                    )
+                    hasil_critic = news_analysis.longgarkan_setelah_revisi(hasil_critic)
+                    if hasil_critic["passed"]:
+                        catatan.append(
+                            "Revisi otomatis tidak berjalan; sebagian kalimat tafsir "
+                            "diberi tanda editorial."
+                        )
 
             ai["critic"] = hasil_critic
             ai["tanda_editorial"] = hasil_critic.get("tanda") or []

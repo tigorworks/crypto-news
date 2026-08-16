@@ -213,7 +213,8 @@ def _coingecko_klines(interval: str, limit: int) -> List[Dict[str, Any]]:
 def fetch_price_and_klines(symbol: str, timeframes: List[str], limit: int) -> Dict[str, Any]:
     """Ambil harga + klines. Raise PriceDataError kalau semua sumber gagal.
 
-    Return: {"price": {...}, "klines": {tf: [...]}, "source": "binance"|"coingecko"}
+    Return: {"price": {...}, "klines": {tf: [...]},
+             "source": "binance"|"okx"|"coingecko"}
     """
     try:
         price = _binance_price(symbol)
@@ -222,11 +223,26 @@ def fetch_price_and_klines(symbol: str, timeframes: List[str], limit: int) -> Di
         return {"price": price, "klines": klines, "source": "binance"}
     except HttpError as exc:
         if exc.status_code in BLOCKED_STATUS:
-            log.warning("Binance memblokir permintaan (HTTP %s), pakai CoinGecko", exc.status_code)
+            log.warning("Binance memblokir permintaan (HTTP %s), coba OKX", exc.status_code)
         else:
-            log.warning("Binance gagal (%s), pakai CoinGecko", exc)
+            log.warning("Binance gagal (%s), coba OKX", exc)
     except (KeyError, ValueError, TypeError) as exc:
-        log.warning("Respons Binance tidak sesuai harapan (%s), pakai CoinGecko", exc)
+        log.warning("Respons Binance tidak sesuai harapan (%s), coba OKX", exc)
+
+    # OKX dicoba SEBELUM CoinGecko. Keduanya sama-sama cadangan, tapi OKX
+    # menyediakan OHLCV sungguhan sedangkan candle CoinGecko di-RESAMPLE dari
+    # deret harga — high/low/volume tiap candle cuma perkiraan, padahal ATR,
+    # Bollinger, rata-rata volume, dan deteksi sapuan likuiditas semuanya
+    # dihitung dari situ. OKX juga sudah terbukti tembus dari IP runner yang
+    # sama (rasio whale, taker, dan riwayat OI berhasil lewat sana), jadi ini
+    # cadangan yang jauh lebih baik untuk kualitas analisa.
+    try:
+        price = okx.fetch_price()
+        klines = {tf: okx.fetch_klines(tf, limit) for tf in timeframes}
+        log.info("Harga & klines dari OKX: $%s", f"{price['last']:,.0f}")
+        return {"price": price, "klines": klines, "source": "okx"}
+    except (HttpError, KeyError, ValueError, TypeError) as exc:
+        log.warning("OKX gagal (%s), pakai CoinGecko", _ringkas(exc))
 
     try:
         price = _coingecko_price()
@@ -235,5 +251,5 @@ def fetch_price_and_klines(symbol: str, timeframes: List[str], limit: int) -> Di
         return {"price": price, "klines": klines, "source": "coingecko"}
     except (HttpError, KeyError, ValueError, TypeError, PriceDataError) as exc:
         raise PriceDataError(
-            f"Binance dan CoinGecko sama-sama gagal menyediakan data harga: {exc}"
+            f"Binance, OKX, dan CoinGecko sama-sama gagal menyediakan data harga: {exc}"
         ) from exc
