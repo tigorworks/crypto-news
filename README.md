@@ -21,7 +21,7 @@ mempool.space      ├─→ pipeline Python ─→ docs/data/latest.json ─→
 alternative.me     │        │
 Farside (ETF)      │        └──────────→ Telegram
 Yahoo Finance      │
-RSS kripto+makro ──┤   (18 feed: media + regulator)
+RSS kripto+makro ──┤   (36 feed: media + regulator + bank sentral)
 Fed/SEC/CFTC       │   (sumber primer regulasi AS)
 US Treasury        │
 Truth Social       │   (pernyataan tokoh)
@@ -71,11 +71,19 @@ Candle 1H tetap diambil, tapi untuk satu keperluan saja: mengukur reaksi harga s
 
 ### Sumber berita dinamis
 
-Selain 18 feed tetap di `config.yaml`, tiap run menambahkan feed hasil **riset**: model murah (step `riset`) diminta mengusulkan beberapa kueri pencarian berdasarkan kondisi hari ini — harga, tema laporan sebelumnya, pergeseran narasi — lalu **kode** yang mengambil artikelnya lewat Google News RSS.
+Selain 36 feed tetap di `config.yaml`, tiap run menambahkan feed hasil **riset**: model murah (step `riset`) diminta mengusulkan beberapa kueri pencarian berdasarkan kondisi hari ini — harga, tema laporan sebelumnya, pergeseran narasi — lalu **kode** yang mengambil artikelnya lewat Google News RSS.
 
 Pembagian tugas itu disengaja dan penting: **model tidak pernah menghasilkan berita, judul, atau URL.** Ia cuma menyarankan apa yang layak dicari. Seluruh artikel yang masuk tetap berasal dari feed sungguhan dan melewati jalur yang sama persis dengan feed tetap — penyaringan umur, dedup, skor prioritas, filter relevansi, lalu critic. Jadi tidak ada celah bagi model untuk mengarang sumber.
 
 Kueri yang diusulkan dicatat di `data_quality.catatan` supaya terlihat apa yang diriset hari itu. Matikan lewat `news.riset_dinamis: false` kalau ingin sumbernya benar-benar tetap.
+
+### Penyaringan relevansi
+
+Dengan 36 feed tetap plus feed riset, satu run bisa menarik ratusan artikel. Tiga hal menjaga agar yang lolos ke brief tetap sedikit dan beragam:
+
+- **Dinilai per batch (60 artikel/panggilan).** Sebelumnya seluruh artikel dinilai dalam satu panggilan; pada 132 artikel keluarannya sudah 3.027 token dan mendekati batas. Sekali terpotong, SELURUH penilaian hilang dan brief jatuh ke fallback kata kunci. Dengan batch, satu batch yang gagal tidak menjatuhkan yang lain.
+- **Kredibilitas sumber jadi pemecah imbang.** Pada relevansi setara, sumber tier 1 menang (tier 1 ×1,30 … tier 3 ×1,00). Sengaja ringan, bukan bobot penuh `1,0/0,7/0,4` yang dipakai skor sentimen: berita Bitcoin paling banyak datang dari media kripto yang kebanyakan tier 2–3, dan bobot penuh akan membuat berita makro tier 1 yang cuma menyerempet BTC menggusur berita kripto yang justru jadi pokok laporan.
+- **Diisi bergiliran per outlet.** Ronde pertama mengambil artikel terbaik dari tiap domain, ronde kedua yang terbaik kedua, dan seterusnya. Satu outlet yang rajin menerbitkan (Blockworks pernah 50 artikel dalam satu tarikan) tidak bisa memborong kuota semata-mata karena jumlahnya banyak. Cara ini juga tidak pernah menyisakan slot kosong kalau kandidatnya memang terkonsentrasi di sedikit outlet.
 
 ### Berita berbahasa Indonesia
 
@@ -134,9 +142,12 @@ Alasannya: yang berbahaya adalah **fakta yang dikarang**, bukan kalimat yang keb
 Kalau ada temuan yang benar-benar menahan:
 
 1. **Satu putaran revisi** — narasi dikirim balik beserta daftar temuan untuk diperbaiki, lalu diperiksa ulang.
-2. **Kalau masih gagal, hanya bagian bermasalah yang ditahan** — bukan seluruh analisa. Pembacaan teknikal, analisa whale, dan outlook tetap terkirim kalau tidak ikut ditandai.
+2. **Setelah revisi, hanya kesalahan ANGKA yang masih boleh menahan.** Temuan non-angka yang bertahan sampai putaran kedua diturunkan jadi tanda editorial dan analisanya tetap terkirim. Ini keputusan sadar berdasarkan bukti produksi: temuan `pengetahuan_luar` yang bertahan sampai putaran kedua hampir selalu salah kategori — kalimat tafsir yang divonis fakta karangan — dan menahan SELURUH analisa (narasi + outlook + skenario sekaligus) karena satu kalimat tafsir jauh lebih merugikan pembaca. Angka karangan tetap menahan tanpa pengecualian, karena angka yang salah menyesatkan secara langsung dan kode sudah memverifikasinya sendiri.
+3. **Kalau masih ada kesalahan angka, hanya bagian bermasalah yang ditahan** — bukan seluruh analisa. Pembacaan teknikal, analisa whale, dan outlook tetap terkirim kalau tidak ikut ditandai.
 
 **Tuduhan angka karangan diperiksa ulang oleh kode.** Sebelum sebuah temuan boleh menahan apa pun, setiap angka pada kalimat yang dituduh dicocokkan dengan seluruh angka di data — dengan toleransi pembulatan, tanpa peduli pemisah ribuan, dan paham suffix skala Indonesia (`"$20,5 miliar"` dicocokkan terhadap `20497629840` di data, bukan cuma angka `20,5` mentah). Kalau semuanya ternyata ada, tuduhannya dibatalkan. Ini menutup dua kelas kesalahan yang nyata terjadi di produksi: critic memvonis `64.371,18` sebagai karangan padahal datanya memuat `64371.1839` (angka yang sama, ditulis berbeda), dan memvonis `$20,5 miliar` sebagai karangan padahal datanya memuat `20497629840` (angka yang sama, disingkat).
+
+**Keberatan soal tafsir dibantah oleh kode, bukan cuma prompt.** Prompt sudah dua kali dipertegas, tapi pola yang sama terus muncul dengan kalimat berbeda, jadi sekarang ada pembantah di sisi kode. Dua penanda yang dipakai: (a) alasan critic memakai kata **"eksplisit"** dalam konteks negatif (*"tidak dinyatakan eksplisit di data"*) — kalau keberatannya soal EKSPLISITAS, critic sedang mengakui bahan faktanya ada dan yang kurang cuma kalimat penegasnya, itu definisi `sebab_akibat`; (b) subjek kalimat alasannya sendiri sebuah kata benda tafsir (*"Interpretasi bahwa …"*, *"Klaim historis tentang …"*, *"Keterkaitan … tidak …"*). Temuan yang cocok diturunkan otomatis jadi `sebab_akibat` minor. Alasan untuk `pengetahuan_luar` yang SUNGGUHAN berbunyi lain — *"tidak ada satu pun berita yang menyebut peristiwa X"* — dan tidak ikut terbantah.
 
 **Batas `pengetahuan_luar` vs `sebab_akibat` diperjelas tegas.** Critic sempat memvonis kalimat seperti *"pergerakan hari ini tampak lebih terkait dengan mekanika teknikal — squeeze volatilitas, taker sell dominan"* sebagai `pengetahuan_luar` (fatal, menahan) padahal ketiga fakta yang dirujuknya (squeeze, taker ratio, short buildup) semuanya ADA di data — itu cuma model MENGHUBUNGKAN data yang ada, persis tugas seorang analis, seharusnya `sebab_akibat` (minor, tidak menahan). Prompt sekarang eksplisit: `pengetahuan_luar` hanya untuk fakta/angka/entitas yang **tidak ada di mana pun** dalam data; menafsirkan atau menghubungkan data yang sudah ada selalu `sebab_akibat`, tidak pernah fatal.
 
@@ -274,16 +285,23 @@ Kesembilan step sudah terisi model yang wajar sebagai titik awal, jadi bisa lang
 
 | Step | Model utama | Cadangan | Alasan |
 |---|---|---|---|
-| `filter` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | murah, tugasnya cuma skor 0–100 |
-| `classify` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | patuh JSON, keluaran pendek |
-| `format` | `deepseek/deepseek-v3.2` | `anthropic/claude-haiku-4.5` | menata tampilan pesan Telegram |
-| `mechanism` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | butuh penalaran sebab-akibat |
-| `statements` | `anthropic/claude-haiku-4.5` | `deepseek/deepseek-v3.2` | menyaring pernyataan dari derau |
+| `filter` | `deepseek/deepseek-v3.2` | — | murah, tugasnya cuma skor 0–100 |
+| `classify` | `deepseek/deepseek-v3.2` | — | patuh JSON, keluaran pendek |
+| `format` | `deepseek/deepseek-v3.2` | — | menata tampilan pesan Telegram |
+| `riset` | `deepseek/deepseek-v3.2` | — | mengusulkan kueri pencarian berita |
+| `agenda` | `deepseek/deepseek-v3.2` | — | ekstraksi teks kalender jadi JSON |
+| `agenda_dampak` | `deepseek/deepseek-v3.2` | — | menilai dampak agenda ke kripto |
+| `mechanism` | `deepseek/deepseek-v3.2` | — | keterangan pendek per berita |
+| `statements` | `deepseek/deepseek-v3.2` | — | menyaring pernyataan dari derau |
 | `technical` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menafsirkan indikator candle harian |
 | `whale` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | membaca divergensi posisi |
 | `synthesis` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menulis analisa panjang |
 | `outlook` | `anthropic/claude-sonnet-5` | `openai/gpt-5.1` | menggabungkan banyak sumber |
 | `critic` | `openai/gpt-5.1` | `google/gemini-3.1-flash-lite-preview` | **beda keluarga** dari `synthesis` |
+
+**Semua langkah pengambilan & penyiapan data memakai DeepSeek saja.** Langkah-langkah itu cuma mengubah data jadi data — memberi skor, mengklasifikasi, mengekstrak jadwal — dan tidak satupun menulis prosa yang dibaca pengguna, jadi model termurah sudah cukup. Yang tetap memakai model kuat hanya langkah yang MENULIS analisa (`technical`, `whale`, `synthesis`, `outlook`) dan `critic` yang memeriksanya.
+
+Konsekuensinya: langkah DeepSeek tidak punya cadangan lintas-vendor. Kalau DeepSeek bermasalah, langkahnya dilewati dan pipeline tetap jalan lewat jalur cadangan masing-masing — misalnya `filter` jatuh ke skor kata kunci yang dihitung kode.
 
 Satu run terukur di produksi sekitar **$0,26**, di bawah plafon `max_cost_usd_per_run: 0.60`. Satu run per hari berarti sekitar **$8 per bulan**.
 

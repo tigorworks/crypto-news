@@ -614,6 +614,16 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
                         catatan.append("Narasi AI melewati satu putaran revisi otomatis.")
                     else:
                         log.warning("Revisi masih belum lolos critic")
+                        # Sudah diberi satu kesempatan perbaikan. Yang masih
+                        # menahan mulai titik ini hanya kesalahan angka;
+                        # sisanya turun jadi tanda editorial supaya analisanya
+                        # tidak hilang seluruhnya (lihat longgarkan_setelah_revisi).
+                        hasil_critic = news_analysis.longgarkan_setelah_revisi(hasil_critic)
+                        if hasil_critic["passed"]:
+                            catatan.append(
+                                "Narasi AI direvisi otomatis; sebagian kalimat tafsir "
+                                "diberi tanda editorial."
+                            )
 
             ai["critic"] = hasil_critic
             ai["tanda_editorial"] = hasil_critic.get("tanda") or []
