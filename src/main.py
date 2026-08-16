@@ -966,6 +966,11 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     for nama, path in ditulis.items():
         log.info("Ditulis %s -> %s", nama, path)
 
+    # Stempel sidik jari app.js ke index.html. Tanpa ini, browser bisa terus
+    # memakai app.js versi lama walaupun datanya sudah baru — halaman lalu
+    # menampilkan elemen yang sudah dihapus dari kode.
+    builder.segarkan_versi_aset()
+
     log.info(
         "Selesai. Harga $%s | sentimen %s | kualitas %s (%d/%d sumber)",
         f"{price['last']:,.0f}",

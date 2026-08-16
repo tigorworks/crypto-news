@@ -233,6 +233,17 @@ Prinsip yang dipegang di jalur parsing dan pelaporan: **gagal keras lebih baik d
 2. **Objek rusak tidak boleh jatuh jadi array** — objek hampir selalu memuat array di dalamnya, dan mengambilnya menghasilkan parse sukses dengan isi yang sama sekali salah.
 3. **Langkah AI yang gagal dicatat per bagian.** Sebelumnya catatan hanya muncul kalau SELURUH blok AI kosong; sintesis gagal + outlook sukses menghasilkan brief tanpa narasi utama tanpa keterangan. Sekarang tiap bagian dicatat sendiri di `data_quality.catatan`. Catatan itu **tidak lagi dirender di halaman web** (lihat "Label peringatan dihapus, penyebabnya dibereskan") — ia tetap ditulis ke `latest.json` sebagai jejak diagnostik, dan yang berdampak ke pembaca dibereskan di sumbernya.
 
+### Kode halaman tidak boleh tertinggal dari datanya
+
+`latest.json` diambil dengan `cache: 'no-store'`, jadi DATANYA selalu baru. Tapi `app.js` dulu diminta dengan URL yang tidak pernah berubah (`<script src="app.js">`), sehingga browser bisa terus memakai salinan lama. Akibatnya membingungkan dan sulit dipercaya saat terjadi: halaman menampilkan elemen yang **sudah lama dihapus dari kode**, memakai data hari ini. Label peringatan yang dilaporkan masih muncul setelah kodenya dibuang persis kasus ini.
+
+Pipeline sekarang menstempel sidik jari isi `app.js` ke tag `<script>` di `index.html` setiap run (`builder.segarkan_versi_aset`). URL-nya berubah HANYA ketika berkasnya benar-benar berubah, jadi:
+
+- browser yang menyimpan versi lama otomatis mengambil yang baru begitu isinya berubah;
+- kalau `app.js` tidak berubah, `index.html` tidak ikut tersentuh dan tidak ada commit sia-sia.
+
+`docs/index.html` karena itu ikut di-`git add` oleh workflow — sebelumnya hanya `docs/data` dan `state` yang di-stage, jadi stempelnya tidak akan pernah sampai ke GitHub Pages.
+
 ### Label peringatan dihapus, penyebabnya dibereskan
 
 Halaman web sempat menampilkan sederet label peringatan kuning di header — sisa dari `data_quality.catatan`. Label semacam itu memindahkan beban ke pembaca: ia melihat ada yang tidak beres tapi tidak bisa berbuat apa-apa. **Seluruh label dihapus dari halaman**, dan setiap penyebab yang pernah memunculkannya dikerjakan di sumbernya — bukan sekadar disembunyikan.
@@ -338,11 +349,13 @@ Kosongkan daftarnya kalau tidak ingin ada tombol.
 
 Serangkaian penambahan berdasar audit "apa yang perlu diperbaiki dari sisi UI/UX yang paham market":
 
-- **Ringkasan (TL;DR) paling atas** — vonis satu kalimat (`ai.bagian.judul`) tampil sebagai panel indigo tepat setelah kartu harga, sebelum pembaca perlu scroll melewati lima bagian data mentah. Pembaca yang cuma punya 10 detik dapat MAKNA, bukan cuma angka.
+- **Kartu RINGKASAN AI paling atas** — panel indigo di posisi teratas halaman, DI ATAS harga dan skor sentimen: vonis satu kalimat (`ai.bagian.judul`) + arah pergerakan 24 jam beserta jenisnya + tautan ke analisa lengkap. Pembaca yang cuma punya 10 detik dapat MAKNA, bukan cuma angka.
+  Analisa AI yang UTUH sengaja tidak ikut dipindah ke atas: bagian itu tingginya belasan ribu piksel di ponsel, dan menaruhnya di sana akan mengubur harga jauh di bawah lipatan. Kartu ini pintu masuknya.
+  Panel pergerakan di dalam kartu dihitung kode, jadi kartunya tetap berisi walaupun narasi AI gagal atau ditahan critic.
 - **"Perubahan vs Brief Sebelumnya" berdiri sendiri di bagian bawah** sebagai konteks penutup, bukan lagi berbagi baris dengan agenda.
-- **Urutan bagian**: harga → TL;DR → **pembacaan teknikal** → analisa AI → pasar → opsi & valuasi → whale → agenda → berita → perubahan vs brief sebelumnya. Analisa AI naik dari urutan keenam, dan teknikal ditaruh tepat di atasnya supaya pembaca sudah memegang kondisi harga sebelum membaca tafsirannya. Nav lompat ponsel mengikuti urutan yang sama.
+- **Urutan bagian**: ringkasan AI → harga → **pembacaan teknikal** → analisa AI → pasar → opsi & valuasi → whale → agenda → berita → perubahan vs brief sebelumnya. Analisa AI naik dari urutan keenam, dan teknikal ditaruh tepat di atasnya supaya pembaca sudah memegang kondisi harga sebelum membaca tafsirannya. Nav lompat ponsel mengikuti urutan yang sama.
 - **Skor sentimen diperbaiki labelnya** — skalanya -100 (bearish penuh) sampai +100 (bullish penuh), tapi label lama menulis "/100" yang gampang salah dibaca seolah skornya selalu positif, apalagi saat angkanya negatif. Sekarang eksplisit "dari -100..+100" dengan tanda `+`/`-` pada angkanya.
-- **Sumber gagal ditulis terang-terangan** — sebelumnya cuma tersembunyi di tooltip badge kualitas data, nyaris tak berguna di ponsel (tanpa hover) dan gampang terlewat bahkan di desktop. Sekarang muncul sebagai baris terpisah di header dalam bahasa manusia ("Arus ETF harian", bukan `etf_flow`) setiap kali ada sumber yang gagal run itu.
+- **Sumber gagal TIDAK lagi ditulis sebagai label di halaman.** Sempat ditampilkan terang-terangan di header, lalu di footer, lalu dihapus seluruhnya — lihat "Label peringatan dihapus, penyebabnya dibereskan". Yang tersisa cuma tooltip pada badge kualitas data, dan penyebabnya dikerjakan di sumber masing-masing.
 - **Corong berita di footer** — "Berita terkumpul" (jumlah KOTOR yang ditarik dari seluruh feed, sebelum saringan umur) dan "Lolos saringan" (yang benar-benar dipakai di brief, plus persentasenya). Angka ini menunjukkan apakah menambah feed benar-benar menambah bahan atau cuma menambah derau yang tetap dibuang di langkah filter.
 - **Perbandingan dua arsip** — di bagian Arsip, pilih satu arsip lagi untuk dibandingkan dengan yang sedang tampil. Tabel ringkas menampilkan harga, perubahan 24 jam, sentimen, funding, open interest, DVOL, dominasi BTC, dan MVRV berdampingan. Dimuat terpisah dari `data` supaya tidak mengganggu tampilan utama maupun grafik.
 - **Grid menyesuaikan jumlah kartu yang benar-benar dirender.** Kelas kolomnya dulu dipatok (`lg:grid-cols-2` untuk whale, `lg:grid-cols-3` untuk data institusional), jadi ketika kartu keduanya tidak ada — sinyal palsu kosong, atau data on-chain gagal diambil — separuh sampai dua pertiga baris tampil melompong. Sekarang jumlah kolom dihitung dari kartu yang ada (`kelasGridWhale`, `kelasGridInstitusional`).
