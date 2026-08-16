@@ -273,6 +273,7 @@ def build_brief(
     data_quality: Dict[str, Any],
     price_series: Optional[List[Dict[str, Any]]] = None,
     tautan_luar: Optional[List[Dict[str, Any]]] = None,
+    bot_telegram: str = "",
     previous: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     sekarang = now_utc()
@@ -300,6 +301,8 @@ def build_brief(
         "diff_vs_previous": {},
         "ai": ai,
         "tautan_luar": tautan_luar or [],
+        # Username bot Telegram (tanpa @) untuk tombol berlangganan di web.
+        "bot_telegram": bot_telegram or "",
         "disclaimer": DISCLAIMER,
     }
 

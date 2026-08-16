@@ -90,6 +90,21 @@
             </span>
           </template>
 
+          <!-- Berlangganan lewat Telegram. `?start=web` membuat Telegram
+               menampilkan tombol MULAI yang langsung mengirim /start, jadi
+               pembaca tidak perlu mengetiknya sendiri. Parameternya diabaikan
+               parser perintah kita, yang cuma membaca kata pertama. -->
+          <template x-if="data?.bot_telegram">
+            <a :href="'https://t.me/' + data.bot_telegram + '?start=web'"
+               target="_blank" rel="noopener noreferrer"
+               title="Berlangganan ringkasan harian lewat Telegram"
+               class="tap inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium
+                      bg-sky-500 hover:bg-sky-600 text-white transition shrink-0">
+              <i data-lucide="send" class="w-4 h-4"></i>
+              <span class="hidden sm:inline">Berlangganan</span>
+            </a>
+          </template>
+
           <button @click="gantiTema()" :title="gelap ? 'Mode terang' : 'Mode gelap'"
                   class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
             <i :data-lucide="gelap ? 'sun' : 'moon'" class="w-4 h-4"></i>
@@ -1256,7 +1271,33 @@
 
   <!-- ================= FOOTER ================= -->
   <footer class="border-t border-slate-200 dark:border-slate-700 mt-6">
-    <div class="max-w-6xl mx-auto px-4 py-6 text-sm text-slate-500 dark:text-slate-400 space-y-2">
+    <div class="max-w-6xl mx-auto px-4 py-6 text-sm text-slate-500 dark:text-slate-400 space-y-3">
+
+      <!-- Ajakan berlangganan versi lengkap. Tombol di header sengaja ringkas
+           (labelnya hilang di ponsel), jadi di sini dijelaskan utuh. -->
+      <template x-if="data?.bot_telegram">
+        <div class="rounded-xl border border-sky-200 dark:border-sky-800/60 bg-sky-50 dark:bg-sky-900/20 p-4
+                    flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div>
+            <div class="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <i data-lucide="send" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+              Dapatkan ringkasan ini di Telegram
+            </div>
+            <p class="mt-1 text-xs">
+              Terkirim otomatis setiap pagi. Kirim <code class="px-1 py-px rounded bg-white dark:bg-slate-800">/stop</code>
+              kapan saja untuk berhenti.
+            </p>
+          </div>
+          <a :href="'https://t.me/' + data.bot_telegram + '?start=web'"
+             target="_blank" rel="noopener noreferrer"
+             class="tap inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium
+                    bg-sky-500 hover:bg-sky-600 text-white transition shrink-0">
+            <span>Berlangganan</span>
+            <span class="opacity-80" x-text="'@' + data.bot_telegram"></span>
+          </a>
+        </div>
+      </template>
+
       <p class="flex items-start gap-2">
         <i data-lucide="info" class="w-4 h-4 mt-0.5 shrink-0"></i>
         <span x-text="data?.disclaimer || 'Konten ini bersifat informasional dan bukan saran investasi.'"></span>
