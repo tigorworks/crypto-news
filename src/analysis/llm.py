@@ -105,6 +105,61 @@ def _perbaiki_json(teks: str) -> str:
     return teks
 
 
+# Baris berbentuk `  "kunci": "nilai...` — pintu masuk dua kerusakan yang
+# paling sering merontokkan balasan panjang: kutip di dalam nilai yang lupa
+# di-escape, dan string yang lupa ditutup.
+_POLA_BARIS_FIELD = re.compile(r'^(\s*"[^"\\]+"\s*:\s*)"(.*)$')
+
+
+def _rapikan_string_baris(teks: str) -> str:
+    """Escape kutip liar di dalam nilai string, dan tutup string yang menggantung.
+
+    Dua kerusakan nyata dari produksi, keduanya pada satu balasan sintesis
+    (~700 kata) yang akhirnya hangus seluruhnya:
+
+      "yang_diwaspadai": "... label tren "jual menguat" — ambigu."
+                                        ^^^^^^^^^^^^^^ kutip tanpa escape
+      "penyebab": "... tapi yield UST 10Y jus
+                                            ^ string tidak pernah ditutup
+
+    Keduanya tidak bisa ditangani penyeimbang kutip/kurung yang sudah ada:
+    yang pertama jumlah kutipnya genap (jadi terlihat "seimbang"), yang kedua
+    membuat sisa dokumen ikut tertelan ke dalam string.
+
+    Bekerja per baris dan hanya pada baris yang benar-benar berbentuk
+    `"kunci": "nilai`. Nilai non-string (angka, array, objek) tidak cocok
+    dengan polanya, jadi tidak tersentuh.
+    """
+    baris = teks.split("\n")
+    hasil: List[str] = []
+    for i, isi in enumerate(baris):
+        cocok = _POLA_BARIS_FIELD.match(isi)
+        if not cocok:
+            hasil.append(isi)
+            continue
+
+        awalan, sisa = cocok.group(1), cocok.group(2)
+
+        # Terminator di ujung baris dilepas dulu supaya tidak ikut di-escape.
+        ekor = ""
+        tanpa_spasi = sisa.rstrip()
+        for kandidat in ('",', '"'):
+            if tanpa_spasi.endswith(kandidat):
+                sisa = tanpa_spasi[: len(tanpa_spasi) - len(kandidat)]
+                ekor = kandidat
+                break
+
+        if not ekor:
+            # String menggantung. Ditutup di sini; komanya menyusul kalau
+            # baris berikutnya memang memulai field baru.
+            berikut = baris[i + 1].lstrip() if i + 1 < len(baris) else ""
+            ekor = '",' if berikut.startswith('"') else '"'
+
+        sisa = re.sub(r'(?<!\\)"', r'\\"', sisa)
+        hasil.append(f"{awalan}\"{sisa}{ekor}")
+    return "\n".join(hasil)
+
+
 def _extract_json(text: str) -> Any:
     """Parse JSON dari balasan model, seagresif yang diperlukan.
 
@@ -119,6 +174,16 @@ def _extract_json(text: str) -> Any:
             continue
 
     cleaned = _strip_fences(text)
+
+    # Perbaikan string dicoba lebih dulu di SELURUH teks: kalau berhasil,
+    # strukturnya utuh dan tidak perlu menebak-nebak potongan mana yang benar.
+    try:
+        hasil = json.loads(_rapikan_string_baris(cleaned))
+        log.warning("JSON model rusak pada nilai string, berhasil dirapikan")
+        return hasil
+    except (json.JSONDecodeError, TypeError):
+        pass
+
     potongan = []
     # Urutan mengikuti kurung yang muncul lebih dulu di teks. Kalau balasan
     # diawali '{' tapi memuat '[' di dalamnya, mencoba '[' lebih dulu akan
@@ -126,6 +191,13 @@ def _extract_json(text: str) -> Any:
     pasangan = [("[", "]"), ("{", "}")]
     posisi = {o: (cleaned.find(o) if cleaned.find(o) != -1 else len(cleaned)) for o, _ in pasangan}
     pasangan.sort(key=lambda p: posisi[p[0]])
+    # Objek yang rusak TIDAK boleh jatuh jadi array. Sebuah objek hampir selalu
+    # memuat array di dalamnya (mis. `data_pendukung`), dan mengambil array itu
+    # menghasilkan struktur yang parse-nya sukses tapi isinya sama sekali bukan
+    # yang diminta — kegagalan diam-diam, yang jauh lebih berbahaya daripada
+    # error. Lebih baik melempar dan membiarkan pemanggil menangani.
+    if posisi["{"] < posisi["["]:
+        pasangan = [("{", "}")]
     for opener, closer in pasangan:
         start = cleaned.find(opener)
         end = cleaned.rfind(closer)

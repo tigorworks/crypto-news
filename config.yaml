@@ -21,17 +21,17 @@ llm:
   # kalau model pertama error / rate limit / kehabisan kapasitas.
   #
   # ISI SENDIRI setelah mengecek katalog https://openrouter.ai/models
-  # Aturan praktis — PENGAMBILAN/PENYIAPAN DATA memakai DeepSeek saja,
-  # PENULISAN ANALISA memakai model kuat (di situlah kualitas terasa):
-  #   filter    -> DeepSeek (tugasnya cuma memberi skor 0-100)
-  #   classify  -> DeepSeek (JSON terstruktur per artikel)
-  #   format    -> DeepSeek, cuma menata pesan Telegram
-  #   agenda    -> DeepSeek, ekstraksi teks-ke-JSON dari investing.com
-  #   riset     -> DeepSeek, mengusulkan kueri pencarian berita hari ini
+  # Aturan praktis — PENGAMBILAN/PENYIAPAN DATA memakai Haiku (cadangan
+  # DeepSeek), PENULISAN ANALISA memakai model kuat:
+  #   filter    -> Haiku (tugasnya cuma memberi skor 0-100)
+  #   classify  -> Haiku (JSON terstruktur per artikel)
+  #   format    -> Haiku, cuma menata pesan Telegram
+  #   agenda    -> Haiku, ekstraksi teks-ke-JSON dari investing.com
+  #   riset     -> Haiku, mengusulkan kueri pencarian berita hari ini
   #   x_posts   -> GROK (wajib xAI: cuma Grok yang bisa mencari di X)
-  #   agenda_dampak -> DeepSeek, menilai dampak agenda ke kripto
-  #   mechanism -> DeepSeek, keterangan pendek per berita
-  #   statements-> DeepSeek (menyaring pernyataan tokoh dari derau berita)
+  #   agenda_dampak -> Haiku, menilai dampak agenda ke kripto
+  #   mechanism -> Haiku, keterangan pendek per berita
+  #   statements-> Haiku (menyaring pernyataan tokoh dari derau berita)
   #   technical -> model menengah/kuat (MENAFSIRKAN indikator, bukan menghitung)
   #   whale     -> model menengah/kuat (membaca posisi whale vs ritel)
   #   synthesis -> model kuat (menulis analisa panjang bersebab-akibat)
@@ -46,26 +46,28 @@ llm:
   # menggagalkan brief.
 
   # ------------------------------------------------------------------
-  # LANGKAH PENGAMBILAN & PENYIAPAN DATA — DEEPSEEK SAJA.
+  # LANGKAH PENGAMBILAN & PENYIAPAN DATA — HAIKU, cadangan DeepSeek.
   # Semua langkah di blok ini cuma mengubah data jadi data: memberi skor,
   # mengklasifikasi, mengekstrak jadwal, mengusulkan kueri pencarian.
-  # Tidak ada satupun yang menulis prosa yang dibaca pengguna, jadi model
-  # termurah sudah cukup dan tidak ada cadangan lintas-vendor di sini.
-  # Kalau DeepSeek sedang bermasalah, langkahnya dilewati dan pipeline
-  # tetap jalan dengan jalur cadangan masing-masing (mis. filter jatuh ke
-  # skor kata kunci yang dihitung kode).
+  # Tidak ada satupun yang menulis prosa yang dibaca pengguna.
+  #
+  # Sempat dipindah ke DeepSeek demi hemat, lalu dikembalikan ke Haiku
+  # karena kepatuhan formatnya lebih bisa diandalkan — DeepSeek pernah
+  # menulis skala 1-5 sebagai angka Romawi ("kekuatan": III) dan
+  # menggugurkan satu batch pernyataan utuh. DeepSeek tetap dipasang
+  # sebagai cadangan supaya satu vendor bermasalah tidak mematikan langkah.
   # ------------------------------------------------------------------
-  filter:     ["deepseek/deepseek-v3.2"]
-  classify:   ["deepseek/deepseek-v3.2"]
+  filter:     ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  classify:   ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
 
   # Perapi pesan Telegram. Murni tata letak — tidak boleh menyentuh angka,
   # dan hasilnya diverifikasi kode sebelum dipakai. Model murah sudah cukup.
-  format:     ["deepseek/deepseek-v3.2"]
+  format:     ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
 
   # Mengusulkan kueri pencarian berita berdasarkan kondisi hari ini. Model
   # hanya menentukan ARAH pencarian; artikelnya diambil kode lewat Google
   # News RSS, jadi tidak ada peluang mengarang sumber. Tugas ringan.
-  riset:      ["deepseek/deepseek-v3.2"]
+  riset:      ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
 
   # Mengambil postingan X (Twitter) lewat Grok. HARUS keluarga Grok: hanya
   # xAI yang punya akses pencarian langsung ke X. Model lain akan menjawab
@@ -80,16 +82,16 @@ llm:
   # sekadar "baca teks berantakan, temukan baris jadwal event" — tidak
   # perlu penalaran, model murah cukup. Sumber ini opsional (lihat
   # src/collectors/investing.py); gagal di sini tidak menggagalkan brief.
-  agenda:     ["deepseek/deepseek-v3.2"]
+  agenda:     ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
 
   # Ketiganya menghasilkan keterangan pendek per item (mekanisme berita,
   # jalur dampak agenda, penyaringan pernyataan tokoh) — bukan prosa utama
   # laporan. Sebelumnya memakai Haiku; dipindah ke DeepSeek karena ini juga
   # bagian dari penyiapan data, dan biayanya di sini paling terasa (langkah
   # statements saja bisa 4 panggilan per run).
-  mechanism:  ["deepseek/deepseek-v3.2"]
-  agenda_dampak: ["deepseek/deepseek-v3.2"]
-  statements: ["deepseek/deepseek-v3.2"]
+  mechanism:  ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  agenda_dampak: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  statements: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
 
   # Menafsirkan data dan menulis panjang: di sini kualitas model paling terasa.
   technical:  ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
