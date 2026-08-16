@@ -126,7 +126,13 @@ def fetch_open_interest_history(symbol: str, period: str = "1d", limit: int = 30
         ]
     except (HttpError, KeyError, ValueError, TypeError) as exc:
         log.warning("Riwayat OI Binance gagal (%s), coba Bybit", _ringkas(exc))
-        return bybit.fetch_open_interest_history(symbol)
+        hasil = bybit.fetch_open_interest_history(symbol)
+        if not hasil:
+            # Tidak ada sumber ketiga untuk riwayat OI (beda dari fetch_open_interest
+            # yang masih bisa jatuh ke Deribit) — dicatat eksplisit di sini supaya
+            # kekosongannya kelihatan di log, bukan cuma hilang tanpa jejak.
+            log.warning("Riwayat OI Bybit juga gagal, riwayat OI kosong untuk run ini")
+        return hasil
 
 
 # --------------------------------------------------------------------------
