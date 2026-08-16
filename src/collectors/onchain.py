@@ -127,6 +127,12 @@ def collect(hari: int = 30) -> Dict[str, Any]:
             data[kunci_kita] = round(angka, 3) if abs(angka) < 1000 else round(angka)
 
         # Perubahan sebulan untuk metrik yang arahnya bermakna.
+        #
+        # Namanya "_30hari_", BUKAN "_30h_". Singkatan "30h" terbaca sebagai
+        # "30 hours" oleh model — dan itu benar-benar terjadi di produksi:
+        # narasi menulis "alamat aktif turun -10,43% dalam 30 jam" padahal
+        # angkanya perubahan 30 HARI. Nama field ikut masuk konteks LLM, jadi
+        # ambiguitas di sini langsung jadi salah tulis di laporan.
         for kunci_cm, kunci_kita in METRIK.items():
             baru, lama = terkini.get(kunci_cm), terlama.get(kunci_cm)
             if baru is None or lama is None:
@@ -136,7 +142,7 @@ def collect(hari: int = 30) -> Dict[str, Any]:
             except (TypeError, ValueError):
                 continue
             if lama_f:
-                data[f"{kunci_kita}_perubahan_30h_pct"] = round(
+                data[f"{kunci_kita}_perubahan_30hari_pct"] = round(
                     (baru_f - lama_f) / lama_f * 100, 2
                 )
 

@@ -546,27 +546,39 @@ function briefApp() {
       return b;
     },
 
+    /* Arsip yang tersimpan sebelum penggantian nama masih memakai kunci
+       `_perubahan_30h_pct`. Keduanya dibaca supaya membuka arsip lama tidak
+       menampilkan metrik tanpa perubahan sama sekali. Nama barunya memakai
+       "30hari" karena "30h" terbaca sebagai "30 hours" — lihat catatan di
+       src/collectors/onchain.py. */
+    perubahan30Hari(o, kunci) {
+      const baru = o[`${kunci}_perubahan_30hari_pct`];
+      if (baru !== null && baru !== undefined) return baru;
+      const lama = o[`${kunci}_perubahan_30h_pct`];
+      return lama === undefined ? null : lama;
+    },
+
     get barisOnchain() {
       const o = this.data?.onchain || {};
       const b = [];
       const ada = (v) => v !== null && v !== undefined;
       if (ada(o.mvrv)) {
         b.push({ label: 'MVRV', nilai: this.angka(o.mvrv, 2) + (o.mvrv_zona ? ` · ${o.mvrv_zona.replace(/_/g, ' ')}` : ''),
-                 perubahan: o.mvrv_perubahan_30h_pct,
+                 perubahan: this.perubahan30Hari(o, 'mvrv'),
                  jelas: 'Kapitalisasi pasar dibagi realized cap — ukuran keuntungan belum terealisasi' });
       }
       if (ada(o.nvt)) {
-        b.push({ label: 'NVT', nilai: this.angka(o.nvt, 1), perubahan: o.nvt_perubahan_30h_pct,
+        b.push({ label: 'NVT', nilai: this.angka(o.nvt, 1), perubahan: this.perubahan30Hari(o, 'nvt'),
                  jelas: 'Kapitalisasi dibagi nilai transaksi — analog rasio P/E' });
       }
       if (ada(o.alamat_aktif)) {
         b.push({ label: 'Alamat aktif', nilai: this.angka(o.alamat_aktif, 0),
-                 perubahan: o.alamat_aktif_perubahan_30h_pct,
+                 perubahan: this.perubahan30Hari(o, 'alamat_aktif'),
                  jelas: 'Alamat aktif harian — proksi permintaan nyata' });
       }
       if (ada(o.realized_cap_usd)) {
         b.push({ label: 'Realized cap', nilai: this.ringkasUang(o.realized_cap_usd),
-                 perubahan: o.realized_cap_usd_perubahan_30h_pct,
+                 perubahan: this.perubahan30Hari(o, 'realized_cap_usd'),
                  jelas: 'Nilai seluruh koin dihargai saat terakhir berpindah' });
       }
       if (ada(o.pasokan_diam_1thn_pct)) {

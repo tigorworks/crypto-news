@@ -493,9 +493,12 @@
                       <dt class="text-slate-500 dark:text-slate-400" :title="b.jelas" x-text="b.label"></dt>
                       <dd class="font-semibold text-right">
                         <span x-text="b.nilai"></span>
+                        <!-- Jangka waktunya ditulis terang-terangan: tanpa ini
+                             pembaca tidak punya cara tahu persentase ini
+                             perubahan sehari, sebulan, atau setahun. -->
                         <template x-if="b.perubahan !== null && b.perubahan !== undefined">
                           <span class="text-xs font-normal" :class="warnaAngka(b.perubahan)"
-                                x-text="' ' + persen(b.perubahan, 1)"></span>
+                                x-text="' ' + persen(b.perubahan, 1) + ' / 30 hari'"></span>
                         </template>
                       </dd>
                     </div>
