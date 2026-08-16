@@ -557,6 +557,22 @@ function briefApp() {
       return baris;
     },
 
+    /* Berita yang mendasari analisa geopolitik, dipilih KODE dari kategori
+       yang relevan — bukan atribusi yang dikarang AI. Sumber tier 1
+       (regulator, kantor berita besar) didahulukan supaya yang paling bisa
+       dipertanggungjawabkan muncul lebih dulu. */
+    get sumberGeopolitik() {
+      const relevan = ['regulasi', 'geopolitik', 'makro'];
+      return (this.data?.news || [])
+        .filter((n) => relevan.includes(n.kategori) && n.url)
+        .sort((a, b) => {
+          const tier = (a.kredibilitas_sumber || 3) - (b.kredibilitas_sumber || 3);
+          if (tier !== 0) return tier;
+          return (b.relevansi_btc || 0) - (a.relevansi_btc || 0);
+        })
+        .slice(0, 4);
+    },
+
     get skenarioOutlook() {
       const o = this.data?.ai?.outlook;
       if (!o) return [];
@@ -578,8 +594,8 @@ function briefApp() {
         { id: 's-institusional', label: 'Opsi & Valuasi', ada: this.adaDataInstitusional },
         { id: 's-whale', label: 'Whale', ada: this.adaDataWhale || !!d.technical?.sinyal_palsu?.length },
         { id: 's-ai', label: 'Analisa AI', ada: true },
-        { id: 's-berita', label: 'Berita', ada: !!d.news?.length || !!d.statements?.length },
         { id: 's-agenda', label: 'Agenda', ada: true },
+        { id: 's-berita', label: 'Berita', ada: !!d.news?.length || !!d.statements?.length },
       ];
       return item.filter((i) => i.ada);
     },

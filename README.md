@@ -21,7 +21,9 @@ mempool.space      ├─→ pipeline Python ─→ docs/data/latest.json ─→
 alternative.me     │        │
 Farside (ETF)      │        └──────────→ Telegram
 Yahoo Finance      │
-RSS kripto+makro ──┤
+RSS kripto+makro ──┤   (18 feed: media + regulator)
+Fed/SEC/CFTC       │   (sumber primer regulasi AS)
+US Treasury        │
 Truth Social       │   (pernyataan tokoh)
 whitehouse.gov     │
 Google News ───────┘
@@ -50,9 +52,9 @@ Tidak ada satu pun angka di output yang dihitung oleh LLM. Prinsipnya tegas: **k
 - **Pernyataan tokoh berpengaruh** — ucapan pejabat dan tokoh yang berpotensi menggerakkan pasar, lengkap dengan status keasliannya.
 - **Makro & geopolitik** — DXY, yield UST 10Y, minyak, emas, VIX, dan **USD/JPY** ditelusuri rantai transmisinya ke BTC (dolar menguat menekan aset berisiko; yen menguat tajam mengindikasikan pelepasan carry trade dolar-yen). Ini bukan bagian terpisah — prompt sintesis dan outlook diwajibkan menimbang data makro ini, bukan cuma berita dan harga.
 - **Pandangan ke depan** — skenario menguat/melemah beserta pemicunya, keputusan besar yang dipantau (FOMC, rilis data ekonomi dari `agenda_mendatang`), dan risiko utama.
-- **Geopolitik & regulasi** — ditulis sebagai **paragraf naratif** (`ai.outlook.narasi_geopolitik`), bukan daftar potongan. Prompt mewajibkan rantai transmisinya ditelusuri sampai ke harga BTC: bukan "ada pertemuan Gedung Putih soal kripto", tapi "pertemuan itu berpotensi menurunkan premi risiko regulasi yang ditanggung institusi AS, jalur yang sama yang menggerakkan arus ETF". Daftar `faktor_geopolitik` tetap ada sebagai butir penopang, bukan pengulangan narasinya.
+- **Geopolitik & regulasi** — ditempatkan **paling atas** di bagian analisa AI, ditulis sebagai **paragraf naratif** (`ai.outlook.narasi_geopolitik`), bukan daftar potongan. Prompt mewajibkan rantai transmisinya ditelusuri sampai ke harga BTC: bukan "ada pertemuan Gedung Putih soal kripto", tapi "pertemuan itu berpotensi menurunkan premi risiko regulasi yang ditanggung institusi AS, jalur yang sama yang menggerakkan arus ETF". Daftar `faktor_geopolitik` tetap ada sebagai butir penopang, bukan pengulangan narasinya. Di bawahnya, web mencantumkan **tautan sumber** yang dipilih kode dari berita berkategori regulasi/geopolitik/makro dan diurutkan berdasarkan tier kredibilitas — jadi pembaca bisa memverifikasi sendiri, bukan sekadar percaya pada AI. Atribusinya berasal dari data, bukan dari model.
 
-**Urutan tampilan** (web dan Telegram): narasi utama → penyebab pergerakan → **pandangan ke depan (makro, geopolitik, agenda)** → pembacaan teknikal → whale. Geopolitik dan agenda sengaja ditempatkan tepat setelah penyebab pergerakan, bukan di paling bawah — faktor-faktor itu levelnya strategis dan sering lebih menentukan arah pasar dibanding detail teknikal harian.
+**Urutan tampilan** — web: **geopolitik & regulasi** → narasi utama → penyebab pergerakan → pandangan ke depan → pembacaan teknikal → whale. Telegram: narasi → penyebab → pandangan ke depan (termasuk geopolitik) → teknikal → whale. Agenda ditempatkan sebelum bagian berita & pernyataan di kedua tempat: apa yang akan terjadi lebih menentukan posisi pembaca daripada apa yang sudah diberitakan.
 
 **Tanpa nama field yang bocor.** Konteks yang dilihat LLM berbentuk JSON, jadi model kerap menyalin nama field dan nilai enum apa adanya ke dalam narasi — pembaca disuguhi `"pola short_covering"`, `"invalidasi_turun di $64.314"`, `"buy_sell_ratio taker 1,785"`. Prompt melarangnya, tapi larangan saja tidak cukup: `src/utils/istilah.py` menggantinya lagi lewat **kode** setelah LLM selesai menulis (`short_covering` → "penutupan posisi short", `invalidasi_turun` → "batas pembatalan skenario turun"), plus aturan generik yang mengubah garis bawah jadi spasi untuk field yang belum masuk kamus. Deterministik, tidak bergantung kepatuhan model, dan tidak pernah menyentuh angka.
 
@@ -186,7 +188,9 @@ Tugas utama langkah LLM di sini adalah **membuang derau**: pencarian berita untu
 
 Daftar akun dan query bisa diubah di `config.yaml` bagian `statements` — menambah tokoh lain (misalnya ketua bank sentral) cukup menambah query, tanpa mengubah kode.
 
-### Agenda ekonomi: dugaan pola + pelengkap dari investing.com
+### Agenda ekonomi: 30 hari, dugaan pola + pelengkap dari investing.com
+
+Horizonnya **30 hari**, bukan 7. Dengan 7 hari agenda kerap kosong sama sekali — padahal FOMC, rilis CPI, dan expiry opsi bulanan justru perlu diantisipasi jauh sebelum harinya tiba.
 
 Kalender bawaan (`calendar.py`) tidak membaca sumber luar sama sekali — FOMC diambil dari config, sisanya (CPI, NFP, PCE) dihitung dari pola tanggal rilis yang biasanya stabil tiap bulan ("Rabu ke-2", "Jumat pertama"), makanya ditandai `perkiraan: true`. Ini tahan lama tapi bisa meleset kalau BLS/BEA menggeser jadwal.
 
@@ -427,7 +431,7 @@ src/
 │   ├── onchain.py          # valuasi on-chain: MVRV, NVT, alamat aktif
 │   ├── flows.py            # premium Coinbase, pasokan stablecoin
 │   ├── statements.py       # pernyataan tokoh berpengaruh
-│   ├── calendar.py         # agenda ekonomi 7 hari (dugaan pola bulanan)
+│   ├── calendar.py         # agenda ekonomi 30 hari (dugaan pola bulanan)
 │   └── investing.py        # pelengkap agenda: tanggal sungguhan via LLM murah
 ├── analysis/
 │   ├── technical.py        # indikator + deteksi sinyal palsu — murni kode
@@ -462,7 +466,7 @@ docs/                       # GitHub Pages
 - **Budget LLM per run** dibatasi `max_cost_usd_per_run`. Begitu terlampaui, step LLM sisanya dihentikan dan brief tetap terbit dengan data seadanya.
 - **Timeout 60 detik** per panggilan HTTP, retry maksimal 2× dengan exponential backoff.
 - **Kredensial hanya lewat environment variable.** Tidak ada key di kode maupun di JSON keluaran.
-- **Skor kualitas data dibobot menurut kepentingan.** 13 sumber dipantau, tapi tidak setara: harga dan teknikal berbobot 3, pembentuk analisa berbobot 2, pelengkap berbobot 1. Tanpa pembobotan, kehilangan dua sumber pinggiran sudah cukup melabeli seluruh brief "sedang" padahal seluruh data intinya utuh — label yang menyesatkan ke arah yang salah. Jumlah sumber yang berhasil tetap dilaporkan apa adanya di `sources_ok`; yang dibobot hanya labelnya.
+- **Skor kualitas data dibobot menurut kepentingan.** 13 sumber dipantau, tapi tidak setara: harga dan teknikal berbobot 3, pembentuk analisa berbobot 2, pelengkap berbobot 1. Tanpa pembobotan, kehilangan dua sumber pinggiran sudah cukup melabeli seluruh brief "sedang" padahal seluruh data intinya utuh — label yang menyesatkan ke arah yang salah. Jumlah sumber yang berhasil tetap dilaporkan apa adanya di `sources_ok`; yang dibobot hanya labelnya. Skor ini tampil di web dan tersimpan di `latest.json`, tapi **tidak dikirim ke Telegram** — itu metrik kesehatan pipeline, bukan informasi pasar, dan pembaca tidak bisa berbuat apa-apa dengannya.
 - **JSON keluaran tidak memuat prompt atau API key** — repo kemungkinan publik.
 - **Telegram dikirim sebelum operasi file/commit**, supaya kegagalan git tidak membatalkan notifikasi.
 - **Critic memeriksa SELURUH bagian naratif** (narasi, teknikal, whale, outlook) terhadap data mentah. Kalau menemukan angka karangan, saran investasi, target harga, atau klaim dari pengetahuan luar, seluruh bagian AI ditahan.

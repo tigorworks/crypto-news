@@ -1,4 +1,4 @@
-"""Agenda ekonomi 7 hari ke depan.
+"""Agenda ekonomi 30 hari ke depan.
 
 Sengaja tanpa scraping: FOMC dari config, rilis data AS memakai pola tanggal
 yang stabil tiap bulan, dan expiry opsi Deribit selalu Jumat terakhir bulan.
@@ -57,8 +57,11 @@ def _candidates(today: date, fomc_dates: List[str]) -> List[Dict[str, Any]]:
 
     for raw in fomc_dates:
         try:
-            d = datetime.strptime(raw, "%Y-%m-%d").date()
-        except ValueError:
+            # TypeError ikut ditangkap: YAML memparsing `2026-01-28` jadi objek
+            # date, bukan string. Loader kita sudah menormalkannya jadi string,
+            # tapi satu tanggal aneh tidak pantas menggagalkan seluruh agenda.
+            d = datetime.strptime(str(raw), "%Y-%m-%d").date()
+        except (ValueError, TypeError):
             log.warning("Tanggal FOMC tidak valid di config: %s", raw)
             continue
         events.append(
@@ -71,7 +74,10 @@ def _candidates(today: date, fomc_dates: List[str]) -> List[Dict[str, Any]]:
             }
         )
 
-    for year, month in _months_ahead(today, 2):
+    # Tiga bulan, bukan dua: horizon 30 hari dari akhir bulan bisa menembus
+    # sampai bulan setelah berikutnya, dan tanpa itu agenda di ujung horizon
+    # hilang diam-diam.
+    for year, month in _months_ahead(today, 3):
         # CPI AS: umumnya sekitar hari kerja ke-10 bulan berjalan.
         cpi = _nth_weekday(year, month, 2, 2)  # Rabu ke-2 sebagai perkiraan
         events.append(
@@ -153,7 +159,7 @@ def _gabung_konfirmasi(kandidat: List[Dict[str, Any]], konfirmasi: List[Dict[str
 
 
 def collect(
-    fomc_dates: List[str], days_ahead: int = 7, konfirmasi: List[Dict[str, Any]] = None
+    fomc_dates: List[str], days_ahead: int = 30, konfirmasi: List[Dict[str, Any]] = None
 ) -> List[Dict[str, Any]]:
     """Agenda dalam `days_ahead` hari ke depan, terurut dari yang terdekat.
 
@@ -190,5 +196,5 @@ def collect(
             }
         )
 
-    log.info("Agenda 7 hari: %d acara", len(out))
+    log.info("Agenda %d hari: %d acara", days_ahead, len(out))
     return out

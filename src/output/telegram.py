@@ -220,14 +220,19 @@ def _blok_berita(brief: Dict[str, Any], maks: int = 5) -> List[str]:
     return baris
 
 
-def _blok_agenda(brief: Dict[str, Any], maks: int = 3) -> List[str]:
+def _blok_agenda(brief: Dict[str, Any], maks: int = 4) -> List[str]:
+    """Agenda terdekat. Horizonnya 30 hari, tapi yang dikirim ke Telegram
+    hanya beberapa yang paling dekat — sisanya bisa dilihat di web."""
     agenda = brief.get("calendar") or []
     if not agenda:
         return []
-    baris = ["", "📅 <b>Agenda</b>"]
+    baris = ["", "📅 <b>Agenda Terdekat</b>"]
     for acara in agenda[:maks]:
         tanda = "~" if acara.get("perkiraan") else ""
         baris.append(f"{esc(acara['waktu_wib'])} · {tanda}{esc(acara['nama'])}")
+    sisa = len(agenda) - maks
+    if sisa > 0:
+        baris.append(f"<i>+{sisa} agenda lain dalam 30 hari</i>")
     return baris
 
 
@@ -535,11 +540,10 @@ def _blok_penutup(brief: Dict[str, Any], site_url: str) -> List[str]:
         teks = pertama.get("keterangan") if isinstance(pertama, dict) else str(pertama)
         baris.append(f"⚠️ Sinyal bertentangan: {esc(teks[:200])}")
 
-    dq = brief.get("data_quality") or {}
-    baris.append(
-        f"📊 Kualitas data: {esc(dq.get('confidence', '—'))} "
-        f"({dq.get('sources_ok', 0)}/{dq.get('sources_total', 0)} sumber)"
-    )
+    # Skor kualitas data sengaja TIDAK ditampilkan di Telegram: itu metrik
+    # kesehatan pipeline, bukan informasi pasar, dan pembaca tidak bisa
+    # berbuat apa-apa dengannya. Tetap tersimpan di `data_quality` pada
+    # latest.json dan tampil di web untuk keperluan pemeriksaan.
     if site_url:
         baris.append("")
         baris.append(f"🔗 Selengkapnya: {esc(site_url)}")
@@ -605,10 +609,12 @@ def render_terpisah(
             bagian += _blok_whale(brief)
         if sinyal:
             bagian += _blok_sinyal_palsu(brief)
-        bagian += _blok_pernyataan(brief, pernyataan_n)
-        bagian += _blok_berita(brief, berita_n)
+        # Agenda mendahului berita & pernyataan: apa yang AKAN terjadi lebih
+        # menentukan posisi pembaca daripada apa yang sudah diberitakan.
         if agenda:
             bagian += _blok_agenda(brief)
+        bagian += _blok_pernyataan(brief, pernyataan_n)
+        bagian += _blok_berita(brief, berita_n)
         bagian += _blok_ai(brief, paragraf_maks=ai_n) + penutup
 
         pesan = "\n".join(bagian)
