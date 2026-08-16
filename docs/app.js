@@ -45,6 +45,10 @@ function briefApp() {
     gelap: document.documentElement.classList.contains('dark'),
     filterKategori: '',
     filterSentimen: '',
+    // Default 'besar': agenda 30 hari bisa panjang dan sebagian besar isinya
+    // dampaknya kecil/sedang — yang layak disorot duluan cuma yang besar.
+    // Filter ini membuka opsi melihat semuanya kalau memang perlu.
+    filterDampakAgenda: 'besar',
     daftarArsip: [],
     arsipDipilih: '',
     // Berita dan pernyataan tokoh berbagi satu bagian dengan dua tab.
@@ -736,9 +740,15 @@ function briefApp() {
     },
 
     /* Agenda dipaginasi juga: dengan horizon 30 hari daftarnya bisa panjang,
-       dan bagian di bawahnya jadi sulit dijangkau kalau digelar semua. */
+       dan bagian di bawahnya jadi sulit dijangkau kalau digelar semua.
+       Filter dampak defaultnya cuma menampilkan yang besar (relevansi >= 4);
+       agenda yang belum sempat dinilai AI-nya ikut disembunyikan di mode ini
+       — statusnya sama-sama "belum terkonfirmasi besar". */
     get agendaTersaring() {
-      const hasil = this.data?.calendar || [];
+      const semua = this.data?.calendar || [];
+      const hasil = this.filterDampakAgenda === 'besar'
+        ? semua.filter((a) => (a.relevansi_kripto || 0) >= 4)
+        : semua;
       const maks = Math.max(1, Math.ceil(hasil.length / this.perHalamanAgenda));
       if (this.halamanAgenda > maks) this.halamanAgenda = 1;
       return hasil;

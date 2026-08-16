@@ -950,12 +950,22 @@
         <section id="s-agenda" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
-            <h2 class="font-semibold flex items-center gap-2 mb-3">
-              <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i> Agenda 30 Hari
-              <span class="text-sm font-normal text-slate-400" x-text="'(' + agendaTersaring.length + ')'"></span>
-            </h2>
-            <template x-if="!agendaTersaring.length">
-              <p class="text-sm text-slate-500">Tidak ada agenda besar dalam 30 hari ke depan.</p>
+            <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+              <h2 class="font-semibold flex items-center gap-2">
+                <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i> Agenda 30 Hari
+                <span class="text-sm font-normal text-slate-400" x-text="'(' + agendaTersaring.length + ')'"></span>
+              </h2>
+              <select x-model="filterDampakAgenda"
+                      class="text-sm px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700">
+                <option value="besar">Dampak besar</option>
+                <option value="">Semua agenda</option>
+              </select>
+            </div>
+            <template x-if="!agendaTersaring.length && (data?.calendar || []).length">
+              <p class="text-sm text-slate-500">Tidak ada agenda berdampak besar dalam 30 hari ke depan — coba filter "Semua agenda".</p>
+            </template>
+            <template x-if="!(data?.calendar || []).length">
+              <p class="text-sm text-slate-500">Tidak ada agenda dalam 30 hari ke depan.</p>
             </template>
             <ul class="space-y-2.5">
               <template x-for="(a, i) in agendaTampil" :key="a.waktu_utc + a.nama">
