@@ -1345,7 +1345,7 @@ def sintesis(
             # dan brief harian justru dibaca untuk melihat APA YANG BERUBAH.
             # Variasi gaya di sini tidak menambah nilai, cuma bikin ragu.
             temperature=0.2,
-            max_tokens=10000,
+            max_tokens=16000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Sintesis narasi gagal: %s", exc)
