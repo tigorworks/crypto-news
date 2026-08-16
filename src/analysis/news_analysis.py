@@ -1332,6 +1332,26 @@ JENIS_PENAHAN = {"angka_karangan", "pengetahuan_luar"}
 
 _POLA_ANGKA = re.compile(r"\d[\d.,]*")
 
+# Pola yang menandakan critic sendiri, di teks alasannya, MENGAKUI fakta yang
+# dipersoalkan memang ada di data — dan cuma keberatan pada framing/kata
+# sifat yang tidak eksplisit tertulis ("data menyebut X, tapi/namun/tanpa
+# menyatakan secara eksplisit Y"). Menurut kriteria critic sendiri (lihat
+# prompt di fungsi critic()), itu definisi sebab_akibat (minor), bukan
+# pengetahuan_luar (fatal) — critic-nya berkontradiksi dengan instruksinya
+# sendiri. Pola ini ditemukan berulang di beberapa run produksi berbeda,
+# jadi dibantah lewat kode alih-alih terus menambal lewat prompt.
+_POLA_AKUI_FAKTA_ADA = re.compile(
+    r"data\s+(?:hanya\s+|memang\s+|juga\s+)?"
+    r"(?:memuat|menyebut|menyertakan|menyampaikan|mencantumkan|berisi|memiliki)"
+    # Bukan [^.]: alasan sering menyisipkan angka desimal ("63000.0") yang
+    # titiknya salah dikira akhir kalimat dan memotong jendela pencarian
+    # sebelum sampai ke tapi/namun/tanpa di baliknya.
+    r".{0,220}?"
+    r"(?:\btapi\b|\bnamun\b|\btanpa\b|tidak\s+ada\s+pernyataan|tidak\s+menyatakan|"
+    r"tidak\s+menyebut|belum\s+menyebut)",
+    re.IGNORECASE | re.DOTALL,
+)
+
 # Angka pendek (≤2 digit) hampir selalu hasil turunan: persentase, jumlah
 # butir, skor 1-5. Menuntutnya ada mentah-mentah di data akan menolak kalimat
 # yang benar.
@@ -1427,6 +1447,50 @@ def _semua_angka_didukung(kutipan: str, nilai_data: List[float]) -> bool:
             return False
     # Tanpa angka panjang sama sekali, tuduhan "angka karangan" tidak berdasar.
     return True
+
+
+def _persentase_level_tersirat(data_mentah: Dict[str, Any]) -> List[float]:
+    """Angka turunan: persentase jarak harga saat ini ke tiap level kunci
+    (support/resistance/invalidasi).
+
+    Critic pernah menuduh persentase semacam ini ("0,44% di atas support")
+    sebagai angka karangan padahal murni hasil hitung dari dua angka yang
+    memang ada di data (harga.last dan level_kunci.*) — dan gagal
+    diverifikasi kode karena persentasenya sendiri memang tidak muncul
+    literal di mana pun. Dihitung sekali di sini (dua konvensi pembagi:
+    persen dari level dan persen dari harga, supaya cocok dengan cara
+    manapun modelnya membulatkan) dan digabung ke `nilai_data`.
+    """
+    hasil: List[float] = []
+    try:
+        harga = float((data_mentah.get("harga") or {}).get("last"))
+    except (TypeError, ValueError):
+        return hasil
+
+    level_kunci = data_mentah.get("level_kunci") or {}
+    kandidat_level: List[float] = []
+    for kunci in ("support", "resistance"):
+        for v in level_kunci.get(kunci) or []:
+            try:
+                kandidat_level.append(float(v))
+            except (TypeError, ValueError):
+                continue
+    for kunci in ("invalidasi_naik", "invalidasi_turun"):
+        v = level_kunci.get(kunci)
+        if v is None:
+            continue
+        try:
+            kandidat_level.append(float(v))
+        except (TypeError, ValueError):
+            continue
+
+    for level in kandidat_level:
+        if level == 0:
+            continue
+        selisih = abs(harga - level)
+        hasil.append(selisih / abs(level) * 100)
+        hasil.append(selisih / harga * 100 if harga else 0.0)
+    return hasil
 
 
 def pilih_model_critic(
@@ -1585,8 +1649,10 @@ def critic(
     corrections = corrections if isinstance(corrections, list) else []
 
     # Daftar angka dari data disiapkan sekali, dipakai untuk membantah tuduhan
-    # "angka karangan" yang sebenarnya cuma beda format penulisan.
-    nilai_data = _angka_dalam_data(data_mentah)
+    # "angka karangan" yang sebenarnya cuma beda format penulisan — plus
+    # persentase jarak ke level kunci yang tidak muncul literal di data tapi
+    # murni turunan dari dua angka yang memang ada (lihat _persentase_level_tersirat).
+    nilai_data = _angka_dalam_data(data_mentah) + _persentase_level_tersirat(data_mentah)
 
     bersih = []
     for c in corrections[:10]:
@@ -1594,7 +1660,8 @@ def critic(
             continue
         jenis = str(c.get("jenis", ""))[:60]
         kutipan = str(c.get("kutipan", ""))[:200]
-        alasan = str(c.get("alasan", ""))[:300]
+        alasan_asli = str(c.get("alasan", ""))
+        alasan = alasan_asli[:300]
         keparahan = c.get("keparahan")
         keparahan = keparahan if keparahan in ("fatal", "minor") else "minor"
 
@@ -1606,6 +1673,22 @@ def critic(
                 alasan = "[dibantah kode: semua angka ditemukan di data] " + alasan
                 log.info(
                     "Tuduhan angka karangan dibatalkan, angkanya ada di data: %s",
+                    kutipan[:80],
+                )
+
+        # 1b. Bantahan kode: kalau critic sendiri MENGAKUI di teks alasannya
+        #     bahwa faktanya ada di data (cuma keberatan framing/kata sifat
+        #     yang tidak eksplisit), itu sebab_akibat menurut kriterianya
+        #     sendiri — dicek pada teks alasan ASLI (sebelum dipotong 300
+        #     karakter) supaya penanda "tapi/namun/tanpa" di ujung kalimat
+        #     tidak ikut terpotong.
+        if keparahan == "fatal" and jenis == "pengetahuan_luar":
+            if _POLA_AKUI_FAKTA_ADA.search(alasan_asli):
+                jenis = "sebab_akibat"
+                keparahan = "minor"
+                alasan = "[dibantah kode: alasan critic sendiri mengakui faktanya ada di data] " + alasan
+                log.info(
+                    "Tuduhan pengetahuan_luar dibatalkan, alasan critic sendiri mengakui faktanya ada di data: %s",
                     kutipan[:80],
                 )
 
