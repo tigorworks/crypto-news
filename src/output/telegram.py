@@ -220,6 +220,27 @@ def _blok_berita(brief: Dict[str, Any], maks: int = 5) -> List[str]:
     return baris
 
 
+def _notice_agenda_mendesak(brief: Dict[str, Any], maks: int = 3) -> List[str]:
+    """Notice mencolok kalau ada agenda BERDAMPAK BESAR dalam <24 jam.
+
+    Ditaruh di kepala pesan (lihat render_terpisah), bukan di _blok_agenda
+    biasa — supaya tidak mungkin tenggelam di tengah pesan, ikut terpotong
+    tangga degradasi saat pesan kepanjangan, atau ditata ulang oleh stylist.
+    """
+    agenda = brief.get("calendar") or []
+    mendesak = [
+        a for a in agenda
+        if a.get("jam_lagi") is not None and a["jam_lagi"] < 24
+        and (a.get("relevansi_kripto") or 0) >= 4
+    ]
+    if not mendesak:
+        return []
+    baris = ["🚨 <b>AGENDA PENTING &lt;24 JAM</b>"]
+    for a in mendesak[:maks]:
+        baris.append(f"• <b>{esc(a['nama'])}</b> — {esc(a.get('waktu_wib', ''))}")
+    return baris
+
+
 def _blok_agenda(brief: Dict[str, Any], maks: int = 4) -> List[str]:
     """Agenda terdekat. Horizonnya 30 hari, tapi yang dikirim ke Telegram
     hanya beberapa yang paling dekat — sisanya bisa dilihat di web."""
@@ -579,8 +600,12 @@ def render_terpisah(
     kepala = [
         "📊 <b>Ringkasan Pasar Bitcoin</b>",
         f"🕐 {esc(brief.get('generated_at_wib', ''))}",
-        "",
     ]
+    notice_mendesak = _notice_agenda_mendesak(brief)
+    if notice_mendesak:
+        kepala.append("")
+        kepala.extend(notice_mendesak)
+    kepala.append("")
     kepala_teks = "\n".join(kepala)
     inti = (
         _blok_harga(brief)

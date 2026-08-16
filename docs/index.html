@@ -120,6 +120,22 @@
       </div>
     </div>
 
+    <!-- Notice agenda mendesak: ditaruh di dalam header sticky supaya tetap
+         terlihat walau halaman sudah discroll — event penting <24 jam tidak
+         boleh terlewat walau pembaca sedang membaca bagian lain. -->
+    <template x-if="agendaMendesak.length">
+      <div class="bg-rose-600 dark:bg-rose-700 text-white border-t border-rose-700 dark:border-rose-800">
+        <div class="max-w-6xl mx-auto px-4 py-2 flex items-center gap-2 text-sm font-medium flex-wrap">
+          <i data-lucide="alarm-clock" class="w-4 h-4 shrink-0 animate-pulse"></i>
+          <span class="shrink-0">Agenda penting &lt;24 jam:</span>
+          <template x-for="a in agendaMendesak" :key="a.waktu_utc + a.nama">
+            <a href="#s-agenda" class="underline underline-offset-2 hover:no-underline"
+               x-text="a.nama + ' · ' + a.waktu_wib"></a>
+          </template>
+        </div>
+      </div>
+    </template>
+
     <!-- Nav lompat: hanya di ponsel, karena halaman ini panjang -->
     <nav class="sm:hidden border-t border-slate-200 dark:border-slate-700 overflow-x-auto"
          aria-label="Lompat ke bagian">

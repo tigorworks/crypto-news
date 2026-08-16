@@ -758,6 +758,17 @@ function briefApp() {
       return Math.max(1, Math.ceil(this.agendaTersaring.length / this.perHalamanAgenda));
     },
 
+    /* Agenda BERDAMPAK BESAR dalam <24 jam — dipakai notice mencolok di
+       header, supaya event penting yang sangat dekat tidak terlewat walau
+       pembaca tidak sempat scroll ke bagian agenda (atau filternya sedang
+       diset ke "Semua agenda" yang membenamkannya di antara yang lain). */
+    get agendaMendesak() {
+      return (this.data?.calendar || []).filter(
+        (a) => a.jam_lagi !== null && a.jam_lagi !== undefined
+          && a.jam_lagi < 24 && (a.relevansi_kripto || 0) >= 4
+      );
+    },
+
     get agendaTampil() {
       const mulai = (this.halamanAgenda - 1) * this.perHalamanAgenda;
       return this.agendaTersaring.slice(mulai, mulai + this.perHalamanAgenda);
