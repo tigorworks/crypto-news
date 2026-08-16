@@ -33,16 +33,38 @@ def _strip_fences(text: str) -> str:
     return text
 
 
+_NILAI_ROMAWI = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5}
+
+# Angka Romawi telanjang sebagai NILAI JSON — `"kekuatan": III,`. Bukan JSON
+# valid, dan satu kemunculan menggugurkan SELURUH batch. Terlihat di produksi
+# pada langkah `statements` setelah pindah ke DeepSeek: enam pernyataan hilang
+# sekaligus hanya karena skala 1-5 ditulis I..V.
+#
+# Sengaja dibatasi I..V (jangkauan semua skala 1-5 di proyek ini) dan hanya
+# yang berdiri sebagai nilai setelah titik dua. Membatasi seketat ini penting
+# karena perbaikan bekerja di atas teks mentah: pola yang lebih longgar bisa
+# ikut mengubah huruf di dalam string yang sah.
+_POLA_ROMAWI_NILAI = re.compile(r"(:\s*)(I{1,3}|IV|V)(\s*[,}\]])")
+
+
 def _perbaiki_json(teks: str) -> str:
     """Perbaiki kerusakan JSON yang lazim dari keluaran model.
 
-    Tiga kerusakan yang paling sering muncul dan bisa dipulihkan dengan aman:
-    koma menggantung sebelum penutup, string yang belum ditutup di ujung
-    balasan, dan kurung yang belum seimbang karena keluarannya terpotong.
-    Memulihkan sebagian temuan jauh lebih berguna daripada membuang seluruh
-    balasan yang tokennya sudah dibayar.
+    Kerusakan yang paling sering muncul dan bisa dipulihkan dengan aman:
+    angka Romawi telanjang sebagai nilai, koma menggantung sebelum penutup,
+    string yang belum ditutup di ujung balasan, dan kurung yang belum
+    seimbang karena keluarannya terpotong. Memulihkan sebagian temuan jauh
+    lebih berguna daripada membuang seluruh balasan yang tokennya sudah
+    dibayar.
     """
     teks = teks.strip()
+
+    # Didahulukan sebelum penyeimbangan kutip/kurung: penggantiannya tidak
+    # mengubah jumlah kutip maupun kurung, jadi urutan ini aman, sementara
+    # kebalikannya bisa menambal kutip di tempat yang salah.
+    teks = _POLA_ROMAWI_NILAI.sub(
+        lambda m: f"{m.group(1)}{_NILAI_ROMAWI[m.group(2)]}{m.group(3)}", teks
+    )
 
     # String yang belum ditutup: hitung kutip ganda yang tidak di-escape.
     kutip = len(re.findall(r'(?<!\\)"', teks))
