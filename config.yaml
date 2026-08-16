@@ -26,6 +26,7 @@ llm:
   #   classify  -> model kecil tapi patuh JSON
   #   format    -> model murah, cuma menata pesan Telegram
   #   agenda    -> model murah, ekstraksi teks-ke-JSON dari investing.com
+  #   riset     -> model murah, mengusulkan kueri pencarian berita hari ini
   #   mechanism -> model menengah (butuh penalaran sebab-akibat)
   #   statements-> model menengah (menyaring pernyataan tokoh dari derau berita)
   #   technical -> model menengah/kuat (MENAFSIRKAN indikator, bukan menghitung)
@@ -48,6 +49,11 @@ llm:
   # Perapi pesan Telegram. Murni tata letak — tidak boleh menyentuh angka,
   # dan hasilnya diverifikasi kode sebelum dipakai. Model murah sudah cukup.
   format:     ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+
+  # Mengusulkan kueri pencarian berita berdasarkan kondisi hari ini. Model
+  # hanya menentukan ARAH pencarian; artikelnya diambil kode lewat Google
+  # News RSS, jadi tidak ada peluang mengarang sumber. Tugas ringan.
+  riset:      ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
 
   # Ekstraksi teks kalender ekonomi investing.com jadi JSON. Tugasnya
   # sekadar "baca teks berantakan, temukan baris jadwal event" — tidak
@@ -80,6 +86,9 @@ news:
   # menyaring; menambah feed berarti menambah kandidat, bukan menambah
   # berita yang lolos ke brief (itu dibatasi max_after_filter).
   max_fetch: 260
+  # Tambahkan feed hasil riset LLM di samping daftar tetap di bawah.
+  # Matikan (false) kalau ingin sumbernya benar-benar tetap.
+  riset_dinamis: true
   max_after_filter: 25
   max_deep_analysis: 10
   max_age_hours: 36

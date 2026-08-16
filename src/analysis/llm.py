@@ -296,10 +296,20 @@ class LLMClient:
                 return panggilan["model"]
         return None
 
+    @property
+    def total_token_masuk(self) -> int:
+        return sum(int(c.get("tokens_in") or 0) for c in self.calls)
+
+    @property
+    def total_token_keluar(self) -> int:
+        return sum(int(c.get("tokens_out") or 0) for c in self.calls)
+
     def ringkasan(self) -> Dict[str, Any]:
         return {
             "total_cost_usd": round(self.total_cost, 5),
             "jumlah_panggilan": len(self.calls),
+            "token_masuk": self.total_token_masuk,
+            "token_keluar": self.total_token_keluar,
             "models_used": self.models_used,
             "budget_habis": self.budget_habis,
         }

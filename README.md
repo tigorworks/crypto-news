@@ -69,6 +69,14 @@ Brief ini terbit sekali sehari, jadi timeframe analisanya **1D saja**. 4H dan 1H
 
 Candle 1H tetap diambil, tapi untuk satu keperluan saja: mengukur reaksi harga satu jam setelah sebuah berita terbit. Candle itu tidak pernah dianalisa maupun ditampilkan sebagai timeframe. Atur lewat `timeframes` dan `timeframe_reaksi` di `config.yaml`.
 
+### Sumber berita dinamis
+
+Selain 18 feed tetap di `config.yaml`, tiap run menambahkan feed hasil **riset**: model murah (step `riset`) diminta mengusulkan beberapa kueri pencarian berdasarkan kondisi hari ini — harga, tema laporan sebelumnya, pergeseran narasi — lalu **kode** yang mengambil artikelnya lewat Google News RSS.
+
+Pembagian tugas itu disengaja dan penting: **model tidak pernah menghasilkan berita, judul, atau URL.** Ia cuma menyarankan apa yang layak dicari. Seluruh artikel yang masuk tetap berasal dari feed sungguhan dan melewati jalur yang sama persis dengan feed tetap — penyaringan umur, dedup, skor prioritas, filter relevansi, lalu critic. Jadi tidak ada celah bagi model untuk mengarang sumber.
+
+Kueri yang diusulkan dicatat di `data_quality.catatan` supaya terlihat apa yang diriset hari itu. Matikan lewat `news.riset_dinamis: false` kalau ingin sumbernya benar-benar tetap.
+
 ### Berita berbahasa Indonesia
 
 Feed sumbernya berbahasa Inggris. Judul dan ringkasan diterjemahkan pada langkah klasifikasi yang memang sudah membaca tiap artikel — jadi tidak ada panggilan LLM tambahan, dan biayanya nyaris tidak berubah. Judul aslinya tetap ditampilkan kecil di bawah terjemahan, karena artikel yang dibuka tetap berbahasa Inggris dan pembaca perlu bisa mencocokkannya.
@@ -440,6 +448,7 @@ src/
 ├── analysis/
 │   ├── technical.py        # indikator + deteksi sinyal palsu — murni kode
 │   ├── llm.py              # klien OpenRouter + budget + logging biaya
+│   ├── riset.py            # LLM mengusulkan kueri berita, kode yang mengambil
 │   └── news_analysis.py    # rangkaian 9 panggilan LLM
 ├── output/
 │   ├── builder.py          # susun brief.json, diff, arsip
@@ -470,7 +479,7 @@ docs/                       # GitHub Pages
 - **Budget LLM per run** dibatasi `max_cost_usd_per_run`. Begitu terlampaui, step LLM sisanya dihentikan dan brief tetap terbit dengan data seadanya.
 - **Timeout 60 detik** per panggilan HTTP, retry maksimal 2× dengan exponential backoff.
 - **Kredensial hanya lewat environment variable.** Tidak ada key di kode maupun di JSON keluaran.
-- **Skor kualitas data dibobot menurut kepentingan.** 13 sumber dipantau, tapi tidak setara: harga dan teknikal berbobot 3, pembentuk analisa berbobot 2, pelengkap berbobot 1. Tanpa pembobotan, kehilangan dua sumber pinggiran sudah cukup melabeli seluruh brief "sedang" padahal seluruh data intinya utuh — label yang menyesatkan ke arah yang salah. Jumlah sumber yang berhasil tetap dilaporkan apa adanya di `sources_ok`; yang dibobot hanya labelnya. Skor ini tampil di web dan tersimpan di `latest.json`, tapi **tidak dikirim ke Telegram** — itu metrik kesehatan pipeline, bukan informasi pasar, dan pembaca tidak bisa berbuat apa-apa dengannya.
+- **Skor kualitas data dibobot menurut kepentingan.** 13 sumber dipantau, tapi tidak setara: harga dan teknikal berbobot 3, pembentuk analisa berbobot 2, pelengkap berbobot 1. Tanpa pembobotan, kehilangan dua sumber pinggiran sudah cukup melabeli seluruh brief "sedang" padahal seluruh data intinya utuh — label yang menyesatkan ke arah yang salah. Jumlah sumber yang berhasil tetap dilaporkan apa adanya di `sources_ok`; yang dibobot hanya labelnya. Footer web juga menampilkan **jumlah token** yang dihabiskan dan **lama proses** run — biayanya sengaja tidak ikut ditampilkan (angkanya tidak berarti bagi pembaca, dan tetap tersimpan di `data_quality.llm_cost_usd`). Skor kualitas tampil di web dan tersimpan di `latest.json`, tapi **tidak dikirim ke Telegram** — itu metrik kesehatan pipeline, bukan informasi pasar, dan pembaca tidak bisa berbuat apa-apa dengannya.
 - **JSON keluaran tidak memuat prompt atau API key** — repo kemungkinan publik.
 - **Telegram dikirim sebelum operasi file/commit**, supaya kegagalan git tidak membatalkan notifikasi.
 - **Critic memeriksa SELURUH bagian naratif** (narasi, teknikal, whale, outlook) terhadap data mentah. Kalau menemukan angka karangan, saran investasi, target harga, atau klaim dari pengetahuan luar, seluruh bagian AI ditahan.

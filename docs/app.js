@@ -205,6 +205,29 @@ function briefApp() {
       return `${tanda}$${formatAngka(abs, 0)}`;
     },
 
+    /* Statistik run untuk footer: token yang dihabiskan dan lama proses.
+       Biaya sengaja tidak ikut — angkanya tidak berarti apa-apa bagi
+       pembaca, dan yang membayar sudah bisa melihatnya di latest.json. */
+    get statistikRun() {
+      const q = this.data?.data_quality;
+      if (!q) return [];
+      const baris = [];
+      if (q.llm_token_total) {
+        const rincian = (q.llm_token_masuk && q.llm_token_keluar)
+          ? ` (${formatAngka(q.llm_token_masuk, 0)} masuk / ${formatAngka(q.llm_token_keluar, 0)} keluar)`
+          : '';
+        baris.push({ label: 'Token AI', nilai: formatAngka(q.llm_token_total, 0) + rincian });
+      }
+      if (q.durasi_detik) {
+        const d = q.durasi_detik;
+        const nilai = d < 60
+          ? `${formatAngka(d, 1)} detik`
+          : `${Math.floor(d / 60)} menit ${formatAngka(d % 60, 0)} detik`;
+        baris.push({ label: 'Lama proses', nilai });
+      }
+      return baris;
+    },
+
     /* Nama bot untuk tombol berlangganan. Sengaja TIDAK bergantung pada
        `data`: tombolnya harus tetap tampil walau latest.json belum ada. */
     get botTelegram() {

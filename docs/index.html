@@ -1302,6 +1302,19 @@
         <i data-lucide="info" class="w-4 h-4 mt-0.5 shrink-0"></i>
         <span x-text="data?.disclaimer || 'Konten ini bersifat informasional dan bukan saran investasi.'"></span>
       </p>
+      <!-- Statistik run: berapa token dihabiskan dan berapa lama prosesnya. -->
+      <template x-if="statistikRun.length">
+        <p class="text-xs flex flex-wrap items-center gap-x-3 gap-y-1">
+          <i data-lucide="activity" class="w-3.5 h-3.5 shrink-0"></i>
+          <template x-for="s in statistikRun" :key="s.label">
+            <span>
+              <span class="text-slate-400" x-text="s.label + ':'"></span>
+              <span class="font-medium text-slate-600 dark:text-slate-300" x-text="s.nilai"></span>
+            </span>
+          </template>
+        </p>
+      </template>
+
       <p class="text-xs">
         Data dihimpun otomatis dari Binance/CoinGecko/OKX, Deribit, Coin Metrics, mempool.space, alternative.me,
         Farside, Yahoo Finance, dan feed berita publik.
