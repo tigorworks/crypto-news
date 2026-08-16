@@ -25,6 +25,7 @@ llm:
   #   filter    -> model paling murah (tugasnya cuma memberi skor 0-100)
   #   classify  -> model kecil tapi patuh JSON
   #   format    -> model murah, cuma menata pesan Telegram
+  #   agenda    -> model murah, ekstraksi teks-ke-JSON dari investing.com
   #   mechanism -> model menengah (butuh penalaran sebab-akibat)
   #   statements-> model menengah (menyaring pernyataan tokoh dari derau berita)
   #   technical -> model menengah/kuat (MENAFSIRKAN indikator, bukan menghitung)
@@ -47,6 +48,12 @@ llm:
   # Perapi pesan Telegram. Murni tata letak — tidak boleh menyentuh angka,
   # dan hasilnya diverifikasi kode sebelum dipakai. Model murah sudah cukup.
   format:     ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+
+  # Ekstraksi teks kalender ekonomi investing.com jadi JSON. Tugasnya
+  # sekadar "baca teks berantakan, temukan baris jadwal event" — tidak
+  # perlu penalaran, model murah cukup. Sumber ini opsional (lihat
+  # src/collectors/investing.py); gagal di sini tidak menggagalkan brief.
+  agenda:     ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
 
   # Butuh penalaran sebab-akibat, tapi keluarannya pendek.
   mechanism:  ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]

@@ -21,6 +21,7 @@ from .collectors import (
     binance,
     calendar as calendar_collector,
     flows,
+    investing,
     macro,
     market,
     news,
@@ -31,7 +32,7 @@ from .collectors import (
 )
 from .config import Config, SUBSCRIBERS_PATH, load_config
 from .output import builder, stylist, subscribers, telegram
-from .utils.timezone import iso_utc, now_utc
+from .utils.timezone import format_wib, iso_utc, now_utc
 
 log = logging.getLogger("brief")
 
@@ -420,7 +421,16 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     diff_sementara["ringkasan"] = builder.ringkas_diff(diff_sementara)
 
     # -- Kalender (dibutuhkan sebagai konteks outlook) ---------------------
-    agenda = calendar_collector.collect(cfg.fomc_dates)
+    # Kalender bawaan menghitung CPI/NFP/PCE dari pola bulanan (dugaan,
+    # ditandai `perkiraan: true`) karena tidak membaca sumber luar sama
+    # sekali. investing.com dicoba sebagai pelengkap untuk tanggal
+    # sungguhan — lewat LLM murah karena tabelnya susah diregex dan
+    # halamannya kerap diblokir (sama seperti Farside), jadi wajar kalau
+    # sering kembali kosong dan kalender bawaan yang dipakai.
+    konfirmasi_agenda = investing.collect(
+        client, cfg.llm_models("agenda"), format_wib(now_utc())
+    ) if client else []
+    agenda = calendar_collector.collect(cfg.fomc_dates, konfirmasi=konfirmasi_agenda)
 
     # -- 12-15. Rangkaian LLM analitis -------------------------------------
     ai: Dict[str, Any] = {
