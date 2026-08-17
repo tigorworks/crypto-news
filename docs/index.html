@@ -131,6 +131,34 @@
     --meter-ring:   #1e293b;   /* slate-800 */
   }
 
+  /* Lencana penanda tafsir model, dipasang menempel pada kalimat yang
+     ditulisnya — bukan sebagai label baris tersendiri di atas blok, yang
+     akan ikut menandai angka terhitung di sekitarnya.
+
+     Seluruh ukuran ditulis di sini, termasuk pergeseran vertikalnya: dipasang
+     di dalam <h2> berukuran text-xl, lencana yang rata garis-dasar akan
+     tampak melorot. Nilai arbitrer Tailwind (`translate-y-[-2px]`) sengaja
+     dihindari — utility semacam itu sudah tiga kali terbukti tidak ikut
+     ter-generate di repo ini dan gagal tanpa error. */
+  .lencana-ai {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    margin-right: 0.4rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+    background: #4f46e5;
+    color: #fff;
+    font-size: 0.68em;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+    position: relative;
+    top: -0.12em;
+    white-space: nowrap;
+  }
+  .lencana-ai svg { width: 0.8em; height: 0.8em; }
+
   /* ===== Tombol kembali ke atas =====
      Halaman ini panjang — di ponsel bisa belasan ribu piksel — dan setelah
      membaca berita di bawah, satu-satunya jalan kembali ke harga adalah
@@ -400,17 +428,31 @@
               <i data-lucide="newspaper" class="w-3.5 h-3.5"></i> SOROTAN
             </div>
 
-            <!-- Bagian AI tetap DITANDAI sendiri (ikon + label indigo) walau
-                 sudah tinggal satu kartu dengan data terhitung. Pembaca harus
-                 selalu bisa memisahkan mana tafsir model dan mana angka. -->
+            <!-- Label "RINGKASAN" berikon AI sengaja DIHAPUS dari sini.
+
+                 Dua sebab. Pertama, ia berdiri tepat di bawah label SOROTAN
+                 sehingga kartu ini dibuka oleh dua baris label beruntun yang
+                 mengerjakan hal yang sama.
+
+                 Kedua, dan lebih serius: blok ini berisi DUA jenis isi —
+                 judul yang ditulis model, dan panel pergerakan 24 jam yang
+                 dihitung kode. Satu label AI di atas keduanya salah alamat,
+                 dan paling kelihatan justru saat narasi ditahan critic:
+                 `bagian` kosong, tapi labelnya tetap menyala di atas angka
+                 yang murni hasil hitungan. Persis yang terjadi pada brief
+                 17 Agustus, ketika critic menahan narasi karena angka
+                 karangan.
+
+                 Penanda AI kini menempel pada judulnya sendiri, jadi ia ikut
+                 hilang bersama judul saat narasi tidak terbit. -->
             <template x-if="pergerakan24j?.arah || (bagianAiTampil('narasi') && data?.ai?.bagian?.judul)">
               <div>
-                <div class="mt-2 flex items-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300">
-                  <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> RINGKASAN
-                </div>
-
                 <template x-if="bagianAiTampil('narasi') && data?.ai?.bagian?.judul">
-                  <h2 class="mt-1 text-xl sm:text-2xl font-bold leading-snug tracking-tight" x-text="data.ai.bagian.judul"></h2>
+                  <h2 class="mt-2 text-xl sm:text-2xl font-bold leading-snug tracking-tight">
+                    <span class="lencana-ai">
+                      <i data-lucide="sparkles"></i> AI
+                    </span> <span x-text="data.ai.bagian.judul"></span>
+                  </h2>
                 </template>
 
                 <template x-if="pergerakan24j?.arah">
@@ -461,7 +503,12 @@
                           <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"
                                 x-text="b.tingkat"></span>
                         </template>
-                        <template x-if="b.mundur">
+                        <!-- Hitung mundur disembunyikan begitu jendelanya
+                             lewat: labelnya sudah berbunyi "JENDELA LEWAT",
+                             dan menambahkan teks "sudah lewat" di sebelahnya
+                             hanya mengulang hal yang sama dua kali. Jam
+                             pastinya tetap ada di jangkar WIB di bawahnya. -->
+                        <template x-if="b.mundur && !b.mundur.lewat">
                           <span class="text-sm font-semibold" :class="kelasBarisDitunggu(b)"
                                 x-text="b.mundur.teks"></span>
                         </template>
