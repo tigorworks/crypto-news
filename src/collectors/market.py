@@ -11,6 +11,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from ..utils.http import HttpError, get_json, get_text
+from . import sosovalue
 
 log = logging.getLogger(__name__)
 
@@ -91,7 +92,29 @@ def _parse_farside_amount(cell: str) -> Optional[float]:
     return -value if negative else value
 
 
-def _etf_flow() -> Dict[str, Any]:
+def _etf_flow(soso_api_key: Optional[str] = None) -> Dict[str, Any]:
+    """Total arus ETF BTC harian terakhir.
+
+    SoSoValue (API resmi) dicoba lebih dulu kalau key-nya tersedia — Farside
+    di belakang Cloudflare dan menolak IP pusat data secara PERMANEN dari
+    GitHub Actions (403 "Just a moment..."), jadi tanpa SoSoValue sumber ini
+    gagal di hampir setiap run produksi. Farside tetap dipertahankan sebagai
+    cadangan kalau SoSoValue sendiri sedang bermasalah atau key belum diisi.
+    """
+    if soso_api_key:
+        try:
+            hasil = sosovalue.fetch_etf_flow(soso_api_key)
+            log.info(
+                "Arus ETF diambil dari SoSoValue (tanggal %s)", hasil["etf_flow_date"]
+            )
+            return hasil
+        except (HttpError, ValueError, KeyError, TypeError) as exc:
+            log.warning("SoSoValue gagal (%s), coba Farside", exc)
+
+    return _etf_flow_farside()
+
+
+def _etf_flow_farside() -> Dict[str, Any]:
     """Scrape total arus harian terakhir dari tabel Farside.
 
     Farside adalah halaman HTML biasa tanpa API. Struktur tabelnya bisa berubah
@@ -145,7 +168,7 @@ def _dominasi_btc() -> Dict[str, Any]:
     return {"btc_dominance_pct": round(float(persen), 2)}
 
 
-def collect(symbol: str) -> Dict[str, Any]:
+def collect(symbol: str, soso_api_key: Optional[str] = None) -> Dict[str, Any]:
     """Kumpulkan semua data pasar. Return dict + daftar sumber yang gagal."""
     result: Dict[str, Any] = {
         "fear_greed": None,
@@ -184,7 +207,7 @@ def collect(symbol: str) -> Dict[str, Any]:
             failed.append("onchain_fees")
 
     try:
-        result.update(_etf_flow())
+        result.update(_etf_flow(soso_api_key))
     except (HttpError, ValueError, KeyError, TypeError) as exc:
         log.warning("Arus ETF gagal diparsing: %s", exc)
         failed.append("etf_flow")
