@@ -139,7 +139,9 @@ def _konteks_llm(
         # Dikirim supaya narasi tahu apakah kejutan hari ini akan ditanggung
         # SENDIRIAN oleh pasar kripto (jeda akhir pekan) atau bisa langsung
         # diserap ETF dan meja institusi AS.
-        "jendela_pasar_as": jendela_agen,
+        # Lewat ringkas_untuk_llm: total panjang jeda tidak ikut, karena model
+        # berulang kali membacanya sebagai sisa waktu.
+        "jendela_pasar_as": jendela_pasar.ringkas_untuk_llm(jendela_agen),
         # Hanya candle harian. Sebelumnya 4H dan 1H ikut dikirim, dan itu
         # justru menimbulkan masalah: model menulis EMA 1H lalu critic
         # mencocokkannya dengan EMA 4H dan memvonisnya karangan. Untuk laporan

@@ -21,6 +21,7 @@ from dateutil import parser as date_parser
 
 from ..utils.format import persen_id
 from ..utils.timezone import now_utc, to_utc
+from . import jendela_pasar
 from .llm import BudgetExceeded, LLMClient, LLMError
 
 log = logging.getLogger(__name__)
@@ -674,6 +675,60 @@ SIKAP_PERNYATAAN = ["mendukung", "menentang", "netral"]
 STATUS_PERNYATAAN = ["verbatim", "dilaporkan_media", "rumor"]
 
 
+_KURUNG = re.compile(r"\s*\([^()]*\)")
+_JAM_DALAM_TEKS = re.compile(r"(\d+(?:[.,]\d+)?)\s*jam")
+
+
+def _angka_jendela(jendela: Dict[str, Any]) -> set:
+    """Angka jam milik jendela, dalam semua ejaan yang mungkin ditulis model."""
+    keluar = set()
+    for kunci in ("panjang_jeda_jam", "jam_sampai_buka", "jeda_berjalan_jam"):
+        nilai = jendela.get(kunci)
+        if nilai is None:
+            continue
+        for bentuk in (f"{nilai:.1f}", f"{nilai:.0f}", str(nilai)):
+            keluar.add(bentuk.replace(".", ","))
+            keluar.add(bentuk.replace(",", "."))
+    return keluar
+
+
+def _buang_jam_jendela(teks: str, jendela: Dict[str, Any]) -> str:
+    """Buang pengulangan angka jam jendela dari prosa model.
+
+    Kalimat waktunya sudah ditulis kode tepat di atas teks ini, lengkap
+    dengan titik awal jeda. Model yang mengulangnya cenderung memampatkan
+    dua besaran berbeda jadi satu frasa — terbukti pada run 17 Agustus, yang
+    keluar "jeda 65.5 jam sampai Senin 09:30 EDT" di hari Senin, seolah
+    bursa baru buka hampir tiga hari lagi padahal tinggal tujuh jam.
+
+    Penyaringan sengaja SEMPIT: hanya tanda kurung yang memuat angka jam
+    milik jendela. Angka jam lain dibiarkan, karena ada yang memang sah —
+    "funding bertahan 192 jam" adalah fakta kerapuhan, bukan salah baca.
+    """
+    if not teks:
+        return teks
+    angka = _angka_jendela(jendela or {})
+    if not angka:
+        return teks
+
+    def ganti(m: "re.Match") -> str:
+        isi = m.group(0)
+        cocok = [x.group(1) for x in _JAM_DALAM_TEKS.finditer(isi)]
+        if any(c in angka for c in cocok):
+            log.info("Angka jam jendela dibuang dari prosa agen: %s", isi.strip())
+            return ""
+        return isi
+
+    sisa = _KURUNG.sub(ganti, teks).strip()
+    # Bentuk tanpa kurung tidak ikut dipotong — memotongnya di tengah kalimat
+    # merusak tata bahasa. Cukup dicatat supaya kalau pola ini berulang, ia
+    # terlihat di log dan bisa ditangani dengan bentuk yang tepat.
+    luar = [m.group(1) for m in _JAM_DALAM_TEKS.finditer(sisa)]
+    if any(x in angka for x in luar):
+        log.info("Agen masih menyebut jam jendela di luar kurung: %s", sisa[:160])
+    return sisa
+
+
 def agen_kebijakan(
     client: LLMClient,
     models: List[str],
@@ -752,6 +807,14 @@ def agen_kebijakan(
         "kepadamu. JANGAN menghitung ulang, jangan membantahnya, dan jangan "
         "mengarang angka baru. Tugasmu menafsirkan artinya.\n\n"
 
+        "JANGAN menyebut ulang angka jam jendela (panjang jeda, sisa waktu, "
+        "jam buka/tutup) di dalam jawabanmu. Kalimat waktunya sudah ditulis "
+        "kode persis di atas teksmu, jadi mengulangnya hanya menduplikasi dan "
+        "gampang tertukar: 'panjang_jeda_jam' adalah total jeda dari tutup "
+        "terakhir sampai buka berikutnya, BUKAN sisa waktu. Sebut posisi "
+        "waktu dengan kata saja — misalnya 'di dalam jeda akhir pekan' atau "
+        "'menjelang pembukaan Senin'.\n\n"
+
         "ATURAN PENILAIAN\n"
         "  - Kalau tidak ada sinyal kebijakan yang berarti, katakan begitu "
         "terus terang dan beri siaga 'rendah'. Menakut-nakuti tanpa dasar "
@@ -775,7 +838,10 @@ def agen_kebijakan(
     )
 
     konteks = {
-        "jendela_pasar_as": jendela,
+        # Versi ringkas: tanpa total panjang jeda, yang terbukti dibaca model
+        # sebagai sisa waktu. Bentuk lengkapnya tetap disimpan di hasil untuk
+        # web dan Telegram.
+        "jendela_pasar_as": jendela_pasar.ringkas_untuk_llm(jendela),
         "kerapuhan_pasar": rapuh,
         "pernyataan_tokoh": kandidat,
         "berita_kebijakan": kandidat_berita,
@@ -815,11 +881,12 @@ def agen_kebijakan(
         )
         siaga = "sedang"
 
+    bersih = lambda t: _buang_jam_jendela(str(t or "").strip(), jendela)
     return {
         "siaga": siaga,
-        "ringkasan": str(hasil.get("ringkasan") or "").strip()[:700],
-        "pemicu": [str(x)[:200] for x in (hasil.get("pemicu") or [])[:3]],
-        "yang_diperhatikan": str(hasil.get("yang_diperhatikan") or "").strip()[:300],
+        "ringkasan": bersih(hasil.get("ringkasan"))[:700],
+        "pemicu": [bersih(x)[:200] for x in (hasil.get("pemicu") or [])[:3]],
+        "yang_diperhatikan": bersih(hasil.get("yang_diperhatikan"))[:300],
         # Disalin apa adanya supaya konsumen (web, Telegram) tidak perlu
         # menghitung ulang dan tidak bisa menyimpang dari yang dinilai agen.
         "jendela": jendela,
