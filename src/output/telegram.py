@@ -747,31 +747,31 @@ def _blok_ai(
 
 
 def _blok_siaga_kebijakan(brief: Dict[str, Any]) -> List[str]:
-    """Alarm risiko kebijakan AS terhadap jendela jam bursa.
+    """Peringatan JENDELA: seberapa berbahaya jamnya, bukan isi kebijakannya.
 
-    Hanya tampil pada siaga sedang/tinggi. Pada siaga rendah blok ini sengaja
-    DIAM: alarm yang berbunyi tiap hari akan diabaikan justru pada hari ia
-    benar-benar berarti.
+    Isi kebijakan sudah pindah ke analisa AI sebagai sebab naik/turun harga,
+    jadi blok ini tidak lagi mengulang pemicu maupun skenario. Yang tersisa
+    hal yang tidak bisa diceritakan analisa: pasar AS sedang tutup, dan
+    seberapa rapuh pasar menyambut kejutan.
+
+    Diam pada risiko rendah. Peringatan yang berbunyi tiap hari akan
+    diabaikan justru pada hari ia benar-benar berarti.
     """
     agen = brief.get("agen_kebijakan") or {}
-    siaga = agen.get("siaga")
-    if siaga not in ("sedang", "tinggi"):
+    risiko = (agen.get("risiko_jendela") or {}).get("tingkat")
+    if risiko not in ("sedang", "tinggi"):
         return []
 
     jendela = agen.get("jendela") or {}
     rapuh = agen.get("kerapuhan") or {}
-    ikon = EMOJI["mendesak"] if siaga == "tinggi" else EMOJI["regulasi"]
-    baris = ["", f"{ikon} <b>SIAGA KEBIJAKAN: {esc(siaga.upper())}</b>"]
+    ikon = EMOJI["mendesak"] if risiko == "tinggi" else EMOJI["regulasi"]
+    baris = ["", f"{ikon} <b>JENDELA RISIKO: {esc(risiko.upper())}</b>"]
 
-    # Posisi waktu ditulis lebih dulu: itu yang membuat berita yang sama
-    # berbahaya atau biasa saja.
     fase = jendela.get("fase")
     if fase == "jeda_akhir_pekan":
         # Sisa jam di sini SNAPSHOT, dan memang seharusnya begitu: pesan
         # Telegram dibaca dekat waktu kirim, jadi "7 jam lagi" benar saat
-        # tiba. Yang perlu hitung mundur hidup cuma halaman web, yang bisa
-        # dibuka belasan jam kemudian. Jangkar WIB tetap ikut supaya pesan
-        # lama pun masih bisa ditempatkan pembacanya.
+        # tiba. Yang perlu hitung mundur hidup cuma halaman web.
         jam = jendela.get("jam_sampai_buka")
         mulai = jendela.get("jeda_mulai")
         wib = jendela.get("buka_berikutnya_wib")
@@ -787,26 +787,19 @@ def _blok_siaga_kebijakan(brief: Dict[str, Any]) -> List[str]:
             "sempat dicerna pasar AS sebelum jeda akhir pekan."
         )
 
-    if agen.get("ringkasan"):
-        baris.append(esc(_potong(agen["ringkasan"], 400)))
-    for p in (agen.get("pemicu") or [])[:2]:
-        baris.append("• " + esc(_potong(p, 160)))
-
-    # Skenario dibatasi dua di Telegram. Isinya kondisional dan agak panjang,
-    # sementara blok ini masuk `inti` yang tidak boleh ikut terpotong saat
-    # pesan mepet 4.096 karakter.
-    skenario = [s for s in (agen.get("skenario") or []) if s][:2]
-    if skenario:
-        baris.append("<i>Kalau kejutan datang:</i>")
-        for s in skenario:
-            baris.append("→ " + esc(_potong(s, 170)))
-
     if rapuh.get("tingkat") in ("sedang", "tinggi"):
         nama = ", ".join(f.get("nama", "") for f in (rapuh.get("faktor") or [])[:3])
         if nama:
             baris.append(f"<i>Kerapuhan {esc(rapuh['tingkat'])}: {esc(nama)}</i>")
-    if agen.get("yang_diperhatikan"):
-        baris.append(f"<i>Diawasi: {esc(_potong(agen['yang_diperhatikan'], 200))}</i>")
+
+    # Berapa sinyal kuat yang mendarat saat pasar AS tidak bisa menyerapnya.
+    # Angka hitungan kode, bukan tafsir model.
+    pend = agen.get("pendaratan") or {}
+    if pend.get("ada_yang_tertahan"):
+        n = pend.get("kuat_di_jendela_rawan")
+        baris.append(
+            f"<i>{n} sinyal kuat mendarat saat pasar AS tutup — efeknya masih menunggu.</i>"
+        )
     return baris
 
 
