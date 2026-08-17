@@ -767,12 +767,19 @@ def _blok_siaga_kebijakan(brief: Dict[str, Any]) -> List[str]:
     # berbahaya atau biasa saja.
     fase = jendela.get("fase")
     if fase == "jeda_akhir_pekan":
+        # Sisa jam di sini SNAPSHOT, dan memang seharusnya begitu: pesan
+        # Telegram dibaca dekat waktu kirim, jadi "7 jam lagi" benar saat
+        # tiba. Yang perlu hitung mundur hidup cuma halaman web, yang bisa
+        # dibuka belasan jam kemudian. Jangkar WIB tetap ikut supaya pesan
+        # lama pun masih bisa ditempatkan pembacanya.
         jam = jendela.get("jam_sampai_buka")
         mulai = jendela.get("jeda_mulai")
+        wib = jendela.get("buka_berikutnya_wib")
         awal = f" sejak {esc(mulai)}" if mulai else ""
+        jangkar = f" (buka {esc(wib)})" if wib else ""
         baris.append(
             f"Bursa AS &amp; ETF tutup{awal} — masih {_angka(jam, 0)} jam lagi "
-            "sampai buka. Kejutan kebijakan ditanggung pasar kripto sendirian."
+            f"sampai buka{jangkar}. Kejutan kebijakan ditanggung pasar kripto sendirian."
         )
     elif fase == "jelang_tutup_pekan":
         baris.append(
@@ -784,6 +791,15 @@ def _blok_siaga_kebijakan(brief: Dict[str, Any]) -> List[str]:
         baris.append(esc(_potong(agen["ringkasan"], 400)))
     for p in (agen.get("pemicu") or [])[:2]:
         baris.append("• " + esc(_potong(p, 160)))
+
+    # Skenario dibatasi dua di Telegram. Isinya kondisional dan agak panjang,
+    # sementara blok ini masuk `inti` yang tidak boleh ikut terpotong saat
+    # pesan mepet 4.096 karakter.
+    skenario = [s for s in (agen.get("skenario") or []) if s][:2]
+    if skenario:
+        baris.append("<i>Kalau kejutan datang:</i>")
+        for s in skenario:
+            baris.append("→ " + esc(_potong(s, 170)))
 
     if rapuh.get("tingkat") in ("sedang", "tinggi"):
         nama = ", ".join(f.get("nama", "") for f in (rapuh.get("faktor") or [])[:3])

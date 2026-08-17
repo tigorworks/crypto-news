@@ -25,7 +25,7 @@ panggilan jaringan, dan hasilnya sama persis untuk masukan yang sama.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
@@ -115,11 +115,18 @@ def fase_pasar(saat: Optional[datetime] = None) -> Dict[str, Any]:
     buka, tutup = _buka_hari(ny), _tutup_hari(ny)
     sedang_buka = hari_kerja and buka <= ny < tutup
 
+    # Instant absolut penanda batas fase berikutnya. INI yang dipakai web
+    # untuk menghitung mundur sendiri; angka jam di bawah cuma cocok untuk
+    # Telegram, yang dibaca dekat waktu kirim.
+    tutup_berikutnya = None
+
     if sedang_buka:
         jam_sampai_buka = 0.0
         panjang_jeda = 0.0
         jeda_mulai = ""
         jeda_berjalan = 0.0
+        buka_berikutnya = _buka_berikutnya(ny)
+        tutup_berikutnya = tutup
         # Masih buka, tapi tinggal beberapa jam sebelum jeda panjang dimulai:
         # berita yang mendarat di sini tidak sempat dicerna pasar AS.
         jelang = (
@@ -130,6 +137,7 @@ def fase_pasar(saat: Optional[datetime] = None) -> Dict[str, Any]:
     else:
         berikut = _buka_berikutnya(ny)
         sebelum = _tutup_terakhir(ny)
+        buka_berikutnya = berikut
         jam_sampai_buka = (berikut - ny).total_seconds() / 3600
         panjang_jeda = (berikut - sebelum).total_seconds() / 3600
         jeda_berjalan = (ny - sebelum).total_seconds() / 3600
@@ -150,7 +158,32 @@ def fase_pasar(saat: Optional[datetime] = None) -> Dict[str, Any]:
         "jeda_mulai": jeda_mulai,
         "jeda_berjalan_jam": round(jeda_berjalan, 1),
         "dalam_jendela_rawan": fase in ("jeda_akhir_pekan", "jelang_tutup_pekan"),
+        # Instant ABSOLUT, bukan selisih. Halaman web dibaca kapan saja —
+        # brief pukul 06.12 masih dibuka jam 6 sore — jadi selisih yang
+        # dibekukan saat brief dibuat akan berbohong sepanjang hari:
+        # "masih 7 jam lagi" ketika jawabannya tinggal 2,5 jam, lalu tetap
+        # mengaku bursa tutup setelah bursa buka. Yang absolut tidak bisa
+        # basi; sisi web menghitung mundurnya sendiri dari sini.
+        "buka_berikutnya_utc": buka_berikutnya.astimezone(timezone.utc).isoformat(),
+        "tutup_berikutnya_utc": (
+            tutup_berikutnya.astimezone(timezone.utc).isoformat()
+            if tutup_berikutnya else None
+        ),
+        "buka_berikutnya_wib": _label_wib(buka_berikutnya),
     }
+
+
+_WIB = ZoneInfo("Asia/Jakarta")
+
+
+def _label_wib(saat: datetime) -> str:
+    """Jangkar absolut dalam waktu pembaca, contoh "Senin 20.30 WIB".
+
+    Hitung mundur boleh basi kalau JavaScript mati; jangkar ini tidak.
+    Karena itu keduanya selalu ditampilkan berdampingan.
+    """
+    w = saat.astimezone(_WIB)
+    return f"{_HARI[w.weekday()]} {w.strftime('%H.%M')} WIB"
 
 
 def ringkas_untuk_llm(jendela: Dict[str, Any]) -> Dict[str, Any]:

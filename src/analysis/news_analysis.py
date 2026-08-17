@@ -729,6 +729,64 @@ def _buang_jam_jendela(teks: str, jendela: Dict[str, Any]) -> str:
     return sisa
 
 
+_ANGKA_UMUM = re.compile(r"\d+(?:[.,]\d+)*")
+_KATA_TARGET = re.compile(
+    r"\b(target|sasaran|proyeksi harga|akan menyentuh|akan mencapai|tembus ke)\b",
+    re.IGNORECASE,
+)
+#: Di atas ini sebuah angka praktis hanya bisa berarti level harga BTC.
+#: Di bawahnya masih wajar: "192 jam", "4/5", "$57,6 juta", "0,72%".
+_AMBANG_ANGKA_HARGA = 1000
+
+
+def _nilai_angka(teks: str) -> float:
+    """Baca angka bergaya Indonesia ("63.517", "57,6") jadi float."""
+    t = teks.replace(".", "").replace(",", ".") if "." in teks and "," in teks else teks
+    if "," in t and "." not in t:
+        t = t.replace(",", ".")
+    elif t.count(".") >= 1 and len(t.split(".")[-1]) == 3:
+        t = t.replace(".", "")     # pemisah ribuan
+    try:
+        return float(t)
+    except ValueError:
+        return 0.0
+
+
+def _skenario_layak(teks: str) -> bool:
+    """Skenario harus menjelaskan MEKANISME, bukan menebak angka.
+
+    Critic yang ada menandai kalimat beraroma anjuran, tapi belum menangkap
+    ramalan berangka — "turun ke 61.000" lolos begitu saja padahal itu
+    persis jenis kalimat yang tidak boleh terbit dari halaman ini.
+
+    Ambangnya dipilih supaya angka yang sah tetap lewat: durasi funding,
+    skor kerapuhan, persentase, dan nilai arus dalam juta/miliar semuanya
+    di bawah seribu, sementara level harga BTC selalu jauh di atasnya.
+    """
+    if not teks or len(teks) < 15:
+        return False
+    if _KATA_TARGET.search(teks):
+        return False
+    return not any(
+        _nilai_angka(m.group(0)) >= _AMBANG_ANGKA_HARGA
+        for m in _ANGKA_UMUM.finditer(teks)
+    )
+
+
+def _saring_skenario(mentah: Any, jendela: Dict[str, Any]) -> List[str]:
+    """Ambil paling banyak tiga skenario yang lolos pagar angka."""
+    keluar: List[str] = []
+    for x in (mentah or [])[:6]:
+        teks = _buang_jam_jendela(str(x or "").strip(), jendela)[:220]
+        if _skenario_layak(teks):
+            keluar.append(teks)
+        elif teks:
+            log.info("Skenario agen dibuang (menyebut angka harga): %s", teks[:90])
+        if len(keluar) == 3:
+            break
+    return keluar
+
+
 def agen_kebijakan(
     client: LLMClient,
     models: List[str],
@@ -832,6 +890,14 @@ def agen_kebijakan(
         "  pemicu: array maksimal 3 string — sinyal kebijakan spesifik yang "
         "sedang dipantau, masing-masing satu kalimat pendek. Array kosong "
         "kalau memang tidak ada.\n"
+        "  skenario: array 2-3 string — kemungkinan yang masuk akal KALAU "
+        "kejutan datang di jendela ini. Tiap butir harus KONDISIONAL dan "
+        "menjelaskan MEKANISMEnya, bersandar pada faktor kerapuhan yang "
+        "sudah dihitung. Contoh bentuk yang benar: 'Kalau funding berbalik, "
+        "posisi long yang bertahan 192 jam jadi bahan likuidasi beruntun.' "
+        "DILARANG menyebut level harga, target, atau arah harga berangka — "
+        "butir seperti itu akan dibuang kode dan sia-sia. Jelaskan sebab "
+        "dan akibat, bukan ramalan angka.\n"
         "  yang_diperhatikan: satu kalimat — apa yang paling layak diawasi "
         "sampai jendela ini lewat.\n\n"
         + ATURAN_DASAR
@@ -886,6 +952,10 @@ def agen_kebijakan(
         "siaga": siaga,
         "ringkasan": bersih(hasil.get("ringkasan"))[:700],
         "pemicu": [bersih(x)[:200] for x in (hasil.get("pemicu") or [])[:3]],
+        # Butir yang menyelipkan level harga DIBUANG, bukan diperbaiki:
+        # memperbaikinya berarti menebak maksud model, dan skenario yang
+        # hilang jauh lebih murah daripada ramalan angka yang terbit.
+        "skenario": _saring_skenario(hasil.get("skenario"), jendela),
         "yang_diperhatikan": bersih(hasil.get("yang_diperhatikan"))[:300],
         # Disalin apa adanya supaya konsumen (web, Telegram) tidak perlu
         # menghitung ulang dan tidak bisa menyimpang dari yang dinilai agen.
