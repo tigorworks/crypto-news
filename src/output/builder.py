@@ -294,6 +294,7 @@ def build_brief(
     price_series: Optional[List[Dict[str, Any]]] = None,
     tautan_luar: Optional[List[Dict[str, Any]]] = None,
     bot_telegram: str = "",
+    agen_kebijakan: Optional[Dict[str, Any]] = None,
     previous: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     sekarang = now_utc()
@@ -320,6 +321,10 @@ def build_brief(
         "conflicts": conflicts,
         "diff_vs_previous": {},
         "ai": ai,
+        # Agen pemantau kebijakan AS + jendela jam bursa. Disimpan terpisah
+        # dari `ai` karena sebagian isinya (jendela, kerapuhan) murni hitungan
+        # kode dan tetap ada walau langkah LLM-nya gagal.
+        "agen_kebijakan": agen_kebijakan or {},
         "tautan_luar": tautan_luar or [],
         # Username bot Telegram (tanpa @) untuk tombol berlangganan di web.
         "bot_telegram": bot_telegram or "",

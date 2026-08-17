@@ -32,6 +32,8 @@ llm:
   #   agenda_dampak -> Haiku, menilai dampak agenda ke kripto
   #   mechanism -> Haiku, keterangan pendek per berita
   #   statements-> Haiku (menyaring pernyataan tokoh dari derau berita)
+  #   agen_kebijakan -> Haiku, menilai risiko kejutan kebijakan AS
+  #                     terhadap jendela jam bursa (lihat jendela_pasar.py)
   #   technical -> model menengah/kuat (MENAFSIRKAN indikator, bukan menghitung)
   #   whale     -> model menengah/kuat (membaca posisi whale vs ritel)
   #   synthesis -> model kuat (menulis analisa panjang bersebab-akibat)
@@ -98,6 +100,10 @@ llm:
   mechanism:  ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
   agenda_dampak: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
   statements: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  # Agen pemantau kebijakan AS. Angka jendela bursa dan kerapuhan pasar
+  # sudah dihitung KODE sebelum sampai ke model, jadi tugasnya cuma
+  # menafsirkan — cukup model kecil.
+  agen_kebijakan: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
 
   # Menafsirkan data dan menulis panjang: di sini kualitas model paling terasa.
   technical:  ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]

@@ -612,6 +612,47 @@ function briefApp() {
       return this.data?.technical?.['1d'] || null;
     },
 
+    /* ===== Siaga kebijakan AS =====
+       Alarm hanya muncul pada siaga sedang/tinggi. Pada siaga rendah panel
+       ini DIAM — alarm yang menyala tiap hari akan diabaikan justru pada
+       hari ia benar-benar berarti. */
+    get siagaKebijakan() {
+      const a = this.data?.agen_kebijakan;
+      if (!a || !['sedang', 'tinggi'].includes(a.siaga)) return null;
+      return a;
+    },
+
+    /* Kalimat posisi waktu — bagian yang membuat berita yang sama berbahaya
+       atau biasa saja. Dirakit dari angka yang dihitung pipeline. */
+    get kalimatJendela() {
+      const j = this.siagaKebijakan?.jendela;
+      if (!j) return '';
+      if (j.fase === 'jeda_akhir_pekan') {
+        return `Bursa AS & ETF tutup — ${this.angka(j.jam_sampai_buka, 0)} jam lagi sampai buka. `
+             + 'Kejutan kebijakan ditanggung pasar kripto sendirian.';
+      }
+      if (j.fase === 'jelang_tutup_pekan') {
+        return 'Menjelang penutupan Jumat — berita yang mendarat sekarang tidak sempat '
+             + 'dicerna pasar AS sebelum jeda akhir pekan.';
+      }
+      return '';
+    },
+
+    get kelasSiaga() {
+      if (this.siagaKebijakan?.siaga === 'tinggi') {
+        return {
+          kotak: 'border-rose-300 dark:border-rose-700/70 bg-rose-50/70 dark:bg-rose-900/20',
+          label: 'text-rose-700 dark:text-rose-300',
+          ikon: 'siren',
+        };
+      }
+      return {
+        kotak: 'border-amber-300 dark:border-amber-700/70 bg-amber-50/70 dark:bg-amber-900/20',
+        label: 'text-amber-700 dark:text-amber-300',
+        ikon: 'landmark',
+      };
+    },
+
     /* Klasifikasi pergerakan 24 jam — dihitung pipeline, bukan AI. Tetap
        tampil walaupun bagian AI gagal atau ditahan critic. */
     get pergerakan24j() {

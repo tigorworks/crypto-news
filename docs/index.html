@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=320fd3a1"></script>
+<script src="app.js?v=a6c158de"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -318,6 +318,69 @@
 
     <template x-if="data && !memuat">
       <div class="space-y-5">
+
+        <!-- ============ SIAGA KEBIJAKAN AS (paling atas saat menyala) ============
+             Ditempatkan DI ATAS ringkasan AI karena sifatnya alarm: kalau ia
+             menyala, itu hal pertama yang perlu diketahui pembaca.
+
+             Isinya menjawab pertanyaan yang tidak bisa dijawab data harga —
+             seberapa berbahaya kalau kejutan kebijakan datang SEKARANG.
+             Kripto jalan 24/7, tapi bursa AS dan ETF spot tutup Jumat 16.00
+             waktu New York sampai Senin 09.30 (jeda ~65 jam). Di dalam jeda
+             itu tidak ada arus ETF yang menyerap tekanan dan meja institusi
+             tutup, jadi kejutan ditanggung pasar kripto sendirian.
+
+             Panel ini DIAM pada siaga rendah. Alarm yang menyala tiap hari
+             akan diabaikan justru pada hari ia benar-benar berarti. -->
+        <template x-if="siagaKebijakan">
+          <section class="rounded-xl border-2 p-4 sm:p-5" :class="kelasSiaga.kotak">
+            <div class="flex items-center gap-1.5 text-xs font-bold" :class="kelasSiaga.label">
+              <i :data-lucide="kelasSiaga.ikon" class="w-3.5 h-3.5"></i>
+              <span x-text="'SIAGA KEBIJAKAN: ' + siagaKebijakan.siaga.toUpperCase()"></span>
+            </div>
+
+            <template x-if="kalimatJendela">
+              <p class="mt-2 text-sm font-semibold leading-relaxed" :class="kelasSiaga.label"
+                 x-text="kalimatJendela"></p>
+            </template>
+
+            <template x-if="siagaKebijakan.ringkasan">
+              <p class="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-200"
+                 x-text="siagaKebijakan.ringkasan"></p>
+            </template>
+
+            <template x-if="siagaKebijakan.pemicu?.length">
+              <ul class="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                <template x-for="(p, i) in siagaKebijakan.pemicu" :key="i">
+                  <li class="flex gap-1.5"><span class="shrink-0" :class="kelasSiaga.label">•</span><span x-text="p"></span></li>
+                </template>
+              </ul>
+            </template>
+
+            <!-- Kerapuhan: kenapa kejutan yang sama bisa berdampak lebih jauh
+                 hari ini. Seluruh butirnya dihitung kode dari data yang sudah
+                 dikumpulkan, bukan tafsiran model. -->
+            <template x-if="siagaKebijakan.kerapuhan?.faktor?.length">
+              <div class="mt-3 pt-3 border-t" :class="kelasSiaga.kotak">
+                <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                     x-text="'Kerapuhan pasar: ' + siagaKebijakan.kerapuhan.tingkat + ' (' + siagaKebijakan.kerapuhan.skor + '/' + siagaKebijakan.kerapuhan.maks + ')'"></div>
+                <ul class="mt-1.5 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                  <template x-for="(f, i) in siagaKebijakan.kerapuhan.faktor" :key="i">
+                    <li class="flex gap-1.5">
+                      <span class="text-slate-400 shrink-0">→</span>
+                      <span><span class="font-medium" x-text="f.nama"></span><span x-text="' — ' + f.keterangan"></span></span>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+            </template>
+
+            <template x-if="siagaKebijakan.yang_diperhatikan">
+              <p class="mt-3 text-xs text-slate-500 dark:text-slate-400"
+                 x-text="'Diawasi: ' + siagaKebijakan.yang_diperhatikan"></p>
+            </template>
+          </section>
+        </template>
 
         <!-- ================= RINGKASAN AI (paling atas) =================
              Vonis singkat sebelum apa pun: judul temuan + arah pergerakan 24

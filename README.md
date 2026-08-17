@@ -345,6 +345,30 @@ Sebagian besar dashboard kripto berhenti di harga, RSI, dan Fear & Greed — sem
 
 Semua angka ini dihitung kode dari data mentah — max pain misalnya dihitung dengan menjumlahkan pembayaran penulis opsi di tiap strike, bukan diambil dari ringkasan pihak lain. Semuanya masuk ke konteks LLM, jadi narasi dan outlook menganalisanya, bukan sekadar menampilkannya.
 
+### Agen pemantau kebijakan AS dan jendela akhir pekan
+
+Kripto diperdagangkan 24/7, tapi bursa saham AS dan ETF spot Bitcoin **tutup Jumat 16.00 waktu New York dan baru buka Senin 09.30** — jeda sekitar **65 jam**. Di dalam jeda itu tidak ada penciptaan/penebusan unit ETF yang bisa menyerap tekanan jual, meja institusi AS tutup sehingga lindung nilai baru praktis tidak ada, dan likuiditas order book menipis.
+
+Akibatnya kejutan kebijakan yang mendarat di jendela itu **ditanggung sendirian oleh pasar kripto sampai Senin**. Itu sebabnya sebagian akhir pekan berakhir dengan penurunan tajam, dan sebabnya waktu kedatangan sebuah berita layak dihitung terpisah dari isinya.
+
+**`src/analysis/jendela_pasar.py` — murni aritmetika kalender**, tanpa LLM dan tanpa jaringan:
+
+- `fase_pasar()` → `buka` / `tutup_harian` / `jelang_tutup_pekan` / `jeda_akhir_pekan`, plus panjang jeda yang sedang berjalan dan jarak ke pembukaan berikutnya.
+- `kerapuhan()` → seberapa besar reaksi yang wajar diharapkan kalau kejutan datang, dari data yang **sudah** dikumpulkan: volume tipis, funding bertahan lama di satu sisi, ritel crowded dibanding whale, open interest bertambah, arus ETF keluar.
+
+Dua keputusan yang menentukan benar-tidaknya modul ini:
+
+1. **Jendela rawan ditentukan dari PANJANG JEDA, bukan nama hari.** Versi pertama saya memeriksa "apakah ini Sabtu/Minggu" dan salah: Senin pukul 04.00 waktu New York masih berada di dalam jeda 65 jam yang dimulai Jumat sore — bursa belum buka, ETF belum bisa menyerap apa pun. Memeriksa nama hari melewatkan seluruh pagi Senin, justru saat kejutan akhir pekan mulai dihargai pasar. Tertangkap oleh pengujian, dan kebetulan run produksi pertama setelah perbaikan mendarat persis di kasus itu.
+2. **Zona waktu memakai `zoneinfo`, bukan offset tetap.** Pergantian EST/EDT menggeser jam tutup sebesar satu jam penuh terhadap WIB; menuliskannya sebagai angka mati akan salah selama separuh tahun.
+
+Hari libur bursa AS sengaja **tidak** diperhitungkan — daftarnya berubah tiap tahun dan menebaknya akan salah diam-diam. Akibatnya jendela rawan sesekali dilaporkan lebih PENDEK dari kenyataan: arah kesalahan yang aman, karena tidak pernah membuat pasar terlihat lebih tenang dari sesungguhnya.
+
+**Agennya sendiri** (`news_analysis.agen_kebijakan`) mempertemukan tiga hal yang sebelumnya tidak pernah disandingkan: sinyal kebijakan/pernyataan AS yang sudah tersaring, posisi waktunya terhadap jam bursa, dan kerapuhan pasar. Angka jendela dan kerapuhan disodorkan **sudah jadi** — model tidak menghitung ulang, hanya menafsirkan.
+
+**Alarm palsu dijaga kode, bukan kepercayaan pada model.** Siaga `tinggi` otomatis diturunkan jadi `sedang` kecuali dua syarat terhitung terpenuhi: waktunya memang di jendela rawan DAN pasarnya memang rapuh. Tanpa penjagaan itu model bisa berteriak "tinggi" pada Rabu siang di pasar yang tebal — persis jenis alarm yang lama-lama membuat alarm sungguhan ikut diabaikan.
+
+Pada siaga `rendah` panel ini **diam sepenuhnya** di web maupun Telegram. Di Telegram ia masuk `inti`, bukan blok opsional: alarm yang hilang begitu pesannya kepanjangan adalah alarm yang gagal justru saat paling dibutuhkan.
+
 ### Pelacakan pernyataan tokoh
 
 Pernyataan seperti "The Fed harus memangkas suku bunga" atau kebijakan soal cadangan Bitcoin bisa menggerakkan pasar dalam hitungan menit. Sistem melacaknya dari tiga lapis sumber:

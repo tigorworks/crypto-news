@@ -746,6 +746,52 @@ def _blok_ai(
     return baris
 
 
+def _blok_siaga_kebijakan(brief: Dict[str, Any]) -> List[str]:
+    """Alarm risiko kebijakan AS terhadap jendela jam bursa.
+
+    Hanya tampil pada siaga sedang/tinggi. Pada siaga rendah blok ini sengaja
+    DIAM: alarm yang berbunyi tiap hari akan diabaikan justru pada hari ia
+    benar-benar berarti.
+    """
+    agen = brief.get("agen_kebijakan") or {}
+    siaga = agen.get("siaga")
+    if siaga not in ("sedang", "tinggi"):
+        return []
+
+    jendela = agen.get("jendela") or {}
+    rapuh = agen.get("kerapuhan") or {}
+    ikon = EMOJI["mendesak"] if siaga == "tinggi" else EMOJI["regulasi"]
+    baris = ["", f"{ikon} <b>SIAGA KEBIJAKAN: {esc(siaga.upper())}</b>"]
+
+    # Posisi waktu ditulis lebih dulu: itu yang membuat berita yang sama
+    # berbahaya atau biasa saja.
+    fase = jendela.get("fase")
+    if fase == "jeda_akhir_pekan":
+        jam = jendela.get("jam_sampai_buka")
+        baris.append(
+            f"Bursa AS &amp; ETF tutup — {_angka(jam, 0)} jam lagi sampai buka. "
+            "Kejutan kebijakan ditanggung pasar kripto sendirian."
+        )
+    elif fase == "jelang_tutup_pekan":
+        baris.append(
+            "Menjelang penutupan Jumat — berita yang mendarat sekarang tidak "
+            "sempat dicerna pasar AS sebelum jeda akhir pekan."
+        )
+
+    if agen.get("ringkasan"):
+        baris.append(esc(_potong(agen["ringkasan"], 400)))
+    for p in (agen.get("pemicu") or [])[:2]:
+        baris.append("• " + esc(_potong(p, 160)))
+
+    if rapuh.get("tingkat") in ("sedang", "tinggi"):
+        nama = ", ".join(f.get("nama", "") for f in (rapuh.get("faktor") or [])[:3])
+        if nama:
+            baris.append(f"<i>Kerapuhan {esc(rapuh['tingkat'])}: {esc(nama)}</i>")
+    if agen.get("yang_diperhatikan"):
+        baris.append(f"<i>Diawasi: {esc(_potong(agen['yang_diperhatikan'], 200))}</i>")
+    return baris
+
+
 def _blok_penutup(brief: Dict[str, Any], site_url: str) -> List[str]:
     baris = [""]
     conflicts = brief.get("conflicts") or []
@@ -806,6 +852,11 @@ def render_terpisah(
     kepala_teks = "\n".join(kepala)
     inti = (
         _blok_harga(brief)
+        # Siaga kebijakan masuk `inti`, bukan blok opsional: alarm yang
+        # hilang begitu pesannya kepanjangan adalah alarm yang gagal justru
+        # saat paling dibutuhkan. Ongkosnya kecil, dan ia diam sendiri pada
+        # siaga rendah.
+        + _blok_siaga_kebijakan(brief)
         + _blok_teknikal(brief)
         + _blok_pasar(brief)
         + _blok_makro(brief)
