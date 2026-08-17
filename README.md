@@ -386,16 +386,21 @@ Event yang dikonfirmasi **menggantikan** dugaan pola bulanan untuk kategori dan 
 
 ### Tautan tambahan
 
-Tombol di kartu harga diatur lewat `tautan_luar` di `config.yaml` — label, URL, dan nama ikon [Lucide](https://lucide.dev/icons):
+Tombol di kartu harga diatur lewat `tautan_luar` di `config.yaml` — label, URL, nama ikon [Lucide](https://lucide.dev/icons), dan `deskripsi` opsional:
 
 ```yaml
 tautan_luar:
   - label: Arena Pertempuran BTC
     url: https://tigorworks.github.io/crypto-battlefield/
     ikon: swords
+    deskripsi: ""      # opsional: satu baris pendek di bawah label
 ```
 
 Kosongkan daftarnya kalau tidak ingin ada tombol.
+
+Tombolnya sengaja dibuat sebagai **CTA sungguhan**, bukan pil datar: gradien amber→oranye, ikon dalam lingkaran, panah yang bergeser saat disentuh, dan kilau lembut yang lewat sesekali. Alasannya sederhana — bentuk lamanya (`bg-amber-500`, seukuran teks biasa) punya bobot visual setara label, jadi tidak pernah terbaca sebagai ajakan. Ini satu-satunya pintu ke produk lain di halaman ini, jadi ia pantas menonjol.
+
+Dua hal yang dijaga: gayanya ditulis sebagai **CSS di `<style>`, bukan utility class** — gradien, transform, dan keyframe justru jenis utility yang paling mungkin tidak ikut ter-generate, dan kalau itu terjadi tombolnya kembali datar tanpa error apa pun. Lalu animasinya **dimatikan otomatis** saat pembaca memasang `prefers-reduced-motion: reduce`; warnanya tetap.
 
 ---
 
