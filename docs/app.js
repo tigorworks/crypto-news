@@ -691,10 +691,17 @@ function briefApp() {
         baris.push({
           jenis: 'siaga',
           ikon: lewat ? 'check-circle' : (s.siaga === 'tinggi' ? 'siren' : 'landmark'),
-          label: lewat ? 'JENDELA SUDAH LEWAT' : `SIAGA KEBIJAKAN: ${s.siaga.toUpperCase()}`,
+          // Label dipendekkan supaya muat sebaris dengan hitung mundur, persis
+          // seperti baris agenda. Versi panjang ("SIAGA KEBIJAKAN: SEDANG")
+          // membungkus dan mendorong hitung mundur ke baris sendiri, sehingga
+          // dua baris yang isinya sejenis tampil dengan susunan berbeda dan
+          // terbaca seolah mengukur hal yang berbeda. Tingkat siaganya pindah
+          // ke chip di sebelah nama.
+          label: lewat ? 'JENDELA LEWAT' : 'SIAGA KEBIJAKAN',
+          tingkat: lewat ? '' : s.siaga,
           mundur,
           jangkar: j.buka_berikutnya_wib || '',
-          awalan: lewat ? 'Bursa AS buka' : 'Bursa AS buka',
+          awalan: 'bursa AS buka',
           isi: lewat
             ? 'Bursa AS dan ETF sudah buka — jendela akhir pekan ini berakhir, '
               + 'dan tekanan mulai bisa diserap arus institusi lagi.'
@@ -750,9 +757,15 @@ function briefApp() {
       const j = this.siagaKebijakan?.jendela;
       if (!j) return '';
       if (j.fase === 'jeda_akhir_pekan') {
+        // Angka jam SENGAJA tidak ikut di kalimat ini. `jam_sampai_buka`
+        // dibekukan saat brief dibuat, jadi menuliskannya akan mengembalikan
+        // persis kebohongan yang baru diperbaiki — "masih 7 jam lagi" pada
+        // pukul 6 sore. Sisa waktunya dipegang hitung mundur hidup tepat di
+        // bawah kalimat ini; di sini cukup jangkar absolutnya.
         const awal = j.jeda_mulai ? ` sejak ${j.jeda_mulai}` : '';
-        return `Bursa AS & ETF tutup${awal} — masih ${this.angka(j.jam_sampai_buka, 0)} jam `
-             + 'lagi sampai buka. Kejutan kebijakan ditanggung pasar kripto sendirian.';
+        const buka = j.buka_berikutnya_wib ? ` dan buka lagi ${j.buka_berikutnya_wib}` : '';
+        return `Bursa AS & ETF tutup${awal}${buka}. `
+             + 'Kejutan kebijakan ditanggung pasar kripto sendirian.';
       }
       if (j.fase === 'jelang_tutup_pekan') {
         return 'Menjelang penutupan Jumat — berita yang mendarat sekarang tidak sempat '

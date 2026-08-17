@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
-from ..utils.timezone import now_utc
+from ..utils.timezone import format_tanggal_singkat, nama_hari, now_utc, to_wib
 
 log = logging.getLogger(__name__)
 
@@ -173,17 +173,18 @@ def fase_pasar(saat: Optional[datetime] = None) -> Dict[str, Any]:
     }
 
 
-_WIB = ZoneInfo("Asia/Jakarta")
-
-
 def _label_wib(saat: datetime) -> str:
-    """Jangkar absolut dalam waktu pembaca, contoh "Senin 20.30 WIB".
+    """Jangkar absolut dalam waktu pembaca: "Senin · 17 Agu · 20:30 WIB".
 
     Hitung mundur boleh basi kalau JavaScript mati; jangkar ini tidak.
     Karena itu keduanya selalu ditampilkan berdampingan.
+
+    Formatnya SENGAJA sama persis dengan baris agenda, dan dirakit dari
+    helper yang sama — dua penanda waktu bersebelahan dengan susunan berbeda
+    membuat pembaca mengira keduanya mengukur hal yang berbeda. Tanggal ikut
+    karena tanpa itu "Senin 20.30" ambigu begitu jaraknya lewat sehari.
     """
-    w = saat.astimezone(_WIB)
-    return f"{_HARI[w.weekday()]} {w.strftime('%H.%M')} WIB"
+    return f"{nama_hari(saat)} · {format_tanggal_singkat(saat)} · {to_wib(saat):%H:%M} WIB"
 
 
 def ringkas_untuk_llm(jendela: Dict[str, Any]) -> Dict[str, Any]:

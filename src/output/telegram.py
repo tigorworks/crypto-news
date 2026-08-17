@@ -776,10 +776,10 @@ def _blok_siaga_kebijakan(brief: Dict[str, Any]) -> List[str]:
         mulai = jendela.get("jeda_mulai")
         wib = jendela.get("buka_berikutnya_wib")
         awal = f" sejak {esc(mulai)}" if mulai else ""
-        jangkar = f" (buka {esc(wib)})" if wib else ""
+        jangkar = f" — buka {esc(wib)}" if wib else ""
         baris.append(
-            f"Bursa AS &amp; ETF tutup{awal} — masih {_angka(jam, 0)} jam lagi "
-            f"sampai buka{jangkar}. Kejutan kebijakan ditanggung pasar kripto sendirian."
+            f"Bursa AS &amp; ETF tutup{awal}, masih {_angka(jam, 0)} jam lagi"
+            f"{jangkar}. Kejutan kebijakan ditanggung pasar kripto sendirian."
         )
     elif fase == "jelang_tutup_pekan":
         baris.append(
