@@ -60,6 +60,111 @@
     --meter-ring:   #1e293b;   /* slate-800 */
   }
 
+  /* ===== Tombol tautan luar (CTA) =====
+     Sebelumnya pil datar `bg-amber-500` seukuran teks biasa — secara visual
+     setara dengan label, jadi tidak pernah terbaca sebagai AJAKAN. Karena ini
+     satu-satunya pintu ke produk lain di halaman ini, ia pantas punya bobot
+     visual sendiri.
+
+     Ditulis sebagai CSS, bukan utility class, dengan alasan yang sama seperti
+     token meter di atas: gradien, transform, dan keyframe adalah justru jenis
+     utility yang paling mungkin tidak ikut ter-generate — dan kalau itu
+     terjadi tombolnya kembali datar TANPA error apa pun. */
+  .cta-luar {
+    position: relative;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.7rem 1.1rem;
+    border-radius: 0.75rem;
+    color: #fff;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    background: linear-gradient(135deg, #f59e0b 0%, #f97316 55%, #ea580c 100%);
+    box-shadow: 0 4px 14px -4px rgba(234, 88, 12, 0.55);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .cta-luar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px -6px rgba(234, 88, 12, 0.7);
+  }
+  .cta-luar:active { transform: translateY(0); }
+  /* Fokus keyboard harus terlihat di atas gradien, jadi cincin putih DI DALAM
+     plus halo oranye di luar — outline biasa tenggelam di warna terangnya. */
+  .cta-luar:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: -4px;
+    box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.55);
+  }
+
+  .cta-luar__ikon {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    flex: none;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.22);
+  }
+  .cta-luar__teks { min-width: 0; }
+  .cta-luar__label { display: block; }
+  .cta-luar__sub {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 400;
+    opacity: 0.9;
+    margin-top: 0.1rem;
+  }
+  .cta-luar__panah {
+    flex: none;
+    margin-left: auto;
+    padding-left: 0.25rem;
+    transition: transform 0.18s ease;
+  }
+  .cta-luar:hover .cta-luar__panah { transform: translateX(3px); }
+  /* Ukuran ikon dipatok di sini, bukan lewat w-4/h-4: Lucide mengganti
+     elemen ikonnya jadi SVG dan menyalin kelasnya apa adanya, jadi utility
+     yang hilang membuat ikon melar memenuhi tombol. */
+  .cta-luar svg { width: 1rem; height: 1rem; }
+  .cta-luar__ikon svg { width: 1.05rem; height: 1.05rem; }
+
+  /* Kilau lembut yang lewat sesekali — menarik mata tanpa berkedip terus.
+     Jeda panjang (65% dari siklus) sengaja: gerakan konstan mengganggu
+     pembacaan di halaman yang isinya angka. */
+  .cta-luar::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 35%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: skewX(-20deg);
+    animation: cta-kilau 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes cta-kilau {
+    0%, 65% { left: -60%; }
+    100%    { left: 135%; }
+  }
+
+  /* Di ponsel jadi selebar kartu: target sentuh lebih besar dan bacaannya
+     lebih tegas sebagai ajakan, bukan tempelan. */
+  @media (max-width: 639px) {
+    .cta-luar { width: 100%; }
+  }
+
+  /* Hormati pengguna yang meminta gerakan dikurangi — kilau dan angkatnya
+     dimatikan, warnanya tetap. */
+  @media (prefers-reduced-motion: reduce) {
+    .cta-luar,
+    .cta-luar__panah { transition: none; }
+    .cta-luar:hover { transform: none; }
+    .cta-luar::after { animation: none; opacity: 0; }
+  }
+
   /* Scroll anchoring bawaan browser mencoba mengoreksi sendiri saat tinggi
      konten berubah, tapi cuma sebagian dan bertabrakan dengan koreksi kita
      sendiri di gantiHalaman*() (lihat _pindahHalamanTerjaga di app.js) —
@@ -335,11 +440,19 @@
             <template x-if="data.tautan_luar?.length">
               <div class="mt-4 flex flex-wrap gap-2">
                 <template x-for="t in data.tautan_luar" :key="t.url">
-                  <a :href="t.url" target="_blank" rel="noopener noreferrer"
-                     class="tap inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-                            bg-amber-500 hover:bg-amber-600 text-white transition">
-                    <i :data-lucide="t.ikon || 'external-link'" class="w-4 h-4"></i>
-                    <span x-text="t.label"></span>
+                  <a :href="t.url" target="_blank" rel="noopener noreferrer" class="tap cta-luar">
+                    <span class="cta-luar__ikon">
+                      <i :data-lucide="t.ikon || 'external-link'"></i>
+                    </span>
+                    <span class="cta-luar__teks">
+                      <span class="cta-luar__label" x-text="t.label"></span>
+                      <!-- Subjudul opsional: judul saja sering tidak cukup
+                           memberi tahu apa yang menanti di balik tautan. -->
+                      <template x-if="t.deskripsi">
+                        <span class="cta-luar__sub" x-text="t.deskripsi"></span>
+                      </template>
+                    </span>
+                    <i data-lucide="arrow-right" class="cta-luar__panah"></i>
                   </a>
                 </template>
               </div>

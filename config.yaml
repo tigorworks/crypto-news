@@ -293,7 +293,11 @@ repo_url: https://github.com/tigorworks/crypto-news
 
 # Tautan tambahan yang muncul sebagai tombol di kartu harga.
 # `ikon` memakai nama ikon Lucide (https://lucide.dev/icons).
+# `deskripsi` opsional: satu baris pendek di bawah label. Judul saja sering
+# tidak cukup memberi tahu apa yang menanti di balik tautan — isi kalau
+# tombolnya perlu menjelaskan dirinya, kosongkan kalau labelnya sudah jelas.
 tautan_luar:
   - label: Arena Pertempuran BTC
     url: https://tigorworks.github.io/crypto-battlefield/
     ikon: swords
+    deskripsi: ""
