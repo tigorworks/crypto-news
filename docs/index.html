@@ -1094,7 +1094,7 @@
                 Ulasan Lengkap
               </h2>
               <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400 max-w-2xl">
-                Ditulis AI dari angka yang dihitung kode. Bisa saja keliru — angkanya yang jadi pegangan, bukan kalimatnya.
+                Ditulis AI berdasarkan angka yang dihitung sistem. Tafsir dapat keliru; angka yang jadi acuan.
               </p>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
@@ -1486,7 +1486,7 @@
 
               <template x-if="data.ai.teknikal.pembatalan">
                 <p class="mt-3 text-sm sm:text-[13px] text-slate-600 dark:text-slate-400">
-                  <span class="font-medium">Pembacaan ini gugur kalau: </span>
+                  <span class="font-medium">Pembacaan ini gugur bila: </span>
                   <span x-text="data.ai.teknikal.pembatalan"></span>
                 </p>
               </template>
@@ -1813,7 +1813,7 @@
             </p>
 
             <template x-if="!adaPernyataan">
-              <p class="mt-4 text-sm text-slate-500">Belum ada pernyataan pejabat yang tertangkap kali ini.</p>
+              <p class="mt-4 text-sm text-slate-500">Belum ada pernyataan pejabat yang terpantau kali ini.</p>
             </template>
 
             <ul class="mt-4 space-y-3">
@@ -2042,40 +2042,37 @@
         </p>
       </template>
 
-      <!-- Ketentuan pemakaian. Versi lama berbunyi "Bagian bertanda ✦ AI
-           dihasilkan model bahasa" — kalimat itu diam-diam menjanjikan
-           sisanya bebas AI, padahal model ikut menulis di hampir semua
-           bagian. Sekarang keterlibatannya dinyatakan di muka, lalu
-           pembagian kerjanya dijelaskan: kode yang menghitung, model yang
-           menafsir. -->
+      <!-- Ketentuan penggunaan.
+           Ditulis dengan REGISTER FORMAL, berbeda dari teks antarmuka di
+           halaman ini yang sengaja dibuat luwes. Penghalusan bahasa berlaku
+           untuk kalimat yang menemani pembaca; ketentuan bukan salah satunya
+           — di sini ragam santai justru mengurangi bobotnya.
+
+           Isinya menyatakan keterlibatan AI di muka. Versi sebelum ini hanya
+           menyebut "bagian bertanda ✦ AI dihasilkan model bahasa", yang
+           diam-diam menjanjikan sisanya bebas AI padahal model ikut bekerja
+           di hampir semua bagian. -->
       <div class="text-xs space-y-2 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-        <p class="flex items-start gap-2">
-          <i data-lucide="sparkles" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-indigo-500"></i>
-          <span>
-            <span class="font-semibold text-slate-700 dark:text-slate-200">Dasbor ini dibuat dengan bantuan AI.</span>
-            Model bahasa ikut bekerja di hampir setiap bagian — menyaring dan menerjemahkan berita,
-            menilai dampak agenda, membaca pernyataan pejabat, sampai menyusun ulasan dan skenario.
-            Bagian bertanda
-            <span class="inline-flex items-center gap-0.5 text-[10px] font-bold px-1 py-px rounded bg-indigo-600 text-white align-middle">✦ AI</span>
-            adalah yang kalimatnya ditulis model.
-          </span>
+        <div class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+          <i data-lucide="scale" class="w-3.5 h-3.5 shrink-0"></i> Ketentuan Penggunaan
+        </div>
+        <p>
+          Layanan ini menggunakan kecerdasan buatan dalam proses penyusunannya. Model bahasa
+          dipakai untuk menyaring dan menerjemahkan berita, menilai dampak agenda ekonomi,
+          menganalisis pernyataan pejabat, serta menyusun ulasan dan skenario pasar. Bagian yang
+          ditandai
+          <span class="inline-flex items-center gap-0.5 text-[10px] font-bold px-1 py-px rounded bg-indigo-600 text-white align-middle">✦ AI</span>
+          merupakan keluaran model bahasa.
         </p>
         <p>
-          Pembagiannya begini: <span class="font-medium text-slate-600 dark:text-slate-300">semua angka dihitung kode</span>
-          dari data sumber, dan model hanya menafsirkan artinya. Tafsir bisa keliru, jadi kalau kalimat
-          dan angka terbaca berbeda, angkanya yang jadi pegangan.
+          Seluruh angka dihitung oleh sistem dari data sumber, dan model hanya menafsirkan
+          maknanya. Hasil tafsir dapat mengandung kesalahan. Apabila terdapat perbedaan antara
+          uraian dan angka, angka yang berlaku.
         </p>
-        <!-- Disclaimer diambil dari data supaya bunyinya bisa diatur dari
-             pipeline. Ditaruh DI DALAM kotak ketentuan, bukan sebagai baris
-             terpisah di atasnya — versi lama membuat "bukan saran investasi"
-             muncul dua kali di layar yang sama. -->
-        <p class="flex items-start gap-2">
-          <i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i>
-          <span x-text="data?.disclaimer || 'Halaman ini bersifat informasional dan bukan saran investasi.'"></span>
-        </p>
+        <p x-text="data?.disclaimer || 'Seluruh isi bersifat informasional dan bukan merupakan saran investasi.'"></p>
         <p class="text-slate-400 dark:text-slate-500">
-          Sumber data: Binance, CoinGecko, OKX, Deribit, Coin Metrics, mempool.space, alternative.me,
-          SoSoValue, Yahoo Finance, dan sejumlah feed berita publik.
+          Sumber data: Binance, CoinGecko, OKX, Deribit, Coin Metrics, mempool.space,
+          alternative.me, SoSoValue, Yahoo Finance, dan sejumlah feed berita publik.
         </p>
       </div>
     </div>
