@@ -217,6 +217,69 @@ def ringkas_untuk_llm(jendela: Dict[str, Any]) -> Dict[str, Any]:
     return aman
 
 
+def klasifikasi_sinyal(waktu_utc: Optional[str]) -> Dict[str, Any]:
+    """Di fase pasar mana sebuah sinyal MENDARAT.
+
+    Sampai sekarang pipeline hanya tahu di mana pasar berada SEKARANG, bukan
+    di mana ia berada saat berita atau pernyataannya terbit. Padahal itu
+    pembeda yang menentukan: tarif yang diumumkan Rabu siang langsung
+    dicerna ETF dan meja institusi, sementara tarif yang sama diumumkan
+    Sabtu sore ditanggung pasar kripto sendirian sampai Senin.
+
+    Pada brief 17 Agustus keempat pernyataan Trump — satu di antaranya
+    berkekuatan 4 — semuanya mendarat di dalam jeda akhir pekan, dan tidak
+    ada satu pun bagian sistem yang mengetahuinya.
+
+    Murni aritmetika kalender: `fase_pasar()` memang sudah menerima waktu
+    sembarang, jadi tinggal dipanggil dengan stempel waktu sinyalnya.
+    """
+    if not waktu_utc:
+        return {}
+    try:
+        saat = datetime.fromisoformat(str(waktu_utc).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return {}
+    if saat.tzinfo is None:
+        saat = saat.replace(tzinfo=timezone.utc)
+    f = fase_pasar(saat)
+    return {
+        "fase": f["fase"],
+        "dalam_jendela_rawan": f["dalam_jendela_rawan"],
+        "keterangan": _ARTI_PENDARATAN.get(f["fase"], ""),
+    }
+
+
+_ARTI_PENDARATAN = {
+    "buka": "mendarat saat bursa AS buka — bisa langsung dicerna ETF dan meja institusi",
+    "tutup_harian": "mendarat setelah bursa tutup — tertunda sampai pembukaan besok",
+    "jelang_tutup_pekan": "mendarat menjelang penutupan Jumat — tak sempat dicerna sebelum jeda",
+    "jeda_akhir_pekan": "mendarat di dalam jeda akhir pekan — ditanggung pasar kripto sendirian",
+}
+
+#: Sinyal selemah ini tidak dihitung dalam ringkasan pendaratan; yang menarik
+#: hanya yang cukup kuat untuk benar-benar menggerakkan pasar.
+_KEKUATAN_LAYAK_DIHITUNG = 4
+
+
+def ringkas_pendaratan(sinyal: list) -> Dict[str, Any]:
+    """Berapa sinyal KUAT yang mendarat saat pasar AS tidak bisa menyerapnya.
+
+    Dihitung kode, bukan ditafsir model, supaya angkanya bisa dipakai
+    critic dan tidak bisa dikarang.
+    """
+    rawan = [
+        s for s in (sinyal or [])
+        if (s.get("kekuatan") or 0) >= _KEKUATAN_LAYAK_DIHITUNG
+        and (s.get("mendarat") or {}).get("dalam_jendela_rawan")
+    ]
+    kuat = [s for s in (sinyal or []) if (s.get("kekuatan") or 0) >= _KEKUATAN_LAYAK_DIHITUNG]
+    return {
+        "kuat": len(kuat),
+        "kuat_di_jendela_rawan": len(rawan),
+        "ada_yang_tertahan": bool(rawan),
+    }
+
+
 #: Ambang kerapuhan. Tiap butir bernilai satu poin; ambangnya dipilih supaya
 #: yang tercatat hanya kondisi yang benar-benar menonjol, bukan fluktuasi
 #: harian biasa.
@@ -297,3 +360,31 @@ def kerapuhan(brief_sebagian: Dict[str, Any]) -> Dict[str, Any]:
     skor = len(faktor)
     tingkat = "tinggi" if skor >= 3 else "sedang" if skor == 2 else "rendah"
     return {"skor": skor, "maks": 5, "tingkat": tingkat, "faktor": faktor}
+
+
+def risiko_jendela(jendela: Dict[str, Any], rapuh: Dict[str, Any]) -> Dict[str, Any]:
+    """Bahaya yang datang dari WAKTU, terpisah dari isi kebijakan.
+
+    Dipisahkan karena keduanya memang dua hal berbeda yang sama pentingnya.
+    Sebelumnya keduanya dilebur jadi satu tingkat siaga, dan peleburan itu
+    merugikan dua arah: kebijakan besar di hari Rabu tertahan di "sedang"
+    hanya karena kalendernya biasa, sementara akhir pekan yang sepi berita
+    tetap menyeret perhatian hanya karena bursanya tutup.
+
+    Seluruhnya hitungan kode — fase pasar dan kerapuhan sama-sama tidak
+    melibatkan model — jadi tingkat ini tidak bisa dikarang.
+    """
+    rawan = bool(jendela.get("dalam_jendela_rawan"))
+    tingkat_rapuh = (rapuh or {}).get("tingkat")
+    if rawan and tingkat_rapuh == "tinggi":
+        tingkat = "tinggi"
+    elif rawan or tingkat_rapuh == "tinggi":
+        tingkat = "sedang"
+    else:
+        tingkat = "rendah"
+    return {
+        "tingkat": tingkat,
+        "fase": jendela.get("fase"),
+        "dalam_jendela_rawan": rawan,
+        "kerapuhan": tingkat_rapuh,
+    }

@@ -817,6 +817,10 @@ def agen_kebijakan(
     if not jendela:
         return None
 
+    # `mendarat` = di fase pasar mana sinyal ini terbit. Dihitung kode dari
+    # stempel waktunya sendiri, bukan ditebak model. Inilah yang membedakan
+    # tarif Rabu siang — langsung diserap ETF — dari tarif Sabtu sore yang
+    # ditanggung pasar kripto sendirian sampai Senin.
     kandidat = [
         {
             "tokoh": p.get("tokoh"),
@@ -826,6 +830,7 @@ def agen_kebijakan(
             "kekuatan": p.get("kekuatan"),
             "status": p.get("status"),
             "waktu_utc": p.get("waktu_utc"),
+            "mendarat": jendela_pasar.klasifikasi_sinyal(p.get("waktu_utc")),
         }
         for p in (pernyataan or [])[:maks_item]
     ]
@@ -838,6 +843,7 @@ def agen_kebijakan(
             "sentimen": b.get("sentimen"),
             "kekuatan": b.get("kekuatan"),
             "status_kepastian": b.get("status_kepastian"),
+            "mendarat": jendela_pasar.klasifikasi_sinyal(b.get("waktu_utc")),
         }
         for b in (berita or [])
         if b.get("kategori") in ("regulasi", "geopolitik", "makro")
@@ -873,14 +879,25 @@ def agen_kebijakan(
         "waktu dengan kata saja — misalnya 'di dalam jeda akhir pekan' atau "
         "'menjelang pembukaan Senin'.\n\n"
 
+        "TIAP SINYAL MEMBAWA FIELD `mendarat` — di fase pasar mana ia terbit, "
+        "dihitung dari stempel waktunya sendiri. Timbanglah ini: kebijakan "
+        "yang mendarat saat bursa buka sudah sempat dicerna ETF dan meja "
+        "institusi, sedangkan yang mendarat menjelang penutupan Jumat atau di "
+        "dalam jeda akhir pekan belum diserap siapa pun dan efeknya masih "
+        "menunggu. Sebutkan secara eksplisit kalau ada sinyal kuat yang "
+        "mendarat di jendela rawan.\n\n"
+
         "ATURAN PENILAIAN\n"
         "  - Kalau tidak ada sinyal kebijakan yang berarti, katakan begitu "
         "terus terang dan beri siaga 'rendah'. Menakut-nakuti tanpa dasar "
         "lebih merugikan daripada diam.\n"
         "  - Bedakan yang SUDAH TERJADI dari yang BARU WACANA. Wacana yang "
         "belum jadi kebijakan bukan alasan siaga tinggi.\n"
-        "  - Siaga 'tinggi' hanya kalau KETIGANYA bertemu: ada sinyal "
-        "kebijakan berdampak, waktunya di jendela rawan, dan pasarnya rapuh.\n"
+        "  - Siaga di sini menilai ISI KEBIJAKANNYA saja, bukan kalendernya. "
+        "Bahaya yang datang dari waktu dihitung terpisah oleh kode, jadi "
+        "jangan menurunkan penilaianmu cuma karena hari ini bukan akhir "
+        "pekan. Siaga 'tinggi' butuh sinyal yang benar-benar berdampak "
+        "besar dan sudah pasti, bukan wacana.\n"
         "  - Dilarang menyebut target harga atau ajakan bertindak.\n\n"
 
         "Balas objek JSON:\n"
@@ -903,12 +920,16 @@ def agen_kebijakan(
         + ATURAN_DASAR
     )
 
+    pendaratan = jendela_pasar.ringkas_pendaratan(kandidat + kandidat_berita)
     konteks = {
         # Versi ringkas: tanpa total panjang jeda, yang terbukti dibaca model
         # sebagai sisa waktu. Bentuk lengkapnya tetap disimpan di hasil untuk
         # web dan Telegram.
         "jendela_pasar_as": jendela_pasar.ringkas_untuk_llm(jendela),
         "kerapuhan_pasar": rapuh,
+        # Dihitung kode: berapa sinyal kuat yang mendarat saat pasar AS tidak
+        # bisa menyerapnya. Angka ini tidak boleh dikarang model.
+        "pendaratan_sinyal": pendaratan,
         "pernyataan_tokoh": kandidat,
         "berita_kebijakan": kandidat_berita,
     }
@@ -933,18 +954,25 @@ def agen_kebijakan(
     if siaga not in ("rendah", "sedang", "tinggi"):
         siaga = "rendah"
 
-    # Siaga TIDAK boleh melebihi apa yang dibenarkan kondisi terhitung.
-    # Tanpa penjagaan ini model bisa berteriak "tinggi" pada Rabu siang di
-    # pasar yang tebal — persis jenis alarm palsu yang lama-lama membuat
-    # alarm sungguhan ikut diabaikan.
-    if siaga == "tinggi" and not (
-        jendela.get("dalam_jendela_rawan")
-        and rapuh.get("tingkat") in ("sedang", "tinggi")
-    ):
-        log.info(
-            "Siaga agen diturunkan tinggi->sedang (jendela rawan=%s, kerapuhan=%s)",
-            jendela.get("dalam_jendela_rawan"), rapuh.get("tingkat"),
-        )
+    # Siaga "tinggi" harus dibenarkan oleh KEKUATAN SINYALNYA, bukan oleh
+    # kalender.
+    #
+    # Penjagaan sebelumnya menuntut jendela rawan, dan itu keliru dua arah:
+    # kebijakan besar di hari Rabu tertahan di "sedang" hanya karena harinya
+    # biasa, sementara bahaya yang datang dari waktu justru bukan urusan
+    # tingkat ini — ia dihitung terpisah oleh `risiko_jendela()`.
+    #
+    # Gantinya syarat substansi: harus ada setidaknya satu sinyal berkekuatan
+    # 4 ke atas yang bukan rumor. Itu tetap bisa diperiksa kode, tapi memeriksa
+    # hal yang benar — seberapa besar kabarnya, bukan hari apa sekarang.
+    kuat_pasti = [
+        x for x in (kandidat + kandidat_berita)
+        if (x.get("kekuatan") or 0) >= 4
+        and x.get("status") != "rumor"
+        and x.get("status_kepastian") != "rumor"
+    ]
+    if siaga == "tinggi" and not kuat_pasti:
+        log.info("Siaga agen diturunkan tinggi->sedang (tidak ada sinyal kuat yang pasti)")
         siaga = "sedang"
 
     bersih = lambda t: _buang_jam_jendela(str(t or "").strip(), jendela)
@@ -961,6 +989,13 @@ def agen_kebijakan(
         # menghitung ulang dan tidak bisa menyimpang dari yang dinilai agen.
         "jendela": jendela,
         "kerapuhan": rapuh,
+        # Bahaya dari WAKTU, dihitung kode dan berdiri sendiri di samping
+        # siaga kebijakan di atas. Keduanya sengaja tidak dilebur: yang satu
+        # menilai isi kabarnya, yang satu menilai kapan kabar itu datang.
+        "risiko_jendela": jendela_pasar.risiko_jendela(jendela, rapuh),
+        # Dihitung kode: berapa sinyal kuat yang mendarat saat pasar AS tidak
+        # bisa menyerapnya — inti dari "keputusan menjelang akhir pekan".
+        "pendaratan": pendaratan,
     }
 
 

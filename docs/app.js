@@ -674,6 +674,30 @@ function briefApp() {
       return a;
     },
 
+    /* Keterangan singkat kenapa risiko waktunya segitu — dirakit dari fase
+       dan kerapuhan yang keduanya hitungan kode, jadi tidak bisa berbeda
+       dari angka yang dipakai menilainya. */
+    get labelRisikoWaktu() {
+      const r = this.siagaKebijakan?.risiko_jendela;
+      if (!r) return '';
+      const bagian = [];
+      if (r.dalam_jendela_rawan) bagian.push('bursa AS tutup');
+      else bagian.push('bursa AS bisa menyerap');
+      if (r.kerapuhan && r.kerapuhan !== 'rendah') bagian.push(`pasar rapuh (${r.kerapuhan})`);
+      return '· ' + bagian.join(', ');
+    },
+
+    /* "Keputusan menjelang akhir pekan" dalam satu kalimat. Angkanya datang
+       dari hitungan kode di pipeline, bukan dari prosa model. */
+    get kalimatPendaratan() {
+      const p = this.siagaKebijakan?.pendaratan;
+      if (!p?.ada_yang_tertahan) return '';
+      const n = p.kuat_di_jendela_rawan;
+      const dari = p.kuat > n ? ` dari ${p.kuat} sinyal kuat` : ' sinyal kuat';
+      return `${n}${dari} mendarat saat pasar AS tidak bisa menyerapnya — `
+           + 'efeknya masih menunggu, belum diserap arus institusi.';
+    },
+
     /* Inti siaga saat jendelanya BUKAN alasan utama. Pemicu pertama dipilih
        lebih dulu karena ia sudah berbentuk satu kalimat spesifik; ringkasan
        dipakai hanya sebagai cadangan dan dipotong di batas kalimat. */
