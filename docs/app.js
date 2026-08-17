@@ -28,6 +28,61 @@ function keWIB(tanggal) {
   return new Date(tanggal.getTime() + (7 * 60 + tanggal.getTimezoneOffset()) * 60000);
 }
 
+/* Pecah satu blok prosa panjang jadi 2-3 paragraf di batas kalimat.
+
+ * Pipeline sudah melakukan hal yang sama saat brief dibuat, tapi ini tetap
+ * perlu ada di sisi tampilan: brief yang SUDAH TERSIMPAN (latest.json hari
+ * ini dan seluruh arsip) menyimpan satu blok panjang, dan tanpa ini mereka
+ * akan selamanya terbaca sebagai dinding teks. Ambang dan aturannya sengaja
+ * dibuat sama dengan _pecah_paragraf() di src/analysis/news_analysis.py.
+ *
+ * Tidak menyentuh teks yang sudah dipecah, dan tidak memecah yang pendek. */
+const MIN_KARAKTER_PECAH = 420;
+const MIN_KALIMAT_PECAH = 4;
+const TARGET_KARAKTER_PARAGRAF = 400;
+
+function pecahParagraf(teks) {
+  const isi = (teks || '').trim();
+  if (!isi) return [];
+  if (isi.includes('\n\n') || isi.length < MIN_KARAKTER_PECAH) {
+    return isi.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  }
+  const kalimat = isi.split(/(?<=[.!?])\s+(?=[A-Z"'\u201c])/).map((k) => k.trim()).filter(Boolean);
+  if (kalimat.length < MIN_KALIMAT_PECAH) return [isi];
+
+  // Jumlah paragraf mengikuti PANJANG, bukan cacah kalimat.
+  let jumlah = Math.min(3, Math.max(2, Math.round(isi.length / TARGET_KARAKTER_PARAGRAF)));
+  jumlah = Math.min(jumlah, kalimat.length);
+
+  // Titik potong dari panjang KUMULATIF — lihat _pecah_paragraf() di
+  // src/analysis/news_analysis.py, algoritmanya sengaja identik.
+  const kumulatif = [];
+  let jalan = 0;
+  for (const k of kalimat) { jalan += k.length + 1; kumulatif.push(jalan); }
+  const total = kumulatif[kumulatif.length - 1];
+
+  const potong = [];
+  for (let j = 1; j < jumlah; j++) {
+    const sasaran = (total * j) / jumlah;
+    let pilih = null;
+    for (let i = 0; i < kalimat.length - 1; i++) {
+      if (potong.length && i <= potong[potong.length - 1]) continue;
+      if (kalimat.length - 1 - i < jumlah - j - 1) continue;
+      if (pilih === null || Math.abs(kumulatif[i] - sasaran) < Math.abs(kumulatif[pilih] - sasaran)) pilih = i;
+    }
+    if (pilih === null) break;
+    potong.push(pilih);
+  }
+
+  const keluar = [];
+  let mulai = 0;
+  for (const i of potong.concat([kalimat.length - 1])) {
+    keluar.push(kalimat.slice(mulai, i + 1).join(' '));
+    mulai = i + 1;
+  }
+  return keluar;
+}
+
 /* Angka gaya Indonesia: titik ribuan, koma desimal. */
 function formatAngka(nilai, desimal = 2) {
   if (nilai === null || nilai === undefined || Number.isNaN(nilai)) return '—';
@@ -904,10 +959,10 @@ function briefApp() {
       const item = [
         { id: 's-harga', label: 'Harga', ada: true },
         { id: 's-teknikal', label: 'Teknikal', ada: !!d.technical?.['1d'] },
-        { id: 's-ai', label: 'Analisa AI', ada: true },
         { id: 's-pasar', label: 'Pasar', ada: true },
         { id: 's-institusional', label: 'Opsi & Valuasi', ada: this.adaDataInstitusional },
         { id: 's-whale', label: 'Whale', ada: this.adaDataWhale || !!d.technical?.sinyal_palsu?.length },
+        { id: 's-ai', label: 'Analisa AI', ada: true },
         { id: 's-agenda', label: 'Agenda', ada: true },
         { id: 's-berita', label: 'Berita', ada: !!d.news?.length || !!d.statements?.length },
       ];
@@ -1002,6 +1057,159 @@ function briefApp() {
 
     get totalHalamanAgenda() {
       return Math.max(1, Math.ceil(this.agendaTersaring.length / this.perHalamanAgenda));
+    },
+
+    /* Narasi geopolitik sebagai daftar paragraf, bukan satu blok. */
+    get paragrafGeopolitik() {
+      return pecahParagraf(this.data?.ai?.outlook?.narasi_geopolitik);
+    },
+
+    /* ===== Peta jangkauan harga — visual "Pandangan ke depan" =====
+
+       Pandangan ke depan sebelumnya murni prosa. Padahal angkanya SUDAH ADA
+       dan dihitung kode: level kunci, level invalidasi, dan kisaran harian
+       normal (ATR). Yang kurang cuma menempatkannya pada satu sumbu supaya
+       terlihat sekaligus — di mana harga berdiri, seberapa jauh ke batas
+       terdekat, dan seberapa besar satu hari normal dibanding jarak itu.
+
+       Bentuknya METER (posisi satu nilai di dalam rentang berbatas), bukan
+       grafik: datanya satu nilai terhadap dua batas. Pewarnaannya EMPHASIS —
+       satu aksen untuk harga sekarang, sisanya abu-abu redup. Batas atas dan
+       bawah dibedakan oleh POSISI dan LABEL, bukan warna: memakai merah/hijau
+       di sini gagal uji keterbacaan buta warna (ΔE deutan 5,8, di bawah
+       ambang 6) padahal keduanya bersebelahan di satu batang.
+
+       Return null kalau level kuncinya tidak ada — tidak ada yang bisa
+       digambar, dan menebak batas akan menyesatkan. */
+    get petaJangkauan() {
+      const lv = this.data?.technical?.key_levels;
+      const harga = this.data?.price?.last;
+      if (!lv || !harga) return null;
+
+      const supportTerdekat = (lv.support || []).filter((v) => v < harga).sort((a, b) => b - a)[0] ?? null;
+      const resistenTerdekat = (lv.resistance || []).filter((v) => v > harga).sort((a, b) => a - b)[0] ?? null;
+      const bawah = Math.min(...[lv.invalidasi_naik, supportTerdekat, harga].filter((v) => v != null));
+      const atas = Math.max(...[lv.invalidasi_turun, resistenTerdekat, harga].filter((v) => v != null));
+      const rentang = atas - bawah;
+      if (!(rentang > 0)) return null;
+
+      // Sisakan ruang di kedua ujung supaya penanda di batas tidak terpotong.
+      const tepi = rentang * 0.06;
+      const skalaBawah = bawah - tepi;
+      const skalaRentang = rentang + tepi * 2;
+      const posisi = (nilai) => (nilai == null ? null
+        : Math.max(0, Math.min(100, ((nilai - skalaBawah) / skalaRentang) * 100)));
+
+      // Kisaran harian normal (ATR) digambar sebagai pita di sekitar harga:
+      // itu yang memberi SKALA pada jarak ke level terdekat — "1,2% lagi"
+      // berarti lain kalau satu hari normal saja bergerak 1,8%.
+      const vol = this.data?.technical?.['1d']?.volatilitas || {};
+      const atr = vol.atr ?? null;
+      const pita = atr ? { kiri: posisi(harga - atr), kanan: posisi(harga + atr) } : null;
+
+      const jarakPct = (nilai) => (nilai == null ? null : ((nilai - harga) / harga) * 100);
+      return {
+        harga,
+        posisiHarga: posisi(harga),
+        support: supportTerdekat,
+        resisten: resistenTerdekat,
+        posisiSupport: posisi(supportTerdekat),
+        posisiResisten: posisi(resistenTerdekat),
+        invalidasiNaik: lv.invalidasi_naik ?? null,
+        invalidasiTurun: lv.invalidasi_turun ?? null,
+        posisiInvalidasiNaik: posisi(lv.invalidasi_naik),
+        posisiInvalidasiTurun: posisi(lv.invalidasi_turun),
+        pita,
+        atr,
+        atrPct: vol.atr_pct ?? null,
+        jarakSupportPct: jarakPct(supportTerdekat),
+        jarakResistenPct: jarakPct(resistenTerdekat),
+      };
+    },
+
+    _hariWIB(tanggal) {
+      const w = keWIB(tanggal);
+      return Math.floor(Date.UTC(w.getFullYear(), w.getMonth(), w.getDate()) / 86400000);
+    },
+
+    /* SATU agenda paling berdampak dalam 3 hari ke depan — isi kartu teratas
+       halaman.
+
+       Jendelanya dihitung per HARI KALENDER WIB, bukan 72 jam mentah. Bukan
+       detail sepele: brief terbit sekitar 00:30 WIB, dan FOMC Meeting Minutes
+       tiga hari kemudian jatuh di `jam_lagi` 72,6 — lewat 36 menit dari batas
+       72 jam, padahal siapa pun yang membaca "3 hari ke depan" jelas
+       mengharapkannya muncul. Menghitung hari menghapus seluruh kelas
+       kesalahan tepi itu.
+
+       Ambangnya `relevansi_kripto >= 4` ("dampak besar"), sama dengan ambang
+       filter agenda dan notice <24 jam: kalau "besar" berarti hal berbeda di
+       tiap tempat, pembaca tidak bisa mempercayai satu pun.
+
+       Urutan pemilihan: relevansi ke kripto dulu (itu yang ditanyakan —
+       dampak TERBESAR, bukan yang terdekat), lalu bobot dampak ekonominya,
+       baru waktu sebagai pemutus. Dengan begitu FOMC Minutes tiga hari lagi
+       tetap menang atas rilis kelas menengah besok. */
+    get agendaSorot() {
+      const acuan = this.data?.generated_at ? new Date(this.data.generated_at) : null;
+      if (!acuan || Number.isNaN(acuan.getTime())) return null;
+      const hariAcuan = this._hariWIB(acuan);
+
+      const bobotDampak = { tinggi: 3, menengah: 2, rendah: 1 };
+      const layak = (this.data?.calendar || []).filter((a) => {
+        if ((a.relevansi_kripto || 0) < 4 || !a.waktu_utc) return false;
+        const t = new Date(a.waktu_utc);
+        if (Number.isNaN(t.getTime())) return false;
+        const selisihHari = this._hariWIB(t) - hariAcuan;
+        if (selisihHari < 0 || selisihHari > 3) return false;
+        // Agenda yang jamnya sudah lewat hari ini bukan lagi pengingat.
+        return a.jam_lagi === null || a.jam_lagi === undefined || a.jam_lagi >= 0;
+      });
+      if (!layak.length) return null;
+
+      return layak.slice().sort((a, b) =>
+        (b.relevansi_kripto || 0) - (a.relevansi_kripto || 0)
+        || (bobotDampak[b.dampak] || 0) - (bobotDampak[a.dampak] || 0)
+        || (a.jam_lagi ?? Infinity) - (b.jam_lagi ?? Infinity)
+      )[0];
+    },
+
+    /* Hitung mundur dalam bahasa manusia. Jam mentah ("61,8 jam lagi") benar
+       tapi tidak terbayang; "2 hari 14 jam lagi" langsung terasa. */
+    hitungMundurAgenda(jam) {
+      if (jam === null || jam === undefined) return '';
+      if (jam < 1) return 'kurang dari 1 jam lagi';
+      const bulat = Math.floor(jam);
+      if (bulat < 24) return `${bulat} jam lagi`;
+      const hari = Math.floor(bulat / 24);
+      const sisa = bulat % 24;
+      return sisa ? `${hari} hari ${sisa} jam lagi` : `${hari} hari lagi`;
+    },
+
+    /* Warna mengikuti KEDEKATAN waktu, bukan besar dampaknya: yang lolos ke
+       kartu ini semuanya sudah berdampak besar, jadi yang membedakan
+       tinggal seberapa mendesak. */
+    get kelasAgendaSorot() {
+      const jam = this.agendaSorot?.jam_lagi;
+      if (jam === null || jam === undefined) {
+        return {
+          kotak: 'border-slate-300 dark:border-slate-600 bg-slate-100/70 dark:bg-slate-800/40',
+          label: 'text-slate-600 dark:text-slate-300',
+          teks: 'text-slate-700 dark:text-slate-200',
+        };
+      }
+      if (jam < 24) {
+        return {
+          kotak: 'border-rose-300 dark:border-rose-700/70 bg-rose-50/70 dark:bg-rose-900/20',
+          label: 'text-rose-700 dark:text-rose-300',
+          teks: 'text-rose-700 dark:text-rose-300',
+        };
+      }
+      return {
+        kotak: 'border-amber-300 dark:border-amber-700/70 bg-amber-50/70 dark:bg-amber-900/20',
+        label: 'text-amber-700 dark:text-amber-300',
+        teks: 'text-amber-700 dark:text-amber-300',
+      };
     },
 
     /* Agenda BERDAMPAK BESAR dalam <24 jam — dipakai notice mencolok di
