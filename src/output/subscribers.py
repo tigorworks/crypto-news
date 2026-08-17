@@ -38,7 +38,7 @@ SALT = b"btc-market-brief-subscribers-v1"
 ITERASI = 390_000
 
 PESAN_SELAMAT_DATANG = (
-    "👋 <b>Kamu berlangganan Nawala</b>\n\n"
+    "📊 <b>Kamu berlangganan Nawala</b>\n\n"
     "<i>Ringkasan Pasar Kripto</i>\n\n"
     "Brief dikirim otomatis setiap pagi berisi harga, teknikal, posisi "
     "derivatif, data opsi, valuasi on-chain, dan analisa AI.\n\n"

@@ -12,6 +12,38 @@ from ..utils.http import HttpError, post_json
 log = logging.getLogger(__name__)
 
 BATAS_KARAKTER = 4096
+
+# Emoji penanda blok, dikumpulkan di satu tempat supaya himpunannya bisa
+# diperiksa sekaligus, bukan tersebar di belasan f-string.
+#
+# ATURANNYA: tiap emoji harus punya ARTI di konteks pasar — bukan hiasan.
+# Yang dibuang karena cuma dekoratif: 🌊 (ombak) untuk posisi pasar, 🌍
+# (bola dunia) untuk makro dan geopolitik, 🎯 (panah dart) untuk opsi, 🗣
+# (kepala bicara) untuk pernyataan, 🎭 (topeng teater) untuk sinyal palsu,
+# 🕐 (jam) untuk timestamp, dan 👋 (lambaian) untuk sapaan pelanggan.
+#
+# Yang dipertahankan justru yang paling kripto: 🐋 whale sudah jadi istilah
+# baku di pasar ini, dan ⛓ rantai adalah lambang on-chain itu sendiri.
+EMOJI = {
+    "merek":       "📊",   # grafik batang — identitas pasar
+    "harga":       "💰",
+    "teknikal":    "📈",
+    "posisi":      "⚖️",   # keseimbangan long vs short, funding, open interest
+    "makro":       "🏦",   # bank sentral, suku bunga, dolar
+    "opsi":        "💹",   # papan harga — derivatif
+    "onchain":     "⛓",
+    "aliran":      "💵",
+    "whale":       "🐋",   # istilah baku pasar kripto
+    "jebakan":     "🎣",   # umpan — bull trap / bear trap
+    "agenda":      "📅",   # kalender ekonomi
+    "pernyataan":  "📣",   # pengumuman yang menggerakkan harga
+    "berita":      "📰",
+    "regulasi":    "🏛",   # lembaga & kebijakan
+    "mendesak":    "🚨",
+    "dampak":      "🔴",
+    "risiko":      "⚠",
+    "tautan":      "🔗",
+}
 PEMISAH = "━━━━━━━━━━━━━━"
 
 
@@ -37,6 +69,20 @@ def _angka(value: Optional[float], desimal: int = 0, prefix: str = "", suffix: s
         return "—"
     teks = teks.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
     return f"{prefix}{teks}{suffix}"
+
+
+def _uang_bertanda(value: Optional[float], desimal: int = 1, suffix: str = "") -> str:
+    """Uang dengan tanda +/- DI DEPAN simbol mata uang.
+
+    Menempelkan angka negatif langsung ke "$" menghasilkan "$-57,6 jt" —
+    terbaca seperti salah ketik, bukan arus keluar. Muncul di dua tempat
+    berbeda (arus ETF dan perubahan kapitalisasi stablecoin), jadi dijadikan
+    satu helper supaya tidak terulang di tempat ketiga.
+    """
+    if value is None:
+        return "—"
+    tanda = "+" if value > 0 else ("-" if value < 0 else "")
+    return f"{tanda}${_angka(abs(value), desimal)}{suffix}"
 
 
 def _persen(value: Optional[float], desimal: int = 2) -> str:
@@ -87,6 +133,40 @@ def _potong(teks: str, maks: int) -> str:
     return teks[:maks].rsplit(" ", 1)[0] + "…"
 
 
+# Sisipan bergaya "(jam lagi 66,2)" adalah NAMA FIELD internal (`jam_lagi`)
+# yang bocor ke prosa model. Dibersihkan di kode, bukan lewat prompt: pola ini
+# muncul berulang dengan angka berbeda, dan penegakan lewat prompt tidak pernah
+# konvergen di repo ini.
+_POLA_BOCOR_FIELD = re.compile(
+    r"\s*\((?:jam|hari)[ _]lagi[^)]*\)", re.IGNORECASE
+)
+
+
+def _bersihkan_kapan(teks: str) -> str:
+    """Buang sisipan nama field dari keterangan waktu agenda."""
+    return _POLA_BOCOR_FIELD.sub("", teks or "").strip()
+
+
+def _rapikan_kosong(baris: List[str]) -> List[str]:
+    """Ciutkan baris kosong beruntun jadi satu, dan buang yang di ujung.
+
+    Blok AI dirakit dari belasan bagian yang masing-masing boleh absen (ditahan
+    critic, gagal dihasilkan, atau memang kosong). Tiap bagian menambahkan
+    pemisah kosongnya sendiri, jadi begitu satu bagian absen pemisahnya
+    bertumpuk — di produksi ini tampil sebagai dua baris kosong menganga tepat
+    setelah baris pergerakan saat narasi ditahan. Dibereskan sekali di sini,
+    bukan ditambal di tiap tempat yang menambahkan "".
+    """
+    hasil: List[str] = []
+    for b in baris:
+        if b == "" and (not hasil or hasil[-1] == ""):
+            continue
+        hasil.append(b)
+    while hasil and hasil[-1] == "":
+        hasil.pop()
+    return hasil
+
+
 def _blok_harga(brief: Dict[str, Any]) -> List[str]:
     price = brief.get("price") or {}
     levels = (brief.get("technical") or {}).get("key_levels") or {}
@@ -94,7 +174,7 @@ def _blok_harga(brief: Dict[str, Any]) -> List[str]:
     resistance = levels.get("resistance") or []
 
     baris = [
-        "💰 <b>Harga</b>",
+        f"{EMOJI['harga']} <b>Harga</b>",
         f"{_angka(price.get('last'), 0, prefix='$')} ({_persen(price.get('change_24h_pct'), 1)} / 24j)",
     ]
     if support or resistance:
@@ -144,7 +224,7 @@ def _blok_teknikal(brief: Dict[str, Any]) -> List[str]:
 def _blok_pasar(brief: Dict[str, Any]) -> List[str]:
     market = brief.get("market") or {}
     teknikal = brief.get("technical") or {}
-    baris = ["", "🌊 <b>Posisi Pasar</b>"]
+    baris = ["", f"{EMOJI['posisi']} <b>Posisi Pasar</b>"]
 
     potongan = []
     funding = market.get("funding_rate")
@@ -168,8 +248,7 @@ def _blok_pasar(brief: Dict[str, Any]) -> List[str]:
     potongan = []
     if market.get("etf_flow_usd") is not None:
         juta = market["etf_flow_usd"] / 1_000_000
-        tanda = "+" if juta > 0 else ""
-        potongan.append(f"ETF flow {tanda}${_angka(juta, 1)} jt")
+        potongan.append("ETF flow " + _uang_bertanda(juta, 1, " jt"))
     fg = market.get("fear_greed") or {}
     if fg.get("value") is not None:
         potongan.append(f"Fear &amp; Greed {fg['value']} ({esc(fg.get('label'))})")
@@ -196,7 +275,7 @@ def _blok_makro(brief: Dict[str, Any]) -> List[str]:
         potongan.append(f"USD/JPY {_angka(macro['usdjpy'], 1)}")
     if not potongan:
         return []
-    return ["", "🌍 <b>Makro</b>", " · ".join(potongan)]
+    return ["", f"{EMOJI['makro']} <b>Makro</b>", " · ".join(potongan)]
 
 
 def _blok_berita(brief: Dict[str, Any], maks: int = 5) -> List[str]:
@@ -205,10 +284,14 @@ def _blok_berita(brief: Dict[str, Any], maks: int = 5) -> List[str]:
     berperingkat.sort(
         key=lambda n: (n.get("kekuatan") or 0) * (n.get("relevansi_btc") or 0), reverse=True
     )
-    if not berperingkat:
+    # `maks <= 0` berarti tangga degradasi memutuskan blok ini dikorbankan.
+    # Tanpa penjagaan ini, judulnya tetap tercetak dengan isi kosong —
+    # tampil di produksi sebagai "📰 Berita Utama" yang menggantung tanpa
+    # satu pun berita di bawahnya.
+    if not berperingkat or maks <= 0:
         return []
 
-    baris = ["", "📰 <b>Berita Utama</b>"]
+    baris = ["", f"{EMOJI['berita']} <b>Berita Utama</b>"]
     for i, n in enumerate(berperingkat[:maks], 1):
         # Judul terjemahan dipakai kalau ada, supaya seluruh pesan satu bahasa.
         judul_berita = n.get("judul_id") or n.get("judul") or ""
@@ -236,7 +319,7 @@ def _notice_agenda_mendesak(brief: Dict[str, Any], maks: int = 3) -> List[str]:
     ]
     if not mendesak:
         return []
-    baris = ["🚨 <b>AGENDA PENTING &lt;24 JAM</b>"]
+    baris = [f"{EMOJI['mendesak']} <b>AGENDA PENTING &lt;24 JAM</b>"]
     for a in mendesak[:maks]:
         baris.append(f"• <b>{esc(a['nama'])}</b> — {esc(a.get('waktu_wib', ''))}")
     return baris
@@ -248,13 +331,13 @@ def _blok_agenda(brief: Dict[str, Any], maks: int = 4) -> List[str]:
     agenda = brief.get("calendar") or []
     if not agenda:
         return []
-    baris = ["", "📅 <b>Agenda Terdekat</b>"]
+    baris = ["", f"{EMOJI['agenda']} <b>Agenda Terdekat</b>"]
     for acara in agenda[:maks]:
         tanda = "~" if acara.get("perkiraan") else ""
         # Acara berdampak besar ke kripto diberi penanda supaya tidak
         # tenggelam di antara rilis data rutin yang nyaris tidak berpengaruh.
         relevansi = acara.get("relevansi_kripto") or 0
-        awalan = "🔴 " if relevansi >= 4 else ""
+        awalan = f"{EMOJI['dampak']} " if relevansi >= 4 else ""
         baris.append(f"{awalan}{esc(acara['waktu_wib'])} · {tanda}{esc(acara['nama'])}")
         # Jalur transmisinya hanya ditulis untuk yang benar-benar berdampak —
         # kalau semua acara diberi penjelasan, blok ini jadi terlalu panjang
@@ -273,7 +356,7 @@ def _blok_opsi(brief: Dict[str, Any]) -> List[str]:
     if not opsi:
         return []
 
-    baris = ["", "🎯 <b>Opsi (Deribit)</b>"]
+    baris = ["", f"{EMOJI['opsi']} <b>Opsi (Deribit)</b>"]
 
     potongan = []
     if opsi.get("dvol") is not None:
@@ -314,7 +397,7 @@ def _blok_valuasi(brief: Dict[str, Any]) -> List[str]:
     if not oc:
         return []
 
-    baris = ["", "⛓ <b>Valuasi On-chain</b>"]
+    baris = ["", f"{EMOJI['onchain']} <b>Valuasi On-chain</b>"]
     potongan = []
     if oc.get("mvrv") is not None:
         zona = oc.get("mvrv_zona")
@@ -343,7 +426,7 @@ def _blok_aliran(brief: Dict[str, Any]) -> List[str]:
     if not fl:
         return []
 
-    baris = ["", "💵 <b>Aliran Dana</b>"]
+    baris = ["", f"{EMOJI['aliran']} <b>Aliran Dana</b>"]
     if fl.get("premium_coinbase_pct") is not None:
         p = fl["premium_coinbase_pct"]
         # Label bisa kosong kalau sumbernya tidak memberi keterangan; tanpa
@@ -359,7 +442,7 @@ def _blok_aliran(brief: Dict[str, Any]) -> List[str]:
         tambahan = ""
         if ubah:
             juta = ubah / 1e6
-            tambahan = f" ({'+' if juta > 0 else ''}${_angka(juta, 0)} jt/24j)"
+            tambahan = f" ({_uang_bertanda(juta, 0, ' jt/24j')})"
         baris.append(f"Stablecoin ${_angka(miliar, 1)} miliar{tambahan}")
     return baris if len(baris) > 2 else []
 
@@ -373,10 +456,12 @@ def _blok_pernyataan(brief: Dict[str, Any], maks: int = 3) -> List[str]:
         if p.get("tokoh") and str(p["tokoh"]).strip().lower() not in
         ("", "tidak disebutkan", "tidak diketahui", "null", "none")
     ]
-    if not pernyataan:
+    # Sama seperti _blok_berita: maks<=0 berarti blok ini dikorbankan tangga
+    # degradasi, jadi judulnya pun tidak boleh ikut tercetak.
+    if not pernyataan or maks <= 0:
         return []
 
-    baris = ["", "🗣 <b>Pernyataan Berpengaruh</b>"]
+    baris = ["", f"{EMOJI['pernyataan']} <b>Pernyataan Berpengaruh</b>"]
     for s in pernyataan[:maks]:
         isi = _potong(s.get("ringkasan") or s.get("kutipan") or "", 170)
         baris.append(f"• <b>{esc(s['tokoh'])}</b>: {esc(isi)}")
@@ -395,7 +480,7 @@ def _blok_whale(brief: Dict[str, Any]) -> List[str]:
     if whale.get("whale_long_pct") is None and whale.get("ritel_long_pct") is None:
         return []
 
-    baris = ["", "🐋 <b>Posisi Besar vs Ritel</b>"]
+    baris = ["", f"{EMOJI['whale']} <b>Posisi Besar vs Ritel</b>"]
     potongan = []
     if whale.get("whale_long_pct") is not None:
         potongan.append(f"Whale {_angka(whale['whale_long_pct'], 1)}% long")
@@ -419,7 +504,7 @@ def _blok_sinyal_palsu(brief: Dict[str, Any], maks: int = 2) -> List[str]:
     sinyal = (brief.get("technical") or {}).get("sinyal_palsu") or []
     if not sinyal:
         return []
-    baris = ["", "🎭 <b>Sinyal Perlu Diwaspadai</b>"]
+    baris = ["", f"{EMOJI['jebakan']} <b>Sinyal Perlu Diwaspadai</b>"]
     for s in sinyal[:maks]:
         baris.append(f"• {esc(s.get('keterangan', ''))}")
     return baris
@@ -459,9 +544,49 @@ def _baris_pergerakan(brief: Dict[str, Any], penuh: bool) -> List[str]:
     return hasil
 
 
-def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
+#: Batas panjang tiap bagian blok AI, dalam dua mode.
+#:
+#: Mode LEGA dipakai selama pesannya masih muat. Mode RINGKAS dipakai begitu
+#: tangga degradasi kehabisan cara lain — dan itu sering terjadi: pada brief
+#: produksi 17 Agustus, blok AI sendirian mencapai 4.302 karakter, MELEBIHI
+#: seluruh batas Telegram (4.096), sementara semua blok lain digabung cuma
+#: 2.780. Akibatnya pesan jatuh ke jalur pemangkasan terakhir yang membuang
+#: seluruh data pasar — termasuk arus ETF — dan menyisakan analisa AI yang
+#: terpotong di tengah kalimat.
+#:
+#: Tiap batas di bawah dulunya masuk akal sendiri-sendiri; yang tidak pernah
+#: diperiksa adalah JUMLAHNYA. Mode ringkas memangkas bagian yang paling
+#: mudah dibaca ulang di web (skenario, keputusan besar, prosa panjang) dan
+#: mempertahankan yang paling menentukan (arah, penyebab, geopolitik).
+_BATAS_AI = {
+    "lega": {
+        "judul": 160, "narasi_par": 700, "outlook": 400, "geo_par": 700, "geo_jumlah": 3,
+        "faktor": 200, "faktor_jumlah": 3, "keputusan": 200, "keputusan_jumlah": 2,
+        "skenario": 200, "syarat": 130, "risiko": 200,
+        "teknikal": 500, "whale": 400, "detail_tambahan": True,
+        "penyebab_jumlah": 4, "penyebab_dasar": 160, "katalis": 250,
+    },
+    "ringkas": {
+        "judul": 120, "narasi_par": 420, "outlook": 260, "geo_par": 420, "geo_jumlah": 1,
+        "faktor": 120, "faktor_jumlah": 2, "keputusan": 130, "keputusan_jumlah": 1,
+        "skenario": 140, "syarat": 0, "risiko": 130,
+        "teknikal": 260, "whale": 220, "detail_tambahan": False,
+        # `penyebab_pergerakan` sempat TERLEWAT dari anggaran ini: empat butir
+        # dengan baris bukti 160 karakter masing-masing menyumbang ~1.000
+        # karakter yang tidak pernah ikut menyusut. Butirnya dipertahankan
+        # (itu jawaban atas "kenapa naik/turun") tapi baris buktinya dilepas —
+        # buktinya ada lengkap di web.
+        "penyebab_jumlah": 2, "penyebab_dasar": 0, "katalis": 0,
+    },
+}
+
+
+def _blok_ai(
+    brief: Dict[str, Any], paragraf_maks: int = 4, ringkas: bool = False
+) -> List[str]:
     ai = brief.get("ai") or {}
     critic = ai.get("critic") or {}
+    bat = _BATAS_AI["ringkas" if ringkas else "lega"]
 
     baris = ["", PEMISAH]
 
@@ -481,15 +606,14 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
         # ikut hilang bersama analisa yang gagal.
         baris.extend(_baris_pergerakan(brief, penuh=True))
         baris.append("<i>Analisa AI tidak tersedia pada run ini.</i>")
-        baris.append(PEMISAH)
-        return baris
+        return _rapikan_kosong(baris) + [PEMISAH]
 
     baris.append("✦ <b>ANALISA AI</b>")
     baris.extend(_baris_pergerakan(brief, penuh=False))
     # Judul memuat temuan utamanya — itu yang paling ingin dibaca duluan.
     judul = ((ai.get("bagian") or {}).get("judul") or "").strip()
     if judul:
-        baris.append(f"<b>{esc(_potong(judul, 160))}</b>")
+        baris.append(f"<b>{esc(_potong(judul, bat['judul']))}</b>")
         baris.append("")
     # Narasi lengkap dikirim beberapa paragraf, bukan cuma satu kalimat
     # pembuka — ruang 4096 karakter jauh lebih dari cukup, dan tangga
@@ -498,7 +622,7 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     if narasi_penuh:
         paragraf = [p.strip() for p in narasi_penuh.split("\n\n") if p.strip()]
         for par in paragraf[:paragraf_maks]:
-            baris.append(esc(_potong(par, 700)))
+            baris.append(esc(_potong(par, bat["narasi_par"])))
             baris.append("")
         if baris and baris[-1] == "":
             baris.pop()
@@ -510,13 +634,13 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     if penyebab:
         baris.append("")
         baris.append("<b>Penyebab utama:</b>")
-        for p in penyebab[:4]:
+        for p in penyebab[: bat["penyebab_jumlah"]]:
             panah = {"naik": "↑", "turun": "↓"}.get(p.get("arah"), "·")
             keyakinan = p.get("keyakinan")
             tanda = {"tinggi": "", "sedang": " (keyakinan sedang)", "rendah": " (keyakinan rendah)"}.get(keyakinan, "")
             baris.append(f"{panah} <b>{esc(p.get('faktor', ''))}</b>{tanda}")
-            if p.get("dasar"):
-                baris.append(f"   <i>{esc(_potong(p['dasar'], 160))}</i>")
+            if p.get("dasar") and bat["penyebab_dasar"]:
+                baris.append(f"   <i>{esc(_potong(p['dasar'], bat['penyebab_dasar']))}</i>")
 
     # Ke depan (makro, geopolitik, agenda) ditempatkan TEPAT SETELAH penyebab
     # pergerakan, sebelum teknikal dan whale — faktor-faktor ini sedang
@@ -527,49 +651,67 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     ol = ai.get("outlook") or {}
     if outlook_ai:
         baris.append("")
-        horizon = f" ({esc(ol['horizon'])})" if ol.get("horizon") else ""
-        baris.append(f"<b>Ke depan{horizon}:</b> " + esc(_potong(outlook_ai, 400)))
+        # Horizon dari model kerap SUDAH memuat kurung sendiri: "1-3 minggu ke
+        # depan (mencakup FOMC Minutes hingga rilis NFP awal September)".
+        # Membungkusnya lagi menghasilkan kurung bersarang, dan memotongnya di
+        # tengah meninggalkan kurung yang tidak pernah ditutup — dua-duanya
+        # terlihat di produksi. Keterangan dalam kurung itu dibuang saja: ia
+        # penjelas, bukan horizonnya, dan versi utuhnya ada di web.
+        teks_horizon = (ol.get("horizon") or "").split("(")[0].strip(" ,;-")
+        horizon = f" ({esc(_potong(teks_horizon, 60))})" if teks_horizon else ""
+        baris.append(f"<b>Ke depan{horizon}:</b> " + esc(_potong(outlook_ai, bat["outlook"])))
         # Geopolitik ditulis sebagai paragraf utuh, bukan tempelan satu baris.
         # Pasar belakangan bergerak mengikuti isu ini, jadi ruangnya diberi
         # jauh lebih lega daripada butir pendukung lain.
         if ol.get("narasi_geopolitik"):
             baris.append("")
-            baris.append("🌍 <b>Geopolitik &amp; regulasi</b>")
-            for par in [p.strip() for p in ol["narasi_geopolitik"].split("\n\n") if p.strip()][:3]:
-                baris.append(esc(_potong(par, 700)))
+            baris.append(f"{EMOJI['regulasi']} <b>Geopolitik &amp; regulasi</b>")
+            paragraf_geo = [p.strip() for p in ol["narasi_geopolitik"].split("\n\n") if p.strip()]
+            for par in paragraf_geo[: bat["geo_jumlah"]]:
+                baris.append(esc(_potong(par, bat["geo_par"])))
         if ol.get("faktor_geopolitik"):
-            for g in ol["faktor_geopolitik"][:3]:
-                baris.append("• " + esc(_potong(g, 200)))
+            for g in ol["faktor_geopolitik"][: bat["faktor_jumlah"]]:
+                baris.append("• " + esc(_potong(g, bat["faktor"])))
         if ol.get("keputusan_besar"):
-            for k in ol["keputusan_besar"][:2]:
+            for k in ol["keputusan_besar"][: bat["keputusan_jumlah"]]:
                 apa = k.get("apa", "")
-                kapan = f" ({esc(k['kapan'])})" if k.get("kapan") else ""
-                baris.append(f"📅 <b>{esc(apa)}{kapan}:</b> " + esc(_potong(k.get("kenapa_penting", ""), 200)))
+                # Sama seperti horizon: `kapan` dari model kerap sudah memuat
+                # kurung sendiri ("20 Agustus (01:00 WIB)"), jadi dibungkus
+                # lagi menghasilkan kurung bersarang.
+                teks_kapan = _bersihkan_kapan(k.get("kapan", "")).replace("(", "").replace(")", "").strip()
+                kapan = f" ({esc(teks_kapan)})" if teks_kapan else ""
+                baris.append(
+                    f"{EMOJI['agenda']} <b>{esc(apa)}{kapan}:</b> "
+                    + esc(_potong(k.get("kenapa_penting", ""), bat["keputusan"]))
+                )
         for nama, kunci, panah in (("Menguat", "skenario_naik", "↑"), ("Melemah", "skenario_turun", "↓")):
             sk = ol.get(kunci) or {}
             pemicu = sk.get("pemicu") or []
             if pemicu:
-                baris.append(f"{panah} <b>{nama}:</b> " + esc(_potong(", ".join(pemicu[:3]), 200)))
-                if sk.get("kondisi"):
-                    baris.append(f"   <i>syarat: {esc(_potong(sk['kondisi'], 130))}</i>")
+                baris.append(
+                    f"{panah} <b>{nama}:</b> "
+                    + esc(_potong(", ".join(pemicu[:3]), bat["skenario"]))
+                )
+                if sk.get("kondisi") and bat["syarat"]:
+                    baris.append(f"   <i>syarat: {esc(_potong(sk['kondisi'], bat['syarat']))}</i>")
         if ol.get("risiko_utama"):
-            baris.append("⚠ <b>Risiko:</b> " + esc(_potong(ol["risiko_utama"][0], 200)))
+            baris.append("⚠ <b>Risiko:</b> " + esc(_potong(ol["risiko_utama"][0], bat["risiko"])))
 
     tek = ai.get("teknikal") or {}
     if teknikal_ai:
         baris.append("")
-        baris.append("<b>Teknikal:</b> " + esc(_potong(teknikal_ai, 500)))
-        if tek.get("kontradiksi"):
+        baris.append("<b>Teknikal:</b> " + esc(_potong(teknikal_ai, bat["teknikal"])))
+        if bat["detail_tambahan"] and tek.get("kontradiksi"):
             baris.append("⚠ " + esc(_potong(tek["kontradiksi"][0], 200)))
-        if tek.get("pembatalan"):
+        if bat["detail_tambahan"] and tek.get("pembatalan"):
             baris.append("<i>Batal bila: " + esc(_potong(tek["pembatalan"], 200)) + "</i>")
 
     if whale_ai.get("ringkasan"):
         waspada = whale_ai.get("tingkat_kewaspadaan")
         tanda = "⚠️ " if waspada == "tinggi" else ""
         baris.append("")
-        baris.append(f"<b>Whale:</b> {tanda}" + esc(_potong(whale_ai["ringkasan"], 400)))
-        for sp in (whale_ai.get("sinyal_palsu") or [])[:2]:
+        baris.append(f"<b>Whale:</b> {tanda}" + esc(_potong(whale_ai["ringkasan"], bat["whale"])))
+        for sp in (whale_ai.get("sinyal_palsu") or [])[:2] if bat["detail_tambahan"] else []:
             if sp.get("keyakinan") in ("tinggi", "sedang"):
                 baris.append(f"• {esc(sp.get('pola',''))}: {esc(_potong(sp.get('arti',''), 150))}")
 
@@ -581,10 +723,10 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     if bagian.get("kesimpulan") and not narasi_penuh:
         baris.append("")
         baris.append("<b>Kesimpulan:</b> " + esc(_potong(bagian["kesimpulan"], 400)))
-    if bagian.get("katalis_berikutnya"):
+    if bagian.get("katalis_berikutnya") and bat["katalis"]:
         baris.append("")
         baris.append("<b>Katalis berikutnya:</b> " + esc(
-            _potong("; ".join(bagian["katalis_berikutnya"][:3]), 250)))
+            _potong("; ".join(bagian["katalis_berikutnya"][:3]), bat["katalis"])))
 
     baris.append("")
     # Kalimat bernada anjuran TIDAK menahan analisa — cuma diberi keterangan,
@@ -597,6 +739,9 @@ def _blok_ai(brief: Dict[str, Any], paragraf_maks: int = 4) -> List[str]:
     if not critic.get("dijalankan", True):
         baris.append("<i>⚠️ Belum sempat diverifikasi — pemeriksa fakta gagal dijalankan.</i>")
     baris.append("<i>Dihasilkan AI, dapat keliru.</i>")
+    # Ciutkan pemisah kosong yang bertumpuk akibat bagian yang absen; PEMISAH
+    # ditambahkan setelahnya supaya tidak ikut terhapus sebagai "ujung kosong".
+    baris = _rapikan_kosong(baris)
     baris.append(PEMISAH)
     return baris
 
@@ -626,7 +771,7 @@ def _blok_penutup(brief: Dict[str, Any], site_url: str) -> List[str]:
 
     if site_url:
         baris.append("")
-        baris.append(f"🔗 Selengkapnya: {esc(site_url)}")
+        baris.append(f"{EMOJI['tautan']} Selengkapnya: {esc(site_url)}")
     baris.append("<i>Informasi, bukan saran investasi.</i>")
     return baris
 
@@ -648,8 +793,10 @@ def render_terpisah(
     """
     batas_efektif = batas or BATAS_KARAKTER
     kepala = [
-        "📰 <b>Nawala</b> · <i>Ringkasan Pasar Kripto</i>",
-        f"🕐 {esc(brief.get('generated_at_wib', ''))}",
+        f"{EMOJI['merek']} <b>Nawala</b> · <i>Ringkasan Pasar Kripto</i>",
+        # Timestamp tanpa emoji: jam bukan penanda pasar, dan barisnya
+        # sudah jelas tanpa hiasan.
+        f"{esc(brief.get('generated_at_wib', ''))}",
     ]
     notice_mendesak = _notice_agenda_mendesak(brief)
     if notice_mendesak:
@@ -669,24 +816,37 @@ def render_terpisah(
     # dipertahankan lama; yang dikorbankan lebih dulu adalah daftar yang
     # gampang dibaca ulang di web.
     #
-    # Plafon paragraf AI dinaikkan satu tingkat saat `karakter_pergerakan`
-    # ditambahkan ke narasi: tanpa itu, paragraf baru di urutan kedua
-    # mendorong peta level dan kesimpulan keluar dari pesan.
-    #  (berita, pernyataan, paragraf_ai, sinyal, whale, agenda, data_tambahan)
+    # Kolom `ringkas` adalah sumbu degradasi KEDUA, ditambahkan setelah
+    # menemukan bahwa memangkas jumlah paragraf saja tidak cukup: blok AI
+    # punya belasan bagian berukuran tetap (geopolitik, keputusan besar,
+    # skenario, teknikal, whale) yang tidak tersentuh `paragraf_ai` sama
+    # sekali. Pada brief produksi 17 Agustus, blok AI mencapai 4.302 karakter
+    # — melebihi seluruh batas Telegram — sehingga tangga ini kehabisan cara
+    # dan pesan jatuh ke pemangkasan terakhir yang membuang SEMUA data pasar.
+    #  (berita, pernyataan, paragraf_ai, sinyal, whale, agenda, data_tambahan, ringkas)
     tangga = [
-        (4, 3, 5, True, True, True, True),
-        (3, 3, 5, True, True, True, True),
-        (3, 2, 4, True, True, True, True),
-        (2, 2, 4, True, True, True, True),
-        (2, 2, 2, True, True, True, True),
-        (1, 1, 2, True, True, True, True),
-        (0, 1, 2, False, True, True, True),
-        (0, 1, 2, False, True, True, False),  # buang opsi/valuasi/aliran
-        (0, 0, 2, False, False, True, False),
-        (0, 0, 1, False, False, False, False),
+        (4, 3, 5, True,  True,  True,  True,  False),
+        (3, 3, 5, True,  True,  True,  True,  False),
+        (3, 2, 4, True,  True,  True,  True,  False),
+        (2, 2, 4, True,  True,  True,  True,  False),
+        (2, 2, 2, True,  True,  True,  True,  False),
+        (1, 1, 2, True,  True,  True,  True,  False),
+        (0, 1, 2, False, True,  True,  True,  False),
+        (0, 1, 2, False, True,  True,  False, False),  # buang opsi/valuasi/aliran
+        # Mulai di sini blok AI sendiri yang diringkas, BUKAN data pasar yang
+        # dibuang. Data pasar murah (seluruh blok pasar cuma ~144 karakter,
+        # sudah termasuk arus ETF, funding, OI, dan Fear & Greed) dan tidak
+        # bisa dibaca ulang di tempat lain dalam sekali lihat; prosa AI mahal
+        # dan versi lengkapnya selalu tersedia di web.
+        (2, 2, 4, True,  True,  True,  True,  True),
+        (1, 1, 3, True,  True,  True,  True,  True),
+        (0, 1, 3, False, True,  True,  True,  True),
+        (0, 0, 2, False, True,  True,  False, True),
+        (0, 0, 2, False, False, True,  False, True),
+        (0, 0, 1, False, False, False, False, True),
     ]
 
-    for berita_n, pernyataan_n, ai_n, sinyal, whale, agenda, tambahan in tangga:
+    for berita_n, pernyataan_n, ai_n, sinyal, whale, agenda, tambahan, ringkas in tangga:
         bagian = kepala + inti
         if tambahan:
             bagian += _blok_opsi(brief) + _blok_valuasi(brief) + _blok_aliran(brief)
@@ -700,21 +860,35 @@ def render_terpisah(
             bagian += _blok_agenda(brief)
         bagian += _blok_pernyataan(brief, pernyataan_n)
         bagian += _blok_berita(brief, berita_n)
-        bagian += _blok_ai(brief, paragraf_maks=ai_n) + penutup
+        bagian += _blok_ai(brief, paragraf_maks=ai_n, ringkas=ringkas) + penutup
 
-        pesan = "\n".join(bagian)
+        # Dirapikan sekali di sini untuk SELURUH pesan, bukan per blok: tiap
+        # blok menambahkan pemisah kosongnya sendiri, jadi sambungan antar
+        # blok (dan blok yang kebetulan kosong) meninggalkan baris kosong
+        # bertumpuk. `kepala` sengaja tidak ikut dirapikan — baris kosong di
+        # ujungnya adalah pemisah yang disengaja, dan potongan `kepala_teks`
+        # di bawah bergantung pada panjangnya tetap persis.
+        pesan = "\n".join(kepala + _rapikan_kosong(bagian[len(kepala):]))
         if len(pesan) <= batas_efektif:
             return kepala_teks, pesan[len(kepala_teks):]
 
-    # Terakhir: pangkas isi blok AI sendiri, sisakan kepala + harga + penutup.
-    dasar = "\n".join(kepala + _blok_harga(brief))
-    sisa = batas_efektif - len(dasar) - len("\n".join(penutup)) - 120
-    ai_teks = "\n".join(_blok_ai(brief, paragraf_maks=1))
+    # Jalur terakhir. Yang dipertahankan adalah `inti` UTUH — harga, teknikal,
+    # posisi pasar (arus ETF, funding, OI, Fear & Greed), dan makro — bukan
+    # cuma harga seperti sebelumnya. Itu perbaikan langsung dari kasus nyata:
+    # pesan 17 Agustus sampai di sini dan pembaca kehilangan seluruh data
+    # pasar, padahal semuanya cuma ~420 karakter dan justru bagian yang tidak
+    # bisa direkonstruksi sendiri oleh pembaca. Prosa AI yang dipangkas,
+    # karena versi lengkapnya ada di web dan tautannya ikut terkirim.
+    panjang_dasar = len("\n".join(kepala + inti))
+    sisa = batas_efektif - panjang_dasar - len("\n".join(penutup)) - 120
+    ai_teks = "\n".join(_blok_ai(brief, paragraf_maks=1, ringkas=True))
     if sisa > 200:
-        ai_teks = ai_teks[:sisa].rsplit("\n", 1)[0] + f"\n…\n{PEMISAH}"
+        if len(ai_teks) > sisa:
+            ai_teks = ai_teks[:sisa].rsplit("\n", 1)[0] + f"\n…\n{PEMISAH}"
     else:
         ai_teks = ""
-    pesan = "\n".join([dasar, ai_teks] + penutup)
+    ekor = _rapikan_kosong(inti + ([ai_teks] if ai_teks else []) + penutup)
+    pesan = "\n".join(kepala + ekor)
     if len(pesan) > batas_efektif:
         pesan = pesan[: batas_efektif - 60].rsplit("\n", 1)[0] + "\n\n…\n<i>Pesan dipotong.</i>"
     return kepala_teks, pesan[len(kepala_teks):]
