@@ -139,7 +139,7 @@ function briefApp() {
         const resp = await fetch(`${berkas}?t=${Date.now()}`, { cache: 'no-store' });
         if (!resp.ok) throw new Error(`Berkas data tidak ditemukan (HTTP ${resp.status}).`);
         const isi = await resp.json();
-        if (!isi || !isi.price) throw new Error('Struktur data tidak dikenali.');
+        if (!isi || !isi.price) throw new Error('Format datanya tidak dikenali.');
         this.data = isi;
       } catch (e) {
         this.data = null;
@@ -1179,7 +1179,7 @@ function briefApp() {
         { id: 's-pasar', label: 'Pasar', ada: true },
         { id: 's-institusional', label: 'Opsi & Valuasi', ada: this.adaDataInstitusional },
         { id: 's-whale', label: 'Whale', ada: this.adaDataWhale || !!d.technical?.sinyal_palsu?.length },
-        { id: 's-ai', label: 'Analisa AI', ada: true },
+        { id: 's-ai', label: 'Ulasan', ada: true },
         { id: 's-agenda', label: 'Agenda', ada: true },
         { id: 's-berita', label: 'Berita', ada: !!d.news?.length || !!d.statements?.length },
       ];

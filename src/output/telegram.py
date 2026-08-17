@@ -601,14 +601,14 @@ def _blok_ai(
     outlook_ai = (ai.get("outlook") or {}).get("ringkasan") or ""
 
     if not any([narasi, teknikal_ai, whale_ai.get("ringkasan"), outlook_ai]):
-        baris.append("✦ <b>ANALISA AI</b>")
+        baris.append("✦ <b>ULASAN LENGKAP</b>")
         # Arah dan sifat pergerakan tetap dikirim: itu hitungan kode, tidak
         # ikut hilang bersama analisa yang gagal.
         baris.extend(_baris_pergerakan(brief, penuh=True))
         baris.append("<i>Analisa AI tidak tersedia pada run ini.</i>")
         return _rapikan_kosong(baris) + [PEMISAH]
 
-    baris.append("✦ <b>ANALISA AI</b>")
+    baris.append("✦ <b>ULASAN LENGKAP</b>")
     baris.extend(_baris_pergerakan(brief, penuh=False))
     # Judul memuat temuan utamanya — itu yang paling ingin dibaca duluan.
     judul = ((ai.get("bagian") or {}).get("judul") or "").strip()

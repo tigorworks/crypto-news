@@ -82,7 +82,7 @@ def _tag_seimbang(teks: str) -> Optional[str]:
 # Angka termasuk desimal dan pemisah ribuan, dengan tanda opsional.
 POLA_ANGKA = re.compile(r"-?\d[\d.,]*")
 
-PENANDA_WAJIB = ("ANALISA AI", "bukan saran investasi")
+PENANDA_WAJIB = ("ULASAN LENGKAP", "bukan saran investasi")
 
 
 def _angka_dinormalkan(teks: str) -> Set[str]:
@@ -235,7 +235,7 @@ def _prompt() -> str:
         "  - JANGAN mengubah angka apa pun. Satu digit pun tidak.\n"
         "  - JANGAN menambah angka baru, termasuk perhitungan sendiri.\n"
         "  - JANGAN menambah fakta, klaim, atau kesimpulan yang tidak ada.\n"
-        "  - JANGAN menghapus angka penting, penanda ANALISA AI, atau disclaimer.\n"
+        "  - JANGAN menghapus angka penting, penanda ULASAN LENGKAP, atau disclaimer.\n"
         "  - JANGAN memberi saran beli/jual atau target harga.\n"
         "  - JANGAN meringkas atau memendekkan isi. Setiap bagian di pesan asli "
         "(penyebab pergerakan, pandangan ke depan, teknikal, whale, kesimpulan, "
