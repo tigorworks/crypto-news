@@ -732,16 +732,24 @@ function briefApp() {
       return baris;
     },
 
-    /* Warna kontainer mengikuti urgensi TERTINGGI di antara barisnya, supaya
-       hari genting tetap berteriak walau widget-nya sudah digabung. */
+    /* Kartu Sorotan muncul kalau SALAH SATU isinya ada. Tanpa penjaga ini
+       kartu kosong bisa terbit di hari yang sepi — kotak berjudul tanpa isi
+       lebih buruk daripada tidak ada kotak sama sekali. */
+    get sorotanAda() {
+      const adaAi = !!(this.pergerakan24j?.arah
+        || (this.bagianAiTampil('narasi') && this.data?.ai?.bagian?.judul));
+      return adaAi || this.barisDitunggu.length > 0;
+    },
+
+    /* Kartu Sorotan sengaja NETRAL. Sebelum ringkasan AI ikut masuk ke sini,
+       latar kartunya diwarnai urgensi tertinggi — dan itu masuk akal selama
+       isinya cuma alarm. Begitu vonis pasar tinggal di kartu yang sama,
+       mewarnai seluruh kartu berarti headline ikut dicat merah gara-gara
+       jendela kebijakan yang tidak ada hubungannya dengan isi headline itu.
+
+       Urgensinya pindah ke garis aksen per baris (lihat `.baris-sorotan`),
+       jadi yang mendesak tetap menonjol tanpa menyeret tetangganya. */
     get kelasBarDitunggu() {
-      const b = this.barisDitunggu;
-      if (b.some((x) => x.mendesak)) {
-        return 'border-2 border-rose-300 dark:border-rose-700/70 bg-rose-50/70 dark:bg-rose-900/20';
-      }
-      if (b.some((x) => x.perhatian)) {
-        return 'border-2 border-amber-300 dark:border-amber-700/70 bg-amber-50/70 dark:bg-amber-900/20';
-      }
       return 'border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60';
     },
 
@@ -749,6 +757,17 @@ function briefApp() {
       if (b.mendesak) return 'text-rose-700 dark:text-rose-300';
       if (b.perhatian) return 'text-amber-700 dark:text-amber-300';
       return 'text-slate-600 dark:text-slate-300';
+    },
+
+    /* Nilai HEX/rgba, bukan kelas utility: `border-l-*` terbukti kalah oleh
+       `border-*` menurut urutan stylesheet dan gagal diam jadi garis 1px
+       kelabu. Sekali kena, cukup. */
+    gayaBarisSorotan(b) {
+      const warna = b.mendesak ? '#f43f5e' : b.perhatian ? '#f59e0b' : '#cbd5e1';
+      const latar = b.mendesak
+        ? 'rgba(244,63,94,0.09)'
+        : b.perhatian ? 'rgba(245,158,11,0.09)' : 'transparent';
+      return `--aksen-baris: ${warna}; --latar-baris: ${latar}`;
     },
 
     /* Kalimat posisi waktu — bagian yang membuat berita yang sama berbahaya
