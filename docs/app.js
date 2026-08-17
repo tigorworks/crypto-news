@@ -121,6 +121,8 @@ function briefApp() {
     grafik: null,
     _jam: null,
     _detak: 0,          // dinaikkan tiap menit supaya waktu relatif ikut menyegar
+    tampilKeAtas: false,
+    _padaGulir: null,
 
     // ---------------------------------------------------------------
     // Siklus hidup
@@ -130,6 +132,28 @@ function briefApp() {
       await this.muatArsip();
       // Waktu relatif ("3 jam lalu") perlu dihitung ulang berkala.
       this._jam = setInterval(() => { this._detak++; }, 60000);
+
+      // Tombol "kembali ke atas". Ambangnya relatif terhadap tinggi jendela,
+      // bukan angka piksel mati: 600 px berarti satu layar penuh di ponsel
+      // tapi baru dua pertiga layar di desktop, sehingga tombolnya muncul
+      // pada saat yang terasa berbeda di tiap perangkat.
+      //
+      // Listener-nya `passive` supaya tidak menahan gulir — halaman ini
+      // panjang dan digulir jauh, jadi handler yang memblokir langsung
+      // terasa sebagai gulir yang tersendat.
+      this._padaGulir = () => {
+        this.tampilKeAtas = window.scrollY > window.innerHeight * 0.8;
+      };
+      window.addEventListener('scroll', this._padaGulir, { passive: true });
+      this._padaGulir();   // halaman bisa dibuka dalam keadaan sudah tergulir
+    },
+
+    /* Gulir balik ke puncak. <html> memakai scroll-smooth, jadi animasinya
+       datang gratis — kecuali bagi pengguna yang meminta gerakan dikurangi,
+       yang di sini dilompati langsung. */
+    keAtas() {
+      const kurangiGerak = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, left: 0, behavior: kurangiGerak ? 'instant' : 'smooth' });
     },
 
     async muat(berkas = 'data/latest.json') {
