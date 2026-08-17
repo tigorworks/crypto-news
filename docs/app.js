@@ -791,7 +791,14 @@ function briefApp() {
       const latar = b.mendesak
         ? 'rgba(244,63,94,0.09)'
         : b.perhatian ? 'rgba(245,158,11,0.09)' : 'transparent';
-      return `--aksen-baris: ${warna}; --latar-baris: ${latar}`;
+      // Hover menebalkan tint milik barisnya sendiri, bukan memakai satu abu
+      // seragam: baris siaga yang sudah beraksen kuning akan terlihat berkedip
+      // ke kelabu kalau warnanya diganti jenis saat disentuh. Baris netral —
+      // yang memang tak punya tint — barulah memakai abu transparan.
+      const hover = b.mendesak
+        ? 'rgba(244,63,94,0.18)'
+        : b.perhatian ? 'rgba(245,158,11,0.18)' : 'rgba(148,163,184,0.16)';
+      return `--aksen-baris: ${warna}; --latar-baris: ${latar}; --latar-hover: ${hover}`;
     },
 
     /* Kalimat posisi waktu — bagian yang membuat berita yang sama berbahaya
