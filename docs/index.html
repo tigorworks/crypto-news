@@ -670,8 +670,18 @@
                   <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">ATR (14)</dt>
                     <dd><span x-text="uang(tfAktif.volatilitas.atr)"></span>
                       <span class="text-slate-400 text-xs" x-text="'· ' + angka(tfAktif.volatilitas.atr_pct, 2) + '%'"></span></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">Volume vs rata²</dt>
-                    <dd x-text="tfAktif.volume.rasio_vs_rata ? angka(tfAktif.volume.rasio_vs_rata, 2) + '×' : '—'"></dd></div>
+                  <!-- Angkanya tetap ditampilkan apa adanya, tapi diberi tanda
+                       saat candle harian belum penuh: volume menumpuk
+                       sepanjang hari, jadi rasio dari candle setengah jalan
+                       selalu terbaca rendah tanpa berarti pasarnya sepi. -->
+                  <div class="flex justify-between gap-2"><dt class="text-slate-500 dark:text-slate-400">Volume vs rata²</dt>
+                    <dd class="text-right">
+                      <span x-text="tfAktif.volume.rasio_vs_rata ? angka(tfAktif.volume.rasio_vs_rata, 2) + '×' : '—'"></span>
+                      <template x-if="tfAktif.volume.parsial">
+                        <span class="block text-[11px] text-slate-400"
+                              x-text="'hari berjalan ' + persen(tfAktif.volume.kelengkapan * 100, 0).replace('+','')"></span>
+                      </template>
+                    </dd></div>
                   <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">OBV</dt>
                     <dd x-text="tfAktif.volume.obv_arah"></dd></div>
                   <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">VWAP harian</dt>

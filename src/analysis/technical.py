@@ -14,6 +14,18 @@ import numpy as np
 import pandas as pd
 
 from ..utils.format import angka_id, persen_id
+from ..utils.timezone import now_utc
+
+#: Di bawah ambang ini, volume candle terakhir belum layak dibandingkan dengan
+#: rata-rata harian penuh. Candle harian Binance berganti tepat 00:00 UTC dan
+#: volumenya menumpuk sepanjang hari, jadi candle yang baru berjalan separuh
+#: otomatis membaca "tipis" berapa pun ramainya pasar.
+#:
+#: Angkanya dipilih dari jadwal: cron pukul 23.15 UTC memberi candle sekitar
+#: 97% terisi, jadi ambang 90% memberi ruang molor eksekusi tanpa pernah
+#: menolak run terjadwal. Yang tersaring justru run manual di tengah hari —
+#: dan itu memang yang bermasalah.
+AMBANG_CANDLE_LENGKAP = 0.9
 
 log = logging.getLogger(__name__)
 
@@ -253,6 +265,28 @@ def _f(value: Any, digits: int = 2) -> Optional[float]:
     return round(v, digits)
 
 
+def _kelengkapan_candle(df: pd.DataFrame) -> Optional[float]:
+    """Seberapa jauh candle TERAKHIR sudah berjalan, dalam 0..1.
+
+    Durasinya diukur dari jarak antar candle di data itu sendiri, bukan
+    ditebak dari nama timeframe — fungsi ini tidak menerima label timeframe,
+    dan menebaknya akan salah diam-diam kalau sumber datanya berganti.
+
+    Dibutuhkan karena `volume.terakhir` diambil dari candle yang MASIH
+    BERJALAN. Pada brief 17 Agustus pukul 11.28 UTC candle harian baru
+    berumur 11,5 jam, dan volumenya terbaca 0,67x rata-rata 20 hari —
+    di bawah ambang "volume tipis" — padahal dengan laju yang sama ia akan
+    mendarat di sekitar 1,40x, alias di ATAS rata-rata.
+    """
+    if len(df) < 2 or "waktu" not in df.columns:
+        return None
+    durasi = (df["waktu"].iloc[-1] - df["waktu"].iloc[-2]).total_seconds()
+    if durasi <= 0:
+        return None
+    lewat = (now_utc() - df["waktu"].iloc[-1].to_pydatetime()).total_seconds()
+    return max(0.0, min(1.0, lewat / durasi))
+
+
 def analyze_timeframe(klines: List[Dict[str, Any]]) -> Dict[str, Any]:
     df = _to_frame(klines)
     if df.empty or len(df) < 30:
@@ -278,6 +312,7 @@ def analyze_timeframe(klines: List[Dict[str, Any]]) -> Dict[str, Any]:
         if pd.notna(emas[p].iloc[-1])
     }
 
+    kelengkapan = _kelengkapan_candle(df)
     volume_terakhir = float(df["volume"].iloc[-1])
     volume_rata = float(volume_ma20.iloc[-1]) if pd.notna(volume_ma20.iloc[-1]) else 0.0
     obv_slope = float(obv_series.iloc[-1] - obv_series.iloc[-6]) if len(obv_series) > 6 else 0.0
@@ -334,6 +369,11 @@ def analyze_timeframe(klines: List[Dict[str, Any]]) -> Dict[str, Any]:
             "terakhir": _f(volume_terakhir, 0),
             "rata_20": _f(volume_rata, 0),
             "rasio_vs_rata": _f(volume_terakhir / volume_rata if volume_rata else None),
+            # Rasio di atas hanya sebanding kalau candle-nya sudah hampir
+            # penuh. Kedua field ini yang menentukan boleh-tidaknya rasio itu
+            # dipakai menyimpulkan sesuatu — bukan rasionya sendiri.
+            "kelengkapan": _f(kelengkapan, 3),
+            "parsial": bool(kelengkapan is not None and kelengkapan < AMBANG_CANDLE_LENGKAP),
             "obv": _f(obv_series.iloc[-1], 0),
             "obv_arah": "naik" if obv_slope > 0 else "turun" if obv_slope < 0 else "datar",
             "vwap_harian": _f(vwap_harian(df)),
@@ -511,8 +551,14 @@ def karakter_pergerakan_24j(
         if jenis:
             jenis_ringkas, jenis_arti = _ARTI_JENIS[jenis]
 
-    volume_rasio = ((harian.get("volume") or {}).get("rasio_vs_rata"))
+    vol = harian.get("volume") or {}
+    volume_rasio = vol.get("rasio_vs_rata")
     volume_rasio = float(volume_rasio) if volume_rasio else None
+    # Candle yang belum penuh selalu terbaca tipis, jadi konfirmasi volume
+    # DITAHAN — bukan dipaksa jadi "tidak dikonfirmasi", yang justru akan
+    # membuat pergerakan sah terbaca meragukan hanya karena jam menjalankan.
+    if vol.get("parsial"):
+        volume_rasio = None
     if volume_rasio is None:
         volume_konfirmasi = None
     elif volume_rasio >= 1.2:

@@ -2,14 +2,22 @@ name: btc-brief
 
 on:
   schedule:
-    # 23:30 UTC = 06:30 WIB. Sengaja BUKAN 00:00 UTC (07:00 WIB): candle
+    # 23:15 UTC = 06:15 WIB. Sengaja BUKAN 00:00 UTC (07:00 WIB): candle
     # harian Binance berganti tepat di 00:00 UTC, jadi menjalankan brief di
     # jam itu membuat candle 1D baru berumur nol menit — volume nyaris nol
-    # dan VWAP harian tidak bermakna. Pada 23:30 UTC candle sudah terisi
-    # 23,5 jam, sesi AS sudah tutup, dan arus ETF harian sudah terbit.
+    # dan VWAP harian tidak bermakna. Pada 23:15 UTC candle sudah terisi
+    # 23,25 jam (97%), sesi AS sudah tutup, dan arus ETF harian sudah terbit.
+    #
+    # Digeser dari 23:30 karena cron GitHub TIDAK tepat waktu — antreannya
+    # kerap menunda eksekusi sepuluh menit atau lebih. Dengan pipeline yang
+    # butuh ~8 menit, jadwal 23:30 hanya menyisakan margin tipis sebelum
+    # pergantian candle; molor setengah jam akan membuat run dimulai setelah
+    # 00:00 UTC dan membaca candle harian yang baru lahir. 23:15 memberi
+    # margin 45 menit.
+    #
     # Satu-satunya jadwal cron — jangan tambah entri lain tanpa alasan kuat,
     # supaya briefnya tetap terbit sekali sehari pada jam yang bisa diandalkan.
-    - cron: '30 23 * * *'
+    - cron: '15 23 * * *'
   workflow_dispatch:
 
 permissions:
