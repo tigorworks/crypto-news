@@ -109,111 +109,51 @@
     --meter-ring:   #1e293b;   /* slate-800 */
   }
 
-  /* ===== Tombol tautan luar (CTA) =====
-     Sebelumnya pil datar `bg-amber-500` seukuran teks biasa — secara visual
-     setara dengan label, jadi tidak pernah terbaca sebagai AJAKAN. Karena ini
-     satu-satunya pintu ke produk lain di halaman ini, ia pantas punya bobot
-     visual sendiri.
+  /* ===== Tautan ke situs luar =====
+     Dulu tombol gradien oranye dengan bayangan dan animasi angkat. Waktu itu
+     tepat: halaman ini penuh kotak berwarna, dan pil datar seukuran teks
+     biasa tenggelam di antaranya.
 
-     Ditulis sebagai CSS, bukan utility class, dengan alasan yang sama seperti
-     token meter di atas: gradien, transform, dan keyframe adalah justru jenis
-     utility yang paling mungkin tidak ikut ter-generate — dan kalau itu
-     terjadi tombolnya kembali datar TANPA error apa pun. */
-  .cta-luar {
-    position: relative;
-    overflow: hidden;
+     Halaman sudah berubah sejak itu — kartu jadi netral, border tebal tinggal
+     satu, warna dipakai hemat. Tombol oranye bergradien akhirnya jadi benda
+     paling ramai di layar, dan menariknya perhatian ke tautan keluar justru
+     mengalahkan isi utamanya sendiri.
+
+     Sekarang tautan teks biasa: garis bawah tipis yang menebal saat disentuh,
+     dengan ikon kecil penanda situs luar. Ditulis sebagai properti CSS, bukan
+     utility, mengikuti kebijakan yang sama seperti token meter — warna dan
+     dekorasi yang gagal ter-generate hilang tanpa error. */
+  .tautan-luar {
     display: inline-flex;
     align-items: center;
-    gap: 0.7rem;
-    padding: 0.7rem 1.1rem;
-    border-radius: 0.75rem;
-    color: #fff;
-    font-weight: 600;
-    line-height: 1.2;
-    text-decoration: none;
-    background: linear-gradient(135deg, #f59e0b 0%, #f97316 55%, #ea580c 100%);
-    box-shadow: 0 4px 14px -4px rgba(234, 88, 12, 0.55);
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    gap: 0.35rem;
+    color: #c2410c;                 /* orange-700 — jejak identitas lama */
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: rgba(194, 65, 12, 0.35);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.15s ease;
   }
-  .cta-luar:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 24px -6px rgba(234, 88, 12, 0.7);
+  .tautan-luar:hover { text-decoration-color: currentColor; }
+  .tautan-luar:focus-visible {
+    outline: 2px solid #c2410c;
+    outline-offset: 3px;
+    border-radius: 0.25rem;
   }
-  .cta-luar:active { transform: translateY(0); }
-  /* Fokus keyboard harus terlihat di atas gradien, jadi cincin putih DI DALAM
-     plus halo oranye di luar — outline biasa tenggelam di warna terangnya. */
-  .cta-luar:focus-visible {
-    outline: 2px solid #fff;
-    outline-offset: -4px;
-    box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.55);
+  /* Tema gelap ditandai KELAS `.dark` di <html> (tailwind darkMode: 'class'),
+     bukan atribut data-theme. Versi pertama memakai
+     `:root:not([data-theme="light"])`, yang di sini cocok SELALU — halaman ini
+     tidak pernah memasang atribut itu — sehingga warna gelap ikut terpakai di
+     mode terang. Tanpa error, seperti biasa; terlihat cuma karena warnanya
+     diukur. Pola di bawah mengikuti token meter di atas. */
+  .dark .tautan-luar {
+    color: #fdba74;                 /* orange-300 — kontras cukup di latar gelap */
+    text-decoration-color: rgba(253, 186, 116, 0.4);
   }
-
-  .cta-luar__ikon {
-    display: grid;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    flex: none;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.22);
-  }
-  .cta-luar__teks { min-width: 0; }
-  .cta-luar__label { display: block; }
-  .cta-luar__sub {
-    display: block;
-    font-size: 0.72rem;
-    font-weight: 400;
-    opacity: 0.9;
-    margin-top: 0.1rem;
-  }
-  .cta-luar__panah {
-    flex: none;
-    margin-left: auto;
-    padding-left: 0.25rem;
-    transition: transform 0.18s ease;
-  }
-  .cta-luar:hover .cta-luar__panah { transform: translateX(3px); }
-  /* Ukuran ikon dipatok di sini, bukan lewat w-4/h-4: Lucide mengganti
-     elemen ikonnya jadi SVG dan menyalin kelasnya apa adanya, jadi utility
-     yang hilang membuat ikon melar memenuhi tombol. */
-  .cta-luar svg { width: 1rem; height: 1rem; }
-  .cta-luar__ikon svg { width: 1.05rem; height: 1.05rem; }
-
-  /* Kilau lembut yang lewat sesekali — menarik mata tanpa berkedip terus.
-     Jeda panjang (65% dari siklus) sengaja: gerakan konstan mengganggu
-     pembacaan di halaman yang isinya angka. */
-  .cta-luar::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -60%;
-    width: 35%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
-    transform: skewX(-20deg);
-    animation: cta-kilau 4s ease-in-out infinite;
-    pointer-events: none;
-  }
-  @keyframes cta-kilau {
-    0%, 65% { left: -60%; }
-    100%    { left: 135%; }
-  }
-
-  /* Di ponsel jadi selebar kartu: target sentuh lebih besar dan bacaannya
-     lebih tegas sebagai ajakan, bukan tempelan. */
-  @media (max-width: 639px) {
-    .cta-luar { width: 100%; }
-  }
-
-  /* Hormati pengguna yang meminta gerakan dikurangi — kilau dan angkatnya
-     dimatikan, warnanya tetap. */
-  @media (prefers-reduced-motion: reduce) {
-    .cta-luar,
-    .cta-luar__panah { transition: none; }
-    .cta-luar:hover { transform: none; }
-    .cta-luar::after { animation: none; opacity: 0; }
-  }
-
+  .dark .tautan-luar:focus-visible { outline-color: #fdba74; }
+  .dark .tautan-luar__sub { color: #94a3b8; }
+  .tautan-luar__ikon { width: 0.85em; height: 0.85em; flex-shrink: 0; opacity: 0.75; }
+  .tautan-luar__sub { color: #64748b; font-weight: 400; }
   /* Scroll anchoring bawaan browser mencoba mengoreksi sendiri saat tinggi
      konten berubah, tapi cuma sebagian dan bertabrakan dengan koreksi kita
      sendiri di gantiHalaman*() (lihat _pindahHalamanTerjaga di app.js) —
@@ -427,7 +367,7 @@
                 </template>
 
                 <a href="#s-ai" class="mt-3 inline-flex items-center gap-1 text-sm text-indigo-700 dark:text-indigo-300 hover:underline">
-                  <span>Baca analisa lengkap</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                  <span>Baca analisa lengkap</span>
                 </a>
               </div>
             </template>
@@ -507,19 +447,14 @@
             <template x-if="data.tautan_luar?.length">
               <div class="mt-4 flex flex-wrap gap-2">
                 <template x-for="t in data.tautan_luar" :key="t.url">
-                  <a :href="t.url" target="_blank" rel="noopener noreferrer" class="tap cta-luar">
-                    <span class="cta-luar__ikon">
-                      <i :data-lucide="t.ikon || 'external-link'"></i>
-                    </span>
-                    <span class="cta-luar__teks">
-                      <span class="cta-luar__label" x-text="t.label"></span>
-                      <!-- Subjudul opsional: judul saja sering tidak cukup
-                           memberi tahu apa yang menanti di balik tautan. -->
-                      <template x-if="t.deskripsi">
-                        <span class="cta-luar__sub" x-text="t.deskripsi"></span>
-                      </template>
-                    </span>
-                    <i data-lucide="arrow-right" class="cta-luar__panah"></i>
+                  <a :href="t.url" target="_blank" rel="noopener noreferrer" class="tap tautan-luar text-sm">
+                    <i :data-lucide="t.ikon || 'external-link'" class="tautan-luar__ikon"></i>
+                    <span x-text="t.label"></span>
+                    <!-- Subjudul opsional: judul saja sering tidak cukup
+                         memberi tahu apa yang menanti di balik tautan. -->
+                    <template x-if="t.deskripsi">
+                      <span class="tautan-luar__sub" x-text="'— ' + t.deskripsi"></span>
+                    </template>
                   </a>
                 </template>
               </div>

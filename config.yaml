@@ -303,7 +303,7 @@ repo_url: https://github.com/tigorworks/crypto-news
 # tidak cukup memberi tahu apa yang menanti di balik tautan — isi kalau
 # tombolnya perlu menjelaskan dirinya, kosongkan kalau labelnya sudah jelas.
 tautan_luar:
-  - label: Arena Pertempuran BTC
+  - label: Lihat Arena Pertempuran BTC
     url: https://tigorworks.github.io/crypto-battlefield/
     ikon: swords
     deskripsi: ""
