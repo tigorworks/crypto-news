@@ -640,9 +640,32 @@ function briefApp() {
        Alarm hanya muncul pada siaga sedang/tinggi. Pada siaga rendah panel
        ini DIAM — alarm yang menyala tiap hari akan diabaikan justru pada
        hari ia benar-benar berarti. */
+    /* Siaga BERAKHIR begitu bursa yang ditunggunya buka.
+
+       Versi sebelumnya menyisakan barisnya dengan label "JENDELA LEWAT",
+       dengan alasan reaksi pembukaan itu sendiri layak diberitakan. Alasan
+       itu tidak bertahan: barisnya tidak MENUNJUKKAN reaksi apa pun — ia
+       cuma mengumumkan bahwa jendelanya sudah tutup. Kartu bernama Sorotan
+       lalu dibuka oleh peristiwa yang sudah selesai dan tidak membawa kabar
+       baru, sampai sepuluh jam lamanya kalau bursa buka malam dan brief
+       berikutnya pagi.
+
+       Yang lebih berbahaya ada di bawahnya: seluruh prosa bagian #s-siaga —
+       pemicu, skenario, "ditanggung pasar kripto sendirian" — ditulis saat
+       jendelanya masih terbuka. Membiarkan barisnya berarti mengundang
+       pembaca ke uraian yang premisnya sudah gugur.
+
+       Karena keduanya digerakkan getter ini, satu penjagaan di sini
+       memadamkan baris dan bagian rinciannya sekaligus. */
     get siagaKebijakan() {
+      this._detak;  // ikut menyegar tiap menit supaya padam tepat waktu
       const a = this.data?.agen_kebijakan;
       if (!a || !['sedang', 'tinggi'].includes(a.siaga)) return null;
+      const buka = a.jendela?.buka_berikutnya_utc;
+      if (buka) {
+        const t = new Date(buka);
+        if (!Number.isNaN(t.getTime()) && t.getTime() <= Date.now()) return null;
+      }
       return a;
     },
 
@@ -707,32 +730,27 @@ function briefApp() {
       if (s) {
         const j = s.jendela || {};
         const mundur = this.hitungMundurLive(j.buka_berikutnya_utc);
-        // Jendela yang sudah lewat TIDAK disembunyikan diam-diam: prosa
-        // agennya ditulis saat jendela masih terbuka, jadi menyisakannya
-        // tanpa penanda akan membiarkan alarm lama berbunyi setelah
-        // sebabnya hilang. Barisnya berganti keadaan secara terbuka.
-        const lewat = !!mundur?.lewat;
+        // Tidak ada lagi cabang "sudah lewat" di sini: getter siagaKebijakan
+        // memulangkan null begitu bursanya buka, jadi baris ini hanya pernah
+        // ada selama jendelanya masih berjalan.
         baris.push({
           jenis: 'siaga',
-          ikon: lewat ? 'check-circle' : (s.siaga === 'tinggi' ? 'siren' : 'landmark'),
+          ikon: s.siaga === 'tinggi' ? 'siren' : 'landmark',
           // Label dipendekkan supaya muat sebaris dengan hitung mundur, persis
           // seperti baris agenda. Versi panjang ("SIAGA KEBIJAKAN: SEDANG")
           // membungkus dan mendorong hitung mundur ke baris sendiri, sehingga
           // dua baris yang isinya sejenis tampil dengan susunan berbeda dan
           // terbaca seolah mengukur hal yang berbeda. Tingkat siaganya pindah
           // ke chip di sebelah nama.
-          label: lewat ? 'JENDELA LEWAT' : 'SIAGA KEBIJAKAN',
-          tingkat: lewat ? '' : s.siaga,
+          label: 'SIAGA KEBIJAKAN',
+          tingkat: s.siaga,
           mundur,
           jangkar: j.buka_berikutnya_wib || '',
           awalan: 'bursa AS buka',
-          isi: lewat
-            ? 'Bursa AS dan ETF sudah buka — jendela akhir pekan ini berakhir, '
-              + 'dan tekanan mulai bisa diserap arus institusi lagi.'
-            : this.kalimatJendelaRingkas,
+          isi: this.kalimatJendelaRingkas,
           tautan: '#s-siaga',
-          mendesak: !lewat && s.siaga === 'tinggi',
-          perhatian: !lewat,
+          mendesak: s.siaga === 'tinggi',
+          perhatian: true,
         });
       }
 
