@@ -637,7 +637,7 @@ def render_terpisah(
     """Sama seperti render(), tapi judul+waktu dipisah dari sisa pesan.
 
     Dipakai supaya perapi LLM (stylist) hanya pernah melihat dan menata
-    BADAN pesan — judul "Ringkasan Pasar Bitcoin" dan timestamp tidak pernah
+    BADAN pesan — judul "Nawala" dan timestamp tidak pernah
     dikirim ke LLM sama sekali, jadi tidak mungkin hilang atau tertulis
     ulang biar pun modelnya lupa instruksi "pertahankan judul". Sebelumnya
     judul ini kadang hilang dari pesan yang sudah dirapikan karena
@@ -648,7 +648,7 @@ def render_terpisah(
     """
     batas_efektif = batas or BATAS_KARAKTER
     kepala = [
-        "📊 <b>Ringkasan Pasar Bitcoin</b>",
+        "📰 <b>Nawala</b> · <i>Ringkasan Pasar Kripto</i>",
         f"🕐 {esc(brief.get('generated_at_wib', ''))}",
     ]
     notice_mendesak = _notice_agenda_mendesak(brief)

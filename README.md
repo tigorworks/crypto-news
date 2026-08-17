@@ -1,4 +1,4 @@
-# Ringkasan Pasar Bitcoin
+# Nawala — Ringkasan Pasar Kripto
 
 Cronjob harian yang mengambil data pasar Bitcoin, menganalisanya, lalu menghasilkan dua keluaran:
 
@@ -713,7 +713,7 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 |---|---|
 | Analisa AI di Telegram terasa sangat pendek, cuma bahas teknikal | Critic menahan `narasi` dan/atau `outlook` karena kesalahan ANGKA (cek `ai.bagian_ditahan` di `latest.json`; sejak pelonggaran setelah revisi, hanya `angka_karangan` yang bisa sampai ke sini) — bagian yang tersisa (teknikal/whale) memang tampil sendirian, tanpa penjelasan ke pembaca (disengaja, lihat bagian Pelabelan AI). Cek `ai.critic.corrections` untuk tahu alasannya. Kalau `pengetahuan_luar` dipakai untuk kalimat yang sebenarnya cuma menafsirkan data yang ada, itu prompt critic yang perlu diperjelas lagi — lihat bagian "Kalau critic menemukan masalah". |
 | Critic menahan narasi karena "volume 24 jam" dianggap karangan | Ada dua angka volume yang berbeda: `harga.volume_24h` (rolling 24 jam sungguhan) vs `teknikal_1d.volume.terakhir`/`.rata_20` (volume per candle harian, bisa jauh berbeda karena batas UTC candle). Prompt sudah diperjelas soal ini; kalau masih terjadi, cek apakah model yang dipakai benar-benar mengikuti instruksi sistemnya. |
-| Judul "Ringkasan Pasar Bitcoin" hilang dari pesan Telegram yang dirapikan | Sudah diperbaiki — judul dan timestamp sekarang selalu ditambahkan oleh KODE setelah perapian, tidak pernah dikirim ke LLM sama sekali (`telegram.render_terpisah()`). Kalau masih hilang, berarti bukan dari jalur ini. |
+| Judul "Nawala" hilang dari pesan Telegram yang dirapikan | Sudah diperbaiki — judul dan timestamp sekarang selalu ditambahkan oleh KODE setelah perapian, tidak pernah dikirim ke LLM sama sekali (`telegram.render_terpisah()`). Kalau masih hilang, berarti bukan dari jalur ini. |
 | Analisa AI di Telegram terasa lebih singkat dari biasanya | Kalau itu hasil rapian LLM, verifikasinya sekarang menolak hasil yang panjangnya kurang dari 60% pesan asli (`stylist.RASIO_PANJANG_MINIMAL`) — perapi cuma boleh menata, bukan meringkas. Hasil yang ditolak otomatis jatuh ke pesan asli (lebih panjang, tidak dirapikan). |
 | Agenda cuma berisi FOMC + tanggal "perkiraan" | Kedua sumber luar (feed ForexFactory dan investing.com) tidak terjangkau, jadi kalender bawaan (dugaan pola bulanan) yang dipakai. Cek log untuk "Kalender ekonomi ForexFactory tidak terjangkau". |
 | Pesan Telegram terasa berhenti di tengah kalimat | Kalau itu hasil rapian LLM (`rapikan_dengan_llm: true`), gerbang verifikasinya sekarang memastikan disclaimer benar-benar ada di ~300 karakter terakhir — balasan yang terpotong otomatis ditolak dan pesan asli (utuh) yang dikirim. Kalau tetap terlihat terpotong, cek dulu apakah itu cuma potongan tangkapan layar (scroll ke bawah) sebelum melapor sebagai bug. |

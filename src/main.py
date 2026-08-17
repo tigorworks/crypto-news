@@ -911,7 +911,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     )
 
     # Perapian tata letak lewat LLM murah — HANYA badan pesan yang dikirim.
-    # Judul "Ringkasan Pasar Bitcoin" dan timestamp tidak pernah dilihat LLM
+    # Judul "Nawala" dan timestamp tidak pernah dilihat LLM
     # sama sekali, jadi tidak mungkin hilang atau ditulis ulang biar pun
     # modelnya lupa instruksi "pertahankan judul" (yang pernah terjadi).
     # Kalau hasilnya tidak lolos verifikasi, badan asli yang dipakai — jadi
