@@ -628,8 +628,9 @@ function briefApp() {
       const j = this.siagaKebijakan?.jendela;
       if (!j) return '';
       if (j.fase === 'jeda_akhir_pekan') {
-        return `Bursa AS & ETF tutup — ${this.angka(j.jam_sampai_buka, 0)} jam lagi sampai buka. `
-             + 'Kejutan kebijakan ditanggung pasar kripto sendirian.';
+        const awal = j.jeda_mulai ? ` sejak ${j.jeda_mulai}` : '';
+        return `Bursa AS & ETF tutup${awal} — masih ${this.angka(j.jam_sampai_buka, 0)} jam `
+             + 'lagi sampai buka. Kejutan kebijakan ditanggung pasar kripto sendirian.';
       }
       if (j.fase === 'jelang_tutup_pekan') {
         return 'Menjelang penutupan Jumat — berita yang mendarat sekarang tidak sempat '

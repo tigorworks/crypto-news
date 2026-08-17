@@ -86,6 +86,18 @@ def _tutup_terakhir(saat_ny: datetime) -> datetime:
 #: yang lebih panjang dari ini berarti akhir pekan sedang berjalan.
 _JEDA_NORMAL_JAM = 20
 
+_HARI = ("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
+
+
+def _label_waktu(saat_ny: datetime) -> str:
+    """Contoh: "Jumat 16.00 EDT" — dipakai pembaca untuk menempatkan jeda.
+
+    Tanpa titik awal ini angka panjang jeda gampang disalahbaca sebagai sisa
+    waktu: "jeda 65,5 jam" pada hari Senin terdengar seperti bursa baru buka
+    tiga hari lagi, padahal 58 jam di antaranya sudah lewat.
+    """
+    return f"{_HARI[saat_ny.weekday()]} {saat_ny.strftime('%H.%M %Z')}"
+
 
 def fase_pasar(saat: Optional[datetime] = None) -> Dict[str, Any]:
     """Fase pasar AS saat ini, panjang jeda, dan jarak ke pembukaan.
@@ -106,6 +118,8 @@ def fase_pasar(saat: Optional[datetime] = None) -> Dict[str, Any]:
     if sedang_buka:
         jam_sampai_buka = 0.0
         panjang_jeda = 0.0
+        jeda_mulai = ""
+        jeda_berjalan = 0.0
         # Masih buka, tapi tinggal beberapa jam sebelum jeda panjang dimulai:
         # berita yang mendarat di sini tidak sempat dicerna pasar AS.
         jelang = (
@@ -118,6 +132,8 @@ def fase_pasar(saat: Optional[datetime] = None) -> Dict[str, Any]:
         sebelum = _tutup_terakhir(ny)
         jam_sampai_buka = (berikut - ny).total_seconds() / 3600
         panjang_jeda = (berikut - sebelum).total_seconds() / 3600
+        jeda_berjalan = (ny - sebelum).total_seconds() / 3600
+        jeda_mulai = _label_waktu(sebelum)
         fase = "jeda_akhir_pekan" if panjang_jeda > _JEDA_NORMAL_JAM else "tutup_harian"
 
     return {
@@ -125,11 +141,46 @@ def fase_pasar(saat: Optional[datetime] = None) -> Dict[str, Any]:
         "waktu_ny": ny.strftime("%Y-%m-%d %H:%M %Z"),
         "bursa_as_buka": sedang_buka,
         "jam_sampai_buka": round(jam_sampai_buka, 1),
-        # Panjang total jeda yang sedang berjalan — inilah ukuran sebenarnya
-        # dari "berapa lama pasar kripto menanggung sendirian".
+        # Panjang TOTAL jeda dari tutup terakhir sampai buka berikutnya —
+        # ukuran "berapa lama pasar kripto menanggung sendirian". Ini BUKAN
+        # sisa waktu; pasangkan selalu dengan `jeda_mulai` dan
+        # `jeda_berjalan_jam`, karena angka ini sendirian menyesatkan pada
+        # Senin pagi (65,5 jam total, tapi 58 di antaranya sudah lewat).
         "panjang_jeda_jam": round(panjang_jeda, 1),
+        "jeda_mulai": jeda_mulai,
+        "jeda_berjalan_jam": round(jeda_berjalan, 1),
         "dalam_jendela_rawan": fase in ("jeda_akhir_pekan", "jelang_tutup_pekan"),
     }
+
+
+def ringkas_untuk_llm(jendela: Dict[str, Any]) -> Dict[str, Any]:
+    """Bentuk jendela yang aman disodorkan ke model.
+
+    `panjang_jeda_jam` sengaja TIDAK ikut. Angka itu benar, tapi hanya
+    bermakna kalau dipasangkan dengan titik awalnya, dan model terbukti
+    memampatkannya jadi sisa waktu: pada run 17 Agustus dua langkah LLM yang
+    berbeda sama-sama menulis "jeda 65,5 jam sampai Senin" di hari Senin
+    pagi, padahal 58 jam di antaranya sudah lewat dan bursa tinggal tujuh
+    jam lagi buka.
+
+    Menutup lubangnya di hulu lebih murah daripada menambal tiap prosa di
+    hilir: angka yang tidak pernah diberikan tidak bisa disalahkutip. Total
+    jeda tetap tersedia lengkap di `fase_pasar()` untuk web dan Telegram,
+    yang kalimatnya ditulis kode dan tidak bisa keliru.
+    """
+    if not jendela:
+        return {}
+    aman = {
+        "fase": jendela.get("fase"),
+        "bursa_as_buka": jendela.get("bursa_as_buka"),
+        "sisa_jam_sampai_buka": jendela.get("jam_sampai_buka"),
+        "dalam_jendela_rawan": jendela.get("dalam_jendela_rawan"),
+        "waktu_ny": jendela.get("waktu_ny"),
+    }
+    mulai = jendela.get("jeda_mulai")
+    if mulai:
+        aman["jeda_dimulai"] = mulai
+    return aman
 
 
 #: Ambang kerapuhan. Tiap butir bernilai satu poin; ambangnya dipilih supaya
