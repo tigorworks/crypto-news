@@ -1233,11 +1233,19 @@ function briefApp() {
        tinggal seberapa mendesak. */
     get kelasAgendaSorot() {
       const jam = this.agendaSorot?.jam_lagi;
+      // `aksen` dipakai strip agenda: urgensinya pindah dari border tebal
+      // keliling ke satu garis di kiri, supaya pengingat tiga hari lagi
+      // tidak tampil semendesak alarm yang sedang berbunyi.
+      //
+      // Nilainya HEX, bukan kelas utility. Versi utility-nya
+      // (`border-l-amber-500`) terukur kalah oleh `border-slate-200` di
+      // stylesheet dan menghasilkan garis slate 1px tanpa error apa pun.
       if (jam === null || jam === undefined) {
         return {
           kotak: 'border-slate-300 dark:border-slate-600 bg-slate-100/70 dark:bg-slate-800/40',
           label: 'text-slate-600 dark:text-slate-300',
           teks: 'text-slate-700 dark:text-slate-200',
+          aksen: '#94a3b8',   // slate-400
         };
       }
       if (jam < 24) {
@@ -1245,12 +1253,14 @@ function briefApp() {
           kotak: 'border-rose-300 dark:border-rose-700/70 bg-rose-50/70 dark:bg-rose-900/20',
           label: 'text-rose-700 dark:text-rose-300',
           teks: 'text-rose-700 dark:text-rose-300',
+          aksen: '#f43f5e',   // rose-500
         };
       }
       return {
         kotak: 'border-amber-300 dark:border-amber-700/70 bg-amber-50/70 dark:bg-amber-900/20',
         label: 'text-amber-700 dark:text-amber-300',
         teks: 'text-amber-700 dark:text-amber-300',
+        aksen: '#f59e0b',     // amber-500
       };
     },
 
