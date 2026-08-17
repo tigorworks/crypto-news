@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=429d2c2f"></script>
+<script src="app.js?v=1039ee06"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -1057,7 +1057,7 @@
           <section id="s-siaga" class="rounded-xl border-2 p-4 sm:p-5" :class="kelasSiaga.kotak">
             <div class="flex items-center gap-1.5 text-xs font-bold" :class="kelasSiaga.label">
               <i :data-lucide="kelasSiaga.ikon" class="w-3.5 h-3.5"></i>
-              <span x-text="'SIAGA KEBIJAKAN: ' + siagaKebijakan.siaga.toUpperCase()"></span>
+              <span x-text="'JENDELA RISIKO: ' + (siagaKebijakan.risiko_jendela?.tingkat || '').toUpperCase()"></span>
             </div>
 
             <template x-if="kalimatJendela">
@@ -1084,22 +1084,10 @@
               </div>
             </template>
 
-            <template x-if="siagaKebijakan.ringkasan">
-              <p class="mt-3 text-sm leading-relaxed text-slate-700 dark:text-slate-200"
-                 x-text="siagaKebijakan.ringkasan"></p>
-            </template>
-
-            <!-- Dua hal berbeda yang sama pentingnya, ditampilkan berdampingan
-                 dan tidak dilebur: siaga di judul menilai ISI kebijakannya,
-                 baris ini menilai KAPAN kabar itu datang. Keduanya hitungan
-                 yang terpisah — yang satu dari model, yang satu dari kode. -->
-            <template x-if="siagaKebijakan.risiko_jendela">
-              <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                <span class="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Risiko waktu</span>
-                <span class="px-1.5 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"
-                      x-text="siagaKebijakan.risiko_jendela.tingkat"></span>
-                <span class="text-slate-500 dark:text-slate-400" x-text="labelRisikoWaktu"></span>
-              </div>
+            <!-- Tingkatnya sudah ada di judul bagian, jadi di sini cukup
+                 alasannya: apa yang membuatnya segitu. -->
+            <template x-if="labelRisikoWaktu">
+              <p class="mt-3 text-xs text-slate-500 dark:text-slate-400" x-text="labelRisikoWaktu"></p>
             </template>
 
             <!-- Inti pertanyaan "kebijakan menjelang akhir pekan": berapa
@@ -1109,40 +1097,6 @@
             <template x-if="siagaKebijakan.pendaratan?.ada_yang_tertahan">
               <p class="mt-2 text-xs text-slate-600 dark:text-slate-300"
                  x-text="kalimatPendaratan"></p>
-            </template>
-
-            <template x-if="siagaKebijakan.pemicu?.length">
-              <div class="mt-3">
-                <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Yang sedang dipantau
-                </div>
-                <ul class="mt-1.5 space-y-1 text-sm text-slate-700 dark:text-slate-300">
-                  <template x-for="(p, i) in siagaKebijakan.pemicu" :key="i">
-                    <li class="flex gap-1.5"><span class="shrink-0" :class="kelasSiaga.label">•</span><span x-text="p"></span></li>
-                  </template>
-                </ul>
-              </div>
-            </template>
-
-            <!-- Skenario: KONDISIONAL dan berbasis mekanisme, bukan ramalan
-                 angka. Butir yang menyelipkan level harga sudah dibuang di
-                 pipeline, jadi yang sampai sini hanya sebab-akibat. -->
-            <template x-if="siagaKebijakan.skenario?.length">
-              <div class="mt-3">
-                <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Kalau kejutan datang di jendela ini
-                </div>
-                <ul class="mt-1.5 space-y-1.5 text-sm text-slate-700 dark:text-slate-300">
-                  <template x-for="(s, i) in siagaKebijakan.skenario" :key="i">
-                    <li class="flex gap-1.5">
-                      <span class="shrink-0 text-slate-400">→</span><span x-text="s"></span>
-                    </li>
-                  </template>
-                </ul>
-                <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  Kemungkinan, bukan ramalan — dan bukan saran investasi.
-                </p>
-              </div>
             </template>
 
             <template x-if="siagaKebijakan.kerapuhan?.faktor?.length">
@@ -1160,10 +1114,6 @@
               </div>
             </template>
 
-            <template x-if="siagaKebijakan.yang_diperhatikan">
-              <p class="mt-3 text-xs text-slate-500 dark:text-slate-400"
-                 x-text="'Diawasi: ' + siagaKebijakan.yang_diperhatikan"></p>
-            </template>
           </section>
         </template>
 

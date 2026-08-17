@@ -141,7 +141,25 @@ def _konteks_llm(
         # diserap ETF dan meja institusi AS.
         # Lewat ringkas_untuk_llm: total panjang jeda tidak ikut, karena model
         # berulang kali membacanya sebagai sisa waktu.
-        "jendela_pasar_as": jendela_pasar.ringkas_untuk_llm(jendela_agen),
+        #
+        # `jendela_agen` yang dioper pemanggil adalah SELURUH dict agen, bukan
+        # jendelanya. Sebelum baris ini diperbaiki, ringkas_untuk_llm menerima
+        # dict yang tidak punya kunci "fase" dan memulangkan lima null — jadi
+        # sintesis tidak pernah benar-benar tahu pasar AS sedang buka atau
+        # tutup, tanpa satu pun error. Bentuk lama tetap diterima supaya
+        # pemanggil yang mengoper jendela langsung tidak ikut rusak.
+        "jendela_pasar_as": jendela_pasar.ringkas_untuk_llm(
+            (jendela_agen or {}).get("jendela") or jendela_agen
+        ),
+        # Bacaan agen kebijakan diteruskan ke sintesis, bukan lagi ditampilkan
+        # sebagai panel sendiri: tempat kebijakan AS adalah sebagai SEBAB
+        # naik/turun harga di dalam analisa, bukan alarm terpisah.
+        "sinyal_kebijakan": {
+            "tingkat": (jendela_agen or {}).get("siaga"),
+            "ringkasan": (jendela_agen or {}).get("ringkasan"),
+            "pemicu": (jendela_agen or {}).get("pemicu") or [],
+            "pendaratan": (jendela_agen or {}).get("pendaratan") or {},
+        } if (jendela_agen or {}).get("siaga") else None,
         # Hanya candle harian. Sebelumnya 4H dan 1H ikut dikirim, dan itu
         # justru menimbulkan masalah: model menulis EMA 1H lalu critic
         # mencocokkannya dengan EMA 4H dan memvonisnya karangan. Untuk laporan
@@ -180,6 +198,10 @@ def _konteks_llm(
                 "kekuatan": b.get("kekuatan"),
                 "status_kepastian": b.get("status_kepastian"),
                 "mekanisme": b.get("mekanisme"),
+                # Di fase pasar mana berita ini terbit. Dipakai sintesis untuk
+                # menimbang: kabar yang mendarat saat bursa AS buka sudah
+                # sempat dihargai, yang mendarat di jeda belum.
+                "mendarat": jendela_pasar.klasifikasi_sinyal(b.get("waktu_utc")),
                 "reaksi_harga_1j": b.get("reaksi_harga_1j"),
             }
             for b in berita[:12]
@@ -195,6 +217,7 @@ def _konteks_llm(
                 "status": p.get("status"),
                 "mekanisme": p.get("mekanisme"),
                 "waktu_utc": p.get("waktu_utc"),
+                "mendarat": jendela_pasar.klasifikasi_sinyal(p.get("waktu_utc")),
             }
             for p in pernyataan[:8]
         ],

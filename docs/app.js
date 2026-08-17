@@ -660,12 +660,12 @@ function briefApp() {
     get siagaKebijakan() {
       this._detak;  // ikut menyegar tiap menit supaya padam tepat waktu
       const a = this.data?.agen_kebijakan;
-      if (!a || !['sedang', 'tinggi'].includes(a.siaga)) return null;
-      // Yang kedaluwarsa saat bursa buka hanyalah siaga yang bersandar pada
-      // JENDELA — jeda akhir pekan, atau jelang tutup Jumat. Siaga yang
-      // bersandar pada isi kebijakannya sendiri tidak berhenti berlaku
-      // begitu lonceng NYSE berbunyi: tarif yang diumumkan Selasa malam
-      // tetap jadi kabar Rabu pagi.
+      // Gerbangnya kini RISIKO WAKTU, bukan tingkat siaga kebijakan. Isi
+      // kebijakannya sudah pindah ke analisa AI sebagai sebab naik/turun
+      // harga, jadi panel ini tinggal mengurus satu hal: seberapa berbahaya
+      // JAMNYA. Menampilkannya pada risiko rendah cuma jadi kotak yang
+      // menyala tiap hari tanpa alasan.
+      if (!a || !['sedang', 'tinggi'].includes(a.risiko_jendela?.tingkat)) return null;
       const buka = a.jendela?.buka_berikutnya_utc;
       if (a.jendela?.dalam_jendela_rawan && buka) {
         const t = new Date(buka);
@@ -684,7 +684,7 @@ function briefApp() {
       if (r.dalam_jendela_rawan) bagian.push('bursa AS tutup');
       else bagian.push('bursa AS bisa menyerap');
       if (r.kerapuhan && r.kerapuhan !== 'rendah') bagian.push(`pasar rapuh (${r.kerapuhan})`);
-      return '· ' + bagian.join(', ');
+      return 'Karena ' + bagian.join(', ') + '.';
     },
 
     /* "Keputusan menjelang akhir pekan" dalam satu kalimat. Angkanya datang
@@ -698,18 +698,14 @@ function briefApp() {
            + 'efeknya masih menunggu, belum diserap arus institusi.';
     },
 
-    /* Inti siaga saat jendelanya BUKAN alasan utama. Pemicu pertama dipilih
-       lebih dulu karena ia sudah berbentuk satu kalimat spesifik; ringkasan
-       dipakai hanya sebagai cadangan dan dipotong di batas kalimat. */
-    get intiSiaga() {
-      const s = this.siagaKebijakan;
-      if (!s) return '';
-      const pemicu = (s.pemicu || []).find((x) => x && x.trim());
-      if (pemicu) return pemicu.trim();
-      const r = (s.ringkasan || '').trim();
-      if (!r) return '';
-      const titik = r.indexOf('. ');
-      return titik > 40 ? r.slice(0, titik + 1) : r;
+    /* Kalimat cadangan saat bursanya sedang buka tapi pasarnya rapuh —
+       satu-satunya cara panel ini menyala di luar jendela akhir pekan.
+       Dirakit dari nama faktor yang sudah dihitung kode. */
+    get kalimatRapuhRingkas() {
+      const f = this.siagaKebijakan?.kerapuhan?.faktor || [];
+      if (!f.length) return '';
+      const nama = f.slice(0, 3).map((x) => x.nama).filter(Boolean).join(', ');
+      return `Pasar rapuh — ${nama}. Kejutan apa pun akan bergerak lebih jauh dari biasanya.`;
     },
 
     /* ===== Hitung mundur HIDUP =====
@@ -786,8 +782,8 @@ function briefApp() {
           // dua baris yang isinya sejenis tampil dengan susunan berbeda dan
           // terbaca seolah mengukur hal yang berbeda. Tingkat siaganya pindah
           // ke chip di sebelah nama.
-          label: 'SIAGA KEBIJAKAN',
-          tingkat: s.siaga,
+          label: 'JENDELA RISIKO',
+          tingkat: (s.risiko_jendela || {}).tingkat || '',
           // Hitung mundur dan jangkar hanya ditampilkan kalau jendelanya
           // memang inti persoalannya. Pada siaga yang lahir dari isi
           // kebijakan, "14 jam lagi · bursa AS buka" bukan cuma mubazir —
@@ -798,7 +794,7 @@ function briefApp() {
           awalan: 'bursa AS buka',
           // Kalimat jendela hanya ada untuk fase akhir pekan. Tanpa cadangan
           // ini, siaga hari kerja terbit sebagai judul tanpa isi sama sekali.
-          isi: this.kalimatJendelaRingkas || this.intiSiaga,
+          isi: this.kalimatJendelaRingkas || this.kalimatRapuhRingkas,
           tautan: '#s-siaga',
           mendesak: s.siaga === 'tinggi',
           perhatian: true,
@@ -915,7 +911,7 @@ function briefApp() {
     },
 
     get kelasSiaga() {
-      if (this.siagaKebijakan?.siaga === 'tinggi') {
+      if (this.siagaKebijakan?.risiko_jendela?.tingkat === 'tinggi') {
         return {
           kotak: 'border-rose-300 dark:border-rose-700/70 bg-rose-50/70 dark:bg-rose-900/20',
           label: 'text-rose-700 dark:text-rose-300',
