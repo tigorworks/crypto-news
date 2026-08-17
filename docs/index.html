@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=17291303"></script>
+<script src="app.js?v=c1291934"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -1067,8 +1067,13 @@
 
             <!-- Hitung mundur hidup + jangkar WIB, sama seperti di bar atas.
                  Angkanya berasal dari instant absolut yang sama, jadi tidak
-                 mungkin berbeda antara dua tempat. -->
-            <template x-if="hitungMundurJendela">
+                 mungkin berbeda antara dua tempat.
+
+                 Hanya untuk siaga yang bersandar pada JENDELA. Pada siaga
+                 yang lahir dari isi kebijakan, jam pembukaan bursa bukan
+                 bagian dari persoalannya, dan menampilkannya mengarahkan
+                 pembaca ke kesimpulan yang salah soal apa yang diwaspadai. -->
+            <template x-if="siagaKebijakan.jendela?.dalam_jendela_rawan && hitungMundurJendela">
               <div class="mt-2 flex flex-wrap items-baseline gap-x-2 text-sm">
                 <span class="font-semibold" :class="kelasSiaga.label"
                       x-text="hitungMundurJendela.lewat ? 'Jendela sudah lewat' : hitungMundurJendela.teks"></span>

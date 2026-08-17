@@ -661,12 +661,31 @@ function briefApp() {
       this._detak;  // ikut menyegar tiap menit supaya padam tepat waktu
       const a = this.data?.agen_kebijakan;
       if (!a || !['sedang', 'tinggi'].includes(a.siaga)) return null;
+      // Yang kedaluwarsa saat bursa buka hanyalah siaga yang bersandar pada
+      // JENDELA — jeda akhir pekan, atau jelang tutup Jumat. Siaga yang
+      // bersandar pada isi kebijakannya sendiri tidak berhenti berlaku
+      // begitu lonceng NYSE berbunyi: tarif yang diumumkan Selasa malam
+      // tetap jadi kabar Rabu pagi.
       const buka = a.jendela?.buka_berikutnya_utc;
-      if (buka) {
+      if (a.jendela?.dalam_jendela_rawan && buka) {
         const t = new Date(buka);
         if (!Number.isNaN(t.getTime()) && t.getTime() <= Date.now()) return null;
       }
       return a;
+    },
+
+    /* Inti siaga saat jendelanya BUKAN alasan utama. Pemicu pertama dipilih
+       lebih dulu karena ia sudah berbentuk satu kalimat spesifik; ringkasan
+       dipakai hanya sebagai cadangan dan dipotong di batas kalimat. */
+    get intiSiaga() {
+      const s = this.siagaKebijakan;
+      if (!s) return '';
+      const pemicu = (s.pemicu || []).find((x) => x && x.trim());
+      if (pemicu) return pemicu.trim();
+      const r = (s.ringkasan || '').trim();
+      if (!r) return '';
+      const titik = r.indexOf('. ');
+      return titik > 40 ? r.slice(0, titik + 1) : r;
     },
 
     /* ===== Hitung mundur HIDUP =====
@@ -731,8 +750,9 @@ function briefApp() {
         const j = s.jendela || {};
         const mundur = this.hitungMundurLive(j.buka_berikutnya_utc);
         // Tidak ada lagi cabang "sudah lewat" di sini: getter siagaKebijakan
-        // memulangkan null begitu bursanya buka, jadi baris ini hanya pernah
-        // ada selama jendelanya masih berjalan.
+        // memulangkan null begitu bursanya buka — untuk siaga yang memang
+        // bersandar pada jendela.
+        const rawan = !!j.dalam_jendela_rawan;
         baris.push({
           jenis: 'siaga',
           ikon: s.siaga === 'tinggi' ? 'siren' : 'landmark',
@@ -744,10 +764,17 @@ function briefApp() {
           // ke chip di sebelah nama.
           label: 'SIAGA KEBIJAKAN',
           tingkat: s.siaga,
-          mundur,
-          jangkar: j.buka_berikutnya_wib || '',
+          // Hitung mundur dan jangkar hanya ditampilkan kalau jendelanya
+          // memang inti persoalannya. Pada siaga yang lahir dari isi
+          // kebijakan, "14 jam lagi · bursa AS buka" bukan cuma mubazir —
+          // ia mengarahkan pembaca menyangka alarmnya SOAL pembukaan bursa,
+          // padahal soal tarif yang baru diumumkan.
+          mundur: rawan ? mundur : null,
+          jangkar: rawan ? (j.buka_berikutnya_wib || '') : '',
           awalan: 'bursa AS buka',
-          isi: this.kalimatJendelaRingkas,
+          // Kalimat jendela hanya ada untuk fase akhir pekan. Tanpa cadangan
+          // ini, siaga hari kerja terbit sebagai judul tanpa isi sama sekali.
+          isi: this.kalimatJendelaRingkas || this.intiSiaga,
           tautan: '#s-siaga',
           mendesak: s.siaga === 'tinggi',
           perhatian: true,
