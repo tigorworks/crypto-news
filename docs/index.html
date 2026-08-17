@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=636a4b7c"></script>
+<script src="app.js?v=3378608d"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -357,7 +357,7 @@
         <h2 class="mt-3 font-semibold text-lg">Data belum bisa dimuat</h2>
         <p class="mt-1 text-sm text-slate-600 dark:text-slate-300 max-w-md mx-auto" x-text="error"></p>
         <p class="mt-2 text-sm text-slate-500">
-          Brief dibuat otomatis setiap pagi. Kalau baru saja dipasang atau baru direset, tunggu jadwal berikutnya.
+          Ringkasan disusun otomatis setiap pagi. Kalau baru dipasang atau datanya baru direset, tunggu jadwal berikutnya.
         </p>
         <button @click="muat()" class="mt-4 px-4 py-2 rounded-lg bg-slate-900 dark:bg-white dark:text-slate-900 text-white text-sm font-medium">
           Coba lagi
@@ -397,7 +397,7 @@
             <template x-if="pergerakan24j?.arah || (bagianAiTampil('narasi') && data?.ai?.bagian?.judul)">
               <div>
                 <div class="mt-2 flex items-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300">
-                  <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> RINGKASAN AI
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> RINGKASAN
                 </div>
 
                 <template x-if="bagianAiTampil('narasi') && data?.ai?.bagian?.judul">
@@ -419,7 +419,7 @@
                       </template>
                       <template x-if="!pergerakan24j.jenis && pergerakan24j.arah !== 'datar'">
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          Sifat pergerakannya belum bisa dipastikan pada run ini.
+                          Sifat pergerakannya belum bisa dipastikan kali ini.
                         </p>
                       </template>
                     </div>
@@ -471,7 +471,11 @@
                            x-text="b.jalur"></p>
                       </template>
                     </div>
-                    <i data-lucide="chevron-right" class="w-4 h-4 shrink-0 text-slate-400 mt-0.5"></i>
+                    <!-- Panah ke BAWAH, bukan chevron kanan. Ketiga tautan di
+                         kartu ini melompat ke bagian yang lebih bawah pada
+                         halaman yang sama; chevron kanan mengesankan pindah
+                         tempat, padahal yang terjadi menggulir turun. -->
+                    <i data-lucide="arrow-down" class="w-4 h-4 shrink-0 text-slate-400 mt-0.5"></i>
                   </a>
                 </template>
               </div>
@@ -577,7 +581,7 @@
         <section id="s-teknikal" class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl">
           <div class="flex items-center justify-between gap-3 p-5 pb-3 flex-wrap">
             <h2 class="font-semibold flex items-center gap-2">
-              <i data-lucide="activity" class="w-4 h-4 text-slate-400"></i> Analisa Teknikal
+              <i data-lucide="activity" class="w-4 h-4 text-slate-400"></i> Teknikal
             </h2>
             <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/70 text-slate-500 dark:text-slate-300">
               Candle harian (1D)
@@ -585,7 +589,7 @@
           </div>
 
           <template x-if="!tfAktif || !tfAktif.momentum">
-            <p class="px-5 pb-5 text-sm text-slate-500">Indikator harian tidak tersedia pada run terakhir.</p>
+            <p class="px-5 pb-5 text-sm text-slate-500">Indikator harian belum masuk pada pembaruan terakhir.</p>
           </template>
 
           <template x-if="tfAktif && tfAktif.momentum">
@@ -877,7 +881,7 @@
             <template x-if="adaDataWhale">
               <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
                 <h2 class="font-semibold flex items-center gap-2 mb-1">
-                  <i data-lucide="fish" class="w-4 h-4 text-slate-400"></i> Posisi Pemain Besar vs Ritel
+                  <i data-lucide="fish" class="w-4 h-4 text-slate-400"></i> Pemain Besar vs Ritel
                 </h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">
                   Rasio posisi top trader Binance dibanding seluruh akun. Angka mentah, bukan hasil AI.
@@ -932,7 +936,7 @@
             <template x-if="data.technical.sinyal_palsu?.length">
               <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
                 <h2 class="font-semibold flex items-center gap-2 mb-1">
-                  <i data-lucide="drama" class="w-4 h-4 text-slate-400"></i> Pola Perlu Diwaspadai
+                  <i data-lucide="drama" class="w-4 h-4 text-slate-400"></i> Sinyal Palsu
                 </h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">
                   Terdeteksi dari geometri candle dan volume oleh kode, bukan AI. Ini petunjuk, bukan bukti manipulasi.
@@ -1068,25 +1072,35 @@
           </section>
         </template>
 
-        <!-- ================= ANALISA AI ================= -->
-        <!-- Area ini SENGAJA dibedakan: border indigo, latar berbeda, badge AI. -->
-        <section id="s-ai" class="rounded-xl border-2 border-indigo-300 dark:border-indigo-600/70 bg-indigo-50/60 dark:bg-indigo-950/30 p-5">
+        <!-- ================= ULASAN LENGKAP =================
+             Dulu bernama "Analisa AI" dan dibungkus border indigo tebal
+             sebagai "wilayah AI". Dua-duanya menyesatkan: AI ikut menulis di
+             delapan langkah pipeline — klasifikasi berita, mekanisme,
+             pernyataan tokoh, dampak agenda, agen kebijakan, interpretasi
+             teknikal, analisa whale, sampai sintesis — jadi memberi satu
+             bagian label "AI" diam-diam menyiratkan sisanya bukan.
+
+             Sumbu yang sebenarnya bukan "AI vs bukan AI", melainkan TERUKUR
+             vs DITAFSIR. Karena itu kotak wilayahnya dilepas, dan kepercayaan
+             dipikul penanda ✦ per blok yang dipakai seragam di seluruh
+             halaman. Namanya kini menyebut isinya: ulasan panjang. -->
+        <section id="s-ai" class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
           <div class="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 class="font-semibold flex items-center gap-2">
                 <span class="inline-flex items-center gap-1 text-xs sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white">
                   <i data-lucide="sparkles" class="w-3 h-3"></i> AI
                 </span>
-                Analisa AI
+                Ulasan Lengkap
               </h2>
-              <p class="mt-1.5 text-xs text-indigo-900/70 dark:text-indigo-200/70 max-w-2xl">
-                Bagian ini dihasilkan oleh AI dan dapat mengandung kesalahan. Data mentah di atas tidak dihasilkan AI.
+              <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400 max-w-2xl">
+                Ditulis AI berdasarkan angka yang dihitung sistem. Tafsir dapat keliru; angka yang jadi acuan.
               </p>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
               <template x-if="data.ai.critic && data.ai.critic.dijalankan === false">
                 <span class="text-xs sm:text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
-                      title="Pemeriksa fakta gagal dijalankan pada run ini">belum terverifikasi</span>
+                      title="Pemeriksa fakta tidak sempat berjalan pada pembaruan ini">belum terverifikasi</span>
               </template>
             </div>
           </div>
@@ -1126,7 +1140,7 @@
                   </template>
                   <template x-if="!pergerakan24j.jenis && pergerakan24j.arah !== 'datar'">
                     <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-                      Data open interest tidak tersedia pada run ini, jadi sifat pergerakannya
+                      Data open interest belum masuk kali ini, jadi sifat pergerakannya
                       (uang baru masuk atau posisi lama ditutup) belum bisa dipastikan.
                     </p>
                   </template>
@@ -1472,7 +1486,7 @@
 
               <template x-if="data.ai.teknikal.pembatalan">
                 <p class="mt-3 text-sm sm:text-[13px] text-slate-600 dark:text-slate-400">
-                  <span class="font-medium">Pembacaan ini batal bila: </span>
+                  <span class="font-medium">Pembacaan ini gugur bila: </span>
                   <span x-text="data.ai.teknikal.pembatalan"></span>
                 </p>
               </template>
@@ -1517,7 +1531,7 @@
 
           <template x-if="!adaKontenAiTampil">
             <p class="mt-4 text-sm text-slate-600 dark:text-slate-300">
-              Analisa AI tidak tersedia pada run ini.
+              Ulasan belum tersedia pada pembaruan ini.
             </p>
           </template>
 
@@ -1584,7 +1598,7 @@
               </select>
             </div>
             <template x-if="!agendaTersaring.length && (data?.calendar || []).length">
-              <p class="text-sm text-slate-500">Tidak ada agenda berdampak besar dalam 30 hari ke depan — coba filter "Semua agenda".</p>
+              <p class="text-sm text-slate-500">Tidak ada agenda berdampak besar dalam 30 hari ke depan. Coba filter "Semua agenda".</p>
             </template>
             <template x-if="!(data?.calendar || []).length">
               <p class="text-sm text-slate-500">Tidak ada agenda dalam 30 hari ke depan.</p>
@@ -1799,7 +1813,7 @@
             </p>
 
             <template x-if="!adaPernyataan">
-              <p class="mt-4 text-sm text-slate-500">Tidak ada pernyataan tokoh yang terpantau pada run ini.</p>
+              <p class="mt-4 text-sm text-slate-500">Belum ada pernyataan pejabat yang terpantau kali ini.</p>
             </template>
 
             <ul class="mt-4 space-y-3">
@@ -1883,7 +1897,7 @@
              bawah setelah pembaca melihat kondisi hari ini. -->
           <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
             <h2 class="font-semibold flex items-center gap-2 mb-3">
-              <i data-lucide="git-compare-arrows" class="w-4 h-4 text-slate-400"></i> Perubahan vs Brief Sebelumnya
+              <i data-lucide="git-compare-arrows" class="w-4 h-4 text-slate-400"></i> Beda dari Kemarin
             </h2>
             <template x-if="!data.diff_vs_previous?.tersedia">
               <p class="text-sm text-slate-500" x-text="data.diff_vs_previous?.alasan || 'Belum ada pembanding.'"></p>
@@ -1897,7 +1911,7 @@
                   </template>
                 </ul>
                 <template x-if="!data.diff_vs_previous.ringkasan?.length">
-                  <p class="text-sm text-slate-500">Tidak ada perubahan berarti.</p>
+                  <p class="text-sm text-slate-500">Tidak banyak yang berubah.</p>
                 </template>
               </div>
             </template>
@@ -1976,7 +1990,7 @@
               </template>
 
               <template x-if="arsipBanding && !memuatBanding && !barisBanding.length">
-                <p class="mt-3 text-sm text-slate-500">Tidak ada metrik yang bisa dibandingkan.</p>
+                <p class="mt-3 text-sm text-slate-500">Belum ada angka yang bisa dibandingkan.</p>
               </template>
             </div>
           </template>
@@ -2015,10 +2029,6 @@
         </div>
       </template>
 
-      <p class="flex items-start gap-2">
-        <i data-lucide="info" class="w-4 h-4 mt-0.5 shrink-0"></i>
-        <span x-text="data?.disclaimer || 'Konten ini bersifat informasional dan bukan saran investasi.'"></span>
-      </p>
       <!-- Statistik run: berapa token dihabiskan dan berapa lama prosesnya. -->
       <template x-if="statistikRun.length">
         <p class="text-xs flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -2032,12 +2042,39 @@
         </p>
       </template>
 
-      <p class="text-xs">
-        Data dihimpun otomatis dari Binance/CoinGecko/OKX, Deribit, Coin Metrics, mempool.space, alternative.me,
-        Farside, Yahoo Finance, dan feed berita publik.
-        Bagian bertanda <span class="inline-flex items-center gap-0.5 text-[11px] sm:text-[10px] font-bold px-1 py-px rounded bg-indigo-600 text-white">✦ AI</span>
-        dihasilkan model bahasa dan dapat keliru.
-      </p>
+      <!-- Ketentuan penggunaan.
+           Ditulis dengan REGISTER FORMAL, berbeda dari teks antarmuka di
+           halaman ini yang sengaja dibuat luwes. Penghalusan bahasa berlaku
+           untuk kalimat yang menemani pembaca; ketentuan bukan salah satunya
+           — di sini ragam santai justru mengurangi bobotnya.
+
+           Isinya menyatakan keterlibatan AI di muka. Versi sebelum ini hanya
+           menyebut "bagian bertanda ✦ AI dihasilkan model bahasa", yang
+           diam-diam menjanjikan sisanya bebas AI padahal model ikut bekerja
+           di hampir semua bagian. -->
+      <div class="text-xs space-y-2 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+        <div class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+          <i data-lucide="scale" class="w-3.5 h-3.5 shrink-0"></i> Ketentuan Penggunaan
+        </div>
+        <p>
+          Layanan ini menggunakan kecerdasan buatan dalam proses penyusunannya. Model bahasa
+          dipakai untuk menyaring dan menerjemahkan berita, menilai dampak agenda ekonomi,
+          menganalisis pernyataan pejabat, serta menyusun ulasan dan skenario pasar. Bagian yang
+          ditandai
+          <span class="inline-flex items-center gap-0.5 text-[10px] font-bold px-1 py-px rounded bg-indigo-600 text-white align-middle">✦ AI</span>
+          merupakan keluaran model bahasa.
+        </p>
+        <p>
+          Seluruh angka dihitung oleh sistem dari data sumber, dan model hanya menafsirkan
+          maknanya. Hasil tafsir dapat mengandung kesalahan. Apabila terdapat perbedaan antara
+          uraian dan angka, angka yang berlaku.
+        </p>
+        <p x-text="data?.disclaimer || 'Seluruh isi bersifat informasional dan bukan merupakan saran investasi.'"></p>
+        <p class="text-slate-400 dark:text-slate-500">
+          Sumber data: Binance, CoinGecko, OKX, Deribit, Coin Metrics, mempool.space,
+          alternative.me, SoSoValue, Yahoo Finance, dan sejumlah feed berita publik.
+        </p>
+      </div>
     </div>
   </footer>
 </div>
