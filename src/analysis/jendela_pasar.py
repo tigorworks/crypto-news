@@ -246,7 +246,14 @@ def kerapuhan(brief_sebagian: Dict[str, Any]) -> Dict[str, Any]:
 
     faktor = []
 
-    rasio_vol = (harian.get("volume") or {}).get("rasio_vs_rata")
+    # Volume dari candle yang belum penuh TIDAK dipakai. Candle harian
+    # menumpuk volumenya sepanjang hari, jadi yang baru berjalan separuh
+    # otomatis terbaca "tipis" berapa pun ramainya pasar — dan faktor palsu
+    # itu ikut menaikkan skor kerapuhan yang jadi gerbang siaga tertinggi.
+    # Terjadi nyata pada run manual 17 Agustus 11.28 UTC: candle 11,5 jam,
+    # rasio terbaca 0,67x, padahal lajunya menuju sekitar 1,40x.
+    volume = harian.get("volume") or {}
+    rasio_vol = None if volume.get("parsial") else volume.get("rasio_vs_rata")
     if rasio_vol is not None and rasio_vol < _AMBANG["volume_tipis"]:
         faktor.append({
             "nama": "volume tipis",
