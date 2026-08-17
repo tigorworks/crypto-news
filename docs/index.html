@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=3378608d"></script>
+<script src="app.js?v=2fc1836b"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -107,6 +107,53 @@
     --meter-tick:   #cbd5e1;   /* slate-300 */
     --meter-accent: #6366f1;   /* indigo-500 — lolos semua uji pada latar gelap */
     --meter-ring:   #1e293b;   /* slate-800 */
+  }
+
+  /* ===== Tombol kembali ke atas =====
+     Halaman ini panjang — di ponsel bisa belasan ribu piksel — dan setelah
+     membaca berita di bawah, satu-satunya jalan kembali ke harga adalah
+     menggulir jauh ke atas.
+
+     Geometri, warna, dan bayangannya ditulis sebagai properti CSS, bukan
+     utility. Tombol melayang yang kehilangan `position: fixed` tidak
+     menghilang; ia jatuh ke aliran dokumen di ujung halaman dan tampak
+     seperti tombol nyasar — kegagalan yang tidak menimbulkan error dan
+     mudah lolos dari pemeriksaan sepintas. */
+  .tombol-atas {
+    position: fixed;
+    right: 1rem;
+    /* Aman dari home indicator iPhone dan bilah gestur Android. */
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 9999px;
+    background: #ffffff;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 6px 20px -6px rgba(15, 23, 42, 0.35);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .tombol-atas:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px -8px rgba(15, 23, 42, 0.45);
+  }
+  .tombol-atas:active { transform: translateY(0); }
+  .tombol-atas:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+  .tombol-atas svg { width: 1.15rem; height: 1.15rem; }
+  .dark .tombol-atas {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-color: #334155;
+    box-shadow: 0 6px 20px -6px rgba(0, 0, 0, 0.65);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tombol-atas { transition: none; }
+    .tombol-atas:hover, .tombol-atas:active { transform: none; }
   }
 
   /* ===== Tautan ke situs luar =====
@@ -2012,6 +2059,23 @@
       </div>
     </div>
   </footer>
+
+  <!-- Kembali ke atas. Muncul setelah halaman digulir sejauh kira-kira satu
+       layar; ambangnya relatif terhadap tinggi jendela, bukan angka piksel
+       mati, supaya perilakunya sama di ponsel dan desktop.
+
+       Saat tersembunyi, x-show memberi display:none — jadi tombolnya ikut
+       keluar dari urutan tab dan tidak bisa disasar keyboard, tanpa perlu
+       mengatur tabindex sendiri. -->
+  <button type="button"
+          x-show="tampilKeAtas"
+          x-transition.opacity.duration.150ms
+          @click="keAtas()"
+          class="tombol-atas"
+          aria-label="Kembali ke atas halaman"
+          title="Kembali ke atas">
+    <i data-lucide="arrow-up"></i>
+  </button>
 </div>
 </body>
 </html>
