@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=c1291934"></script>
+<script src="app.js?v=429d2c2f"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -1087,6 +1087,28 @@
             <template x-if="siagaKebijakan.ringkasan">
               <p class="mt-3 text-sm leading-relaxed text-slate-700 dark:text-slate-200"
                  x-text="siagaKebijakan.ringkasan"></p>
+            </template>
+
+            <!-- Dua hal berbeda yang sama pentingnya, ditampilkan berdampingan
+                 dan tidak dilebur: siaga di judul menilai ISI kebijakannya,
+                 baris ini menilai KAPAN kabar itu datang. Keduanya hitungan
+                 yang terpisah — yang satu dari model, yang satu dari kode. -->
+            <template x-if="siagaKebijakan.risiko_jendela">
+              <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                <span class="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Risiko waktu</span>
+                <span class="px-1.5 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"
+                      x-text="siagaKebijakan.risiko_jendela.tingkat"></span>
+                <span class="text-slate-500 dark:text-slate-400" x-text="labelRisikoWaktu"></span>
+              </div>
+            </template>
+
+            <!-- Inti pertanyaan "kebijakan menjelang akhir pekan": berapa
+                 sinyal kuat yang mendarat saat pasar AS tidak bisa
+                 menyerapnya. Dihitung kode, jadi angkanya tidak bisa
+                 dikarang model. -->
+            <template x-if="siagaKebijakan.pendaratan?.ada_yang_tertahan">
+              <p class="mt-2 text-xs text-slate-600 dark:text-slate-300"
+                 x-text="kalimatPendaratan"></p>
             </template>
 
             <template x-if="siagaKebijakan.pemicu?.length">

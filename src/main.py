@@ -577,7 +577,15 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     # Tanpa LLM (atau saat agennya gagal), jendela dan kerapuhan TETAP
     # disimpan: keduanya hitungan kode dan tetap berguna walau tanpa prosa.
     if agen is None:
-        agen = {"siaga": None, "jendela": jendela, "kerapuhan": rapuh}
+        agen = {
+            "siaga": None,
+            "jendela": jendela,
+            "kerapuhan": rapuh,
+            # Risiko waktu murni hitungan kode, jadi ia tetap tersedia walau
+            # prosa agennya gagal — justru pada hari LLM bermasalah, sinyal
+            # yang tidak bergantung model adalah yang paling berharga.
+            "risiko_jendela": jendela_pasar.risiko_jendela(jendela, rapuh),
+        }
 
     # Karakter pergerakan 24 jam: arah, besaran, dan JENISNYA (uang baru vs
     # posisi ditutup). Dihitung di sini karena butuh berita yang SUDAH
