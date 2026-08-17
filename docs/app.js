@@ -680,9 +680,9 @@ function briefApp() {
     get labelRisikoWaktu() {
       const r = this.siagaKebijakan?.risiko_jendela;
       if (!r) return '';
-      const bagian = [];
-      if (r.dalam_jendela_rawan) bagian.push('bursa AS tutup');
-      else bagian.push('bursa AS bisa menyerap');
+      // Panel ini hanya hidup di dalam jendela rawan, jadi bagian pertama
+      // selalu benar; kerapuhan menempel sebagai pengali kalau ada.
+      const bagian = ['bursa AS tutup'];
       if (r.kerapuhan && r.kerapuhan !== 'rendah') bagian.push(`pasar rapuh (${r.kerapuhan})`);
       return 'Karena ' + bagian.join(', ') + '.';
     },
@@ -696,16 +696,6 @@ function briefApp() {
       const dari = p.kuat > n ? ` dari ${p.kuat} sinyal kuat` : ' sinyal kuat';
       return `${n}${dari} mendarat saat pasar AS tidak bisa menyerapnya — `
            + 'efeknya masih menunggu, belum diserap arus institusi.';
-    },
-
-    /* Kalimat cadangan saat bursanya sedang buka tapi pasarnya rapuh —
-       satu-satunya cara panel ini menyala di luar jendela akhir pekan.
-       Dirakit dari nama faktor yang sudah dihitung kode. */
-    get kalimatRapuhRingkas() {
-      const f = this.siagaKebijakan?.kerapuhan?.faktor || [];
-      if (!f.length) return '';
-      const nama = f.slice(0, 3).map((x) => x.nama).filter(Boolean).join(', ');
-      return `Pasar rapuh — ${nama}. Kejutan apa pun akan bergerak lebih jauh dari biasanya.`;
     },
 
     /* ===== Hitung mundur HIDUP =====
@@ -794,7 +784,7 @@ function briefApp() {
           awalan: 'bursa AS buka',
           // Kalimat jendela hanya ada untuk fase akhir pekan. Tanpa cadangan
           // ini, siaga hari kerja terbit sebagai judul tanpa isi sama sekali.
-          isi: this.kalimatJendelaRingkas || this.kalimatRapuhRingkas,
+          isi: this.kalimatJendelaRingkas,
           tautan: '#s-siaga',
           mendesak: s.siaga === 'tinggi',
           perhatian: true,

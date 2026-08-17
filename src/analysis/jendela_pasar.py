@@ -376,12 +376,20 @@ def risiko_jendela(jendela: Dict[str, Any], rapuh: Dict[str, Any]) -> Dict[str, 
     """
     rawan = bool(jendela.get("dalam_jendela_rawan"))
     tingkat_rapuh = (rapuh or {}).get("tingkat")
-    if rawan and tingkat_rapuh == "tinggi":
-        tingkat = "tinggi"
-    elif rawan or tingkat_rapuh == "tinggi":
-        tingkat = "sedang"
-    else:
+    if not rawan:
+        # Di luar jendela rawan TIDAK ADA risiko jendela — sekalipun pasarnya
+        # rapuh. Versi sebelumnya menaikkannya ke "sedang" hanya karena
+        # kerapuhan tinggi, sehingga panel menyala saat bursa AS justru sedang
+        # BUKA: keadaan ketika ETF dan meja institusi siap menyerap tekanan,
+        # yaitu kebalikan dari yang mau diperingatkan.
+        #
+        # Kerapuhan tetap dilaporkan terpisah lewat `kerapuhan()`. Perannya di
+        # sini pengali di DALAM jendela, bukan pemicu yang berdiri sendiri.
         tingkat = "rendah"
+    elif tingkat_rapuh == "tinggi":
+        tingkat = "tinggi"
+    else:
+        tingkat = "sedang"
     return {
         "tingkat": tingkat,
         "fase": jendela.get("fase"),
