@@ -12,6 +12,38 @@ from ..utils.http import HttpError, post_json
 log = logging.getLogger(__name__)
 
 BATAS_KARAKTER = 4096
+
+# Emoji penanda blok, dikumpulkan di satu tempat supaya himpunannya bisa
+# diperiksa sekaligus, bukan tersebar di belasan f-string.
+#
+# ATURANNYA: tiap emoji harus punya ARTI di konteks pasar — bukan hiasan.
+# Yang dibuang karena cuma dekoratif: 🌊 (ombak) untuk posisi pasar, 🌍
+# (bola dunia) untuk makro dan geopolitik, 🎯 (panah dart) untuk opsi, 🗣
+# (kepala bicara) untuk pernyataan, 🎭 (topeng teater) untuk sinyal palsu,
+# 🕐 (jam) untuk timestamp, dan 👋 (lambaian) untuk sapaan pelanggan.
+#
+# Yang dipertahankan justru yang paling kripto: 🐋 whale sudah jadi istilah
+# baku di pasar ini, dan ⛓ rantai adalah lambang on-chain itu sendiri.
+EMOJI = {
+    "merek":       "📊",   # grafik batang — identitas pasar
+    "harga":       "💰",
+    "teknikal":    "📈",
+    "posisi":      "⚖️",   # keseimbangan long vs short, funding, open interest
+    "makro":       "🏦",   # bank sentral, suku bunga, dolar
+    "opsi":        "💹",   # papan harga — derivatif
+    "onchain":     "⛓",
+    "aliran":      "💵",
+    "whale":       "🐋",   # istilah baku pasar kripto
+    "jebakan":     "🎣",   # umpan — bull trap / bear trap
+    "agenda":      "📅",   # kalender ekonomi
+    "pernyataan":  "📣",   # pengumuman yang menggerakkan harga
+    "berita":      "📰",
+    "regulasi":    "🏛",   # lembaga & kebijakan
+    "mendesak":    "🚨",
+    "dampak":      "🔴",
+    "risiko":      "⚠",
+    "tautan":      "🔗",
+}
 PEMISAH = "━━━━━━━━━━━━━━"
 
 
@@ -142,7 +174,7 @@ def _blok_harga(brief: Dict[str, Any]) -> List[str]:
     resistance = levels.get("resistance") or []
 
     baris = [
-        "💰 <b>Harga</b>",
+        f"{EMOJI['harga']} <b>Harga</b>",
         f"{_angka(price.get('last'), 0, prefix='$')} ({_persen(price.get('change_24h_pct'), 1)} / 24j)",
     ]
     if support or resistance:
@@ -192,7 +224,7 @@ def _blok_teknikal(brief: Dict[str, Any]) -> List[str]:
 def _blok_pasar(brief: Dict[str, Any]) -> List[str]:
     market = brief.get("market") or {}
     teknikal = brief.get("technical") or {}
-    baris = ["", "🌊 <b>Posisi Pasar</b>"]
+    baris = ["", f"{EMOJI['posisi']} <b>Posisi Pasar</b>"]
 
     potongan = []
     funding = market.get("funding_rate")
@@ -243,7 +275,7 @@ def _blok_makro(brief: Dict[str, Any]) -> List[str]:
         potongan.append(f"USD/JPY {_angka(macro['usdjpy'], 1)}")
     if not potongan:
         return []
-    return ["", "🌍 <b>Makro</b>", " · ".join(potongan)]
+    return ["", f"{EMOJI['makro']} <b>Makro</b>", " · ".join(potongan)]
 
 
 def _blok_berita(brief: Dict[str, Any], maks: int = 5) -> List[str]:
@@ -259,7 +291,7 @@ def _blok_berita(brief: Dict[str, Any], maks: int = 5) -> List[str]:
     if not berperingkat or maks <= 0:
         return []
 
-    baris = ["", "📰 <b>Berita Utama</b>"]
+    baris = ["", f"{EMOJI['berita']} <b>Berita Utama</b>"]
     for i, n in enumerate(berperingkat[:maks], 1):
         # Judul terjemahan dipakai kalau ada, supaya seluruh pesan satu bahasa.
         judul_berita = n.get("judul_id") or n.get("judul") or ""
@@ -287,7 +319,7 @@ def _notice_agenda_mendesak(brief: Dict[str, Any], maks: int = 3) -> List[str]:
     ]
     if not mendesak:
         return []
-    baris = ["🚨 <b>AGENDA PENTING &lt;24 JAM</b>"]
+    baris = [f"{EMOJI['mendesak']} <b>AGENDA PENTING &lt;24 JAM</b>"]
     for a in mendesak[:maks]:
         baris.append(f"• <b>{esc(a['nama'])}</b> — {esc(a.get('waktu_wib', ''))}")
     return baris
@@ -299,13 +331,13 @@ def _blok_agenda(brief: Dict[str, Any], maks: int = 4) -> List[str]:
     agenda = brief.get("calendar") or []
     if not agenda:
         return []
-    baris = ["", "📅 <b>Agenda Terdekat</b>"]
+    baris = ["", f"{EMOJI['agenda']} <b>Agenda Terdekat</b>"]
     for acara in agenda[:maks]:
         tanda = "~" if acara.get("perkiraan") else ""
         # Acara berdampak besar ke kripto diberi penanda supaya tidak
         # tenggelam di antara rilis data rutin yang nyaris tidak berpengaruh.
         relevansi = acara.get("relevansi_kripto") or 0
-        awalan = "🔴 " if relevansi >= 4 else ""
+        awalan = f"{EMOJI['dampak']} " if relevansi >= 4 else ""
         baris.append(f"{awalan}{esc(acara['waktu_wib'])} · {tanda}{esc(acara['nama'])}")
         # Jalur transmisinya hanya ditulis untuk yang benar-benar berdampak —
         # kalau semua acara diberi penjelasan, blok ini jadi terlalu panjang
@@ -324,7 +356,7 @@ def _blok_opsi(brief: Dict[str, Any]) -> List[str]:
     if not opsi:
         return []
 
-    baris = ["", "🎯 <b>Opsi (Deribit)</b>"]
+    baris = ["", f"{EMOJI['opsi']} <b>Opsi (Deribit)</b>"]
 
     potongan = []
     if opsi.get("dvol") is not None:
@@ -365,7 +397,7 @@ def _blok_valuasi(brief: Dict[str, Any]) -> List[str]:
     if not oc:
         return []
 
-    baris = ["", "⛓ <b>Valuasi On-chain</b>"]
+    baris = ["", f"{EMOJI['onchain']} <b>Valuasi On-chain</b>"]
     potongan = []
     if oc.get("mvrv") is not None:
         zona = oc.get("mvrv_zona")
@@ -394,7 +426,7 @@ def _blok_aliran(brief: Dict[str, Any]) -> List[str]:
     if not fl:
         return []
 
-    baris = ["", "💵 <b>Aliran Dana</b>"]
+    baris = ["", f"{EMOJI['aliran']} <b>Aliran Dana</b>"]
     if fl.get("premium_coinbase_pct") is not None:
         p = fl["premium_coinbase_pct"]
         # Label bisa kosong kalau sumbernya tidak memberi keterangan; tanpa
@@ -429,7 +461,7 @@ def _blok_pernyataan(brief: Dict[str, Any], maks: int = 3) -> List[str]:
     if not pernyataan or maks <= 0:
         return []
 
-    baris = ["", "🗣 <b>Pernyataan Berpengaruh</b>"]
+    baris = ["", f"{EMOJI['pernyataan']} <b>Pernyataan Berpengaruh</b>"]
     for s in pernyataan[:maks]:
         isi = _potong(s.get("ringkasan") or s.get("kutipan") or "", 170)
         baris.append(f"• <b>{esc(s['tokoh'])}</b>: {esc(isi)}")
@@ -448,7 +480,7 @@ def _blok_whale(brief: Dict[str, Any]) -> List[str]:
     if whale.get("whale_long_pct") is None and whale.get("ritel_long_pct") is None:
         return []
 
-    baris = ["", "🐋 <b>Posisi Besar vs Ritel</b>"]
+    baris = ["", f"{EMOJI['whale']} <b>Posisi Besar vs Ritel</b>"]
     potongan = []
     if whale.get("whale_long_pct") is not None:
         potongan.append(f"Whale {_angka(whale['whale_long_pct'], 1)}% long")
@@ -472,7 +504,7 @@ def _blok_sinyal_palsu(brief: Dict[str, Any], maks: int = 2) -> List[str]:
     sinyal = (brief.get("technical") or {}).get("sinyal_palsu") or []
     if not sinyal:
         return []
-    baris = ["", "🎭 <b>Sinyal Perlu Diwaspadai</b>"]
+    baris = ["", f"{EMOJI['jebakan']} <b>Sinyal Perlu Diwaspadai</b>"]
     for s in sinyal[:maks]:
         baris.append(f"• {esc(s.get('keterangan', ''))}")
     return baris
@@ -633,7 +665,7 @@ def _blok_ai(
         # jauh lebih lega daripada butir pendukung lain.
         if ol.get("narasi_geopolitik"):
             baris.append("")
-            baris.append("🌍 <b>Geopolitik &amp; regulasi</b>")
+            baris.append(f"{EMOJI['regulasi']} <b>Geopolitik &amp; regulasi</b>")
             paragraf_geo = [p.strip() for p in ol["narasi_geopolitik"].split("\n\n") if p.strip()]
             for par in paragraf_geo[: bat["geo_jumlah"]]:
                 baris.append(esc(_potong(par, bat["geo_par"])))
@@ -649,7 +681,7 @@ def _blok_ai(
                 teks_kapan = _bersihkan_kapan(k.get("kapan", "")).replace("(", "").replace(")", "").strip()
                 kapan = f" ({esc(teks_kapan)})" if teks_kapan else ""
                 baris.append(
-                    f"📅 <b>{esc(apa)}{kapan}:</b> "
+                    f"{EMOJI['agenda']} <b>{esc(apa)}{kapan}:</b> "
                     + esc(_potong(k.get("kenapa_penting", ""), bat["keputusan"]))
                 )
         for nama, kunci, panah in (("Menguat", "skenario_naik", "↑"), ("Melemah", "skenario_turun", "↓")):
@@ -739,7 +771,7 @@ def _blok_penutup(brief: Dict[str, Any], site_url: str) -> List[str]:
 
     if site_url:
         baris.append("")
-        baris.append(f"🔗 Selengkapnya: {esc(site_url)}")
+        baris.append(f"{EMOJI['tautan']} Selengkapnya: {esc(site_url)}")
     baris.append("<i>Informasi, bukan saran investasi.</i>")
     return baris
 
@@ -761,8 +793,10 @@ def render_terpisah(
     """
     batas_efektif = batas or BATAS_KARAKTER
     kepala = [
-        "📰 <b>Nawala</b> · <i>Ringkasan Pasar Kripto</i>",
-        f"🕐 {esc(brief.get('generated_at_wib', ''))}",
+        f"{EMOJI['merek']} <b>Nawala</b> · <i>Ringkasan Pasar Kripto</i>",
+        # Timestamp tanpa emoji: jam bukan penanda pasar, dan barisnya
+        # sudah jelas tanpa hiasan.
+        f"{esc(brief.get('generated_at_wib', ''))}",
     ]
     notice_mendesak = _notice_agenda_mendesak(brief)
     if notice_mendesak:
