@@ -30,6 +30,9 @@ class Secrets:
     telegram_chat_id: Optional[str] = None
     fred_api_key: Optional[str] = None
     telegram_subscriber_key: Optional[str] = None
+    # Nama secret di repo ini SOSO_KEY (bukan SOSOVALUE_API_KEY) — samakan
+    # dengan yang sudah dibuat pemilik repo di GitHub, jangan ganti sepihak.
+    soso_api_key: Optional[str] = None
 
     @property
     def llm_enabled(self) -> bool:
@@ -98,6 +101,7 @@ def load_config(path: Path = CONFIG_PATH) -> Config:
         telegram_chat_id=os.environ.get("TELEGRAM_CHAT_ID") or None,
         fred_api_key=os.environ.get("FRED_API_KEY") or None,
         telegram_subscriber_key=os.environ.get("TELEGRAM_SUBSCRIBER_KEY") or None,
+        soso_api_key=os.environ.get("SOSO_KEY") or None,
     )
 
     cfg = Config(

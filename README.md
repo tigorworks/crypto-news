@@ -19,7 +19,7 @@ Coin Metrics       │   (MVRV, NVT, alamat aktif)
 Coinbase           │   (premium AS)
 mempool.space      ├─→ pipeline Python ─→ docs/data/latest.json ─→ GitHub Pages
 alternative.me     │        │
-Farside (ETF)      │        └──────────→ Telegram
+SoSoValue/Farside  │        └──────────→ Telegram
 Yahoo Finance      │
 RSS kripto+makro ──┤   (36 feed: media + regulator + bank sentral)
 Fed/SEC/CFTC       │   (sumber primer regulasi AS)
@@ -282,7 +282,7 @@ Halaman web sempat menampilkan sederet label peringatan kuning di header — sis
 
 | Label yang pernah muncul | Yang sebenarnya salah | Yang dikerjakan |
 |---|---|---|
-| *Sumber tidak tersedia run ini: Arus ETF harian* | Farside di belakang Cloudflare, sering menolak IP pusat data | Angka terakhir yang diketahui dipakai ulang **beserta tanggalnya**, ditampilkan sebagai keterangan data biasa (`per 14 Aug 2026`), bukan label peringatan. Dibatasi 7 hari supaya angka lama tidak terbaca sebagai kondisi hari ini |
+| *Sumber tidak tersedia run ini: Arus ETF harian* | Farside di belakang Cloudflare, sering menolak IP pusat data | **SoSoValue (API resmi) dipasang sebagai sumber utama**, Farside jadi cadangan — lihat "Arus ETF lewat API resmi SoSoValue". Kalau keduanya gagal, angka terakhir yang diketahui dipakai ulang **beserta tanggalnya**, ditampilkan sebagai keterangan data biasa (`per 14 Aug 2026`), bukan label peringatan. Dibatasi 7 hari supaya angka lama tidak terbaca sebagai kondisi hari ini |
 | *Harga memakai sumber cadangan CoinGecko; candle merupakan hasil resampling* | CoinGecko tidak punya OHLC gratis, jadi candle-nya di-resample dari deret harga — high/low/volume cuma perkiraan, padahal ATR, Bollinger, rata-rata volume, dan deteksi sapuan likuiditas semuanya dihitung dari situ | **OKX disisipkan sebagai cadangan kedua**, sebelum CoinGecko. OKX menyediakan OHLCV sungguhan dan sudah terbukti tembus dari IP runner yang sama (rasio whale, taker, dan riwayat OI berhasil lewat sana). CoinGecko turun jadi lapis ketiga, dan catatan resampling hanya berlaku kalau benar-benar sampai ke sana |
 | *Feed gagal: home.treasury.gov, fdic.gov, bis.org, imf.org* | Empat feed yang ditambahkan tanpa bisa diverifikasi; keempatnya memang tidak menyediakan RSS di alamat itu | Dihapus dari `config.yaml` (tier-nya dipertahankan untuk feed lain) |
 | *Sebagian sumber pernyataan tidak terjangkau: truth_social:realDonaldTrump* | CDN Truth Social memblokir permanen dari IP pusat data — bukan gangguan sementara | Kegagalan berprefiks `truth_social:` tidak lagi dicatat sebagai anomali. Pernyataan tokoh yang sama tetap masuk lewat Google News, whitehouse.gov, dan pencarian X |
@@ -290,6 +290,28 @@ Halaman web sempat menampilkan sederet label peringatan kuning di header — sis
 | *Perapian pesan dilewati: memunculkan angka yang tidak ada di pesan asli: 64315* | Pemeriksaan angka perapi Telegram membandingkan DERET DIGIT, jadi `64.315,33` yang dibulatkan jadi `64.315` dianggap angka karangan dan seluruh hasil perapian ditolak | Perbandingan diganti jadi **numerik dengan toleransi mutlak < 1 satuan**. Pembulatan desimal lolos; harga yang benar-benar diubah (`63.042` → `63.542`) tetap ditolak |
 
 Yang **tidak** ikut dihapus: tooltip pada badge kualitas data di header (muncul hanya saat kursor diarahkan) dan `data_quality.catatan` di `latest.json`. Keduanya jejak diagnostik, bukan label yang mengganggu pembacaan.
+
+### Arus ETF lewat API resmi SoSoValue
+
+`etf_flow` adalah satu-satunya sumber yang HAMPIR SELALU gagal di produksi — bukan sesekali, tapi di hampir setiap run. Penyebabnya sudah dikonfirmasi lewat log produksi: Farside (satu-satunya sumber lama) berada di belakang Cloudflare, dan permintaan dari IP GitHub Actions mendapat halaman tantangan bot ("Just a moment...", HTTP 403) — bukan gangguan sementara, tapi pemblokiran aktif terhadap IP pusat data, persis seperti Binance memblokir IP yang sama dengan HTTP 451.
+
+**SoSoValue** (`openapi.sosovalue.com`) dipasang sebagai sumber utama, karena punya API resmi terdokumentasi — bukan scrape HTML yang bisa berubah kapan saja:
+
+```
+GET /api/v1/etfs/summary-history?symbol=BTC&country_code=US&limit=5
+Header: x-soso-api-key: <SOSO_KEY>
+```
+
+Mengembalikan **total gabungan** arus seluruh ETF BTC AS per hari (`total_net_inflow`, USD) — persis kolom "Total" di Farside, tanpa perlu memanggil API per ticker (IBIT, FBTC, dst) lalu menjumlahkan sendiri.
+
+Dua hal dari dokumentasi resminya yang wajib ditangani di kode, bukan diasumsikan:
+
+1. **Baris hari berjalan belum settle.** Arus dan aset settle T+1; baris untuk hari yang sedang berjalan tetap muncul di respons tapi `total_net_inflow` (dan field lain) masih `null` sampai hari berikutnya. Mengambil `data[0]` begitu saja akan sering mendapat `null` pada run pagi. `sosovalue.fetch_etf_flow()` karena itu meminta 5 baris terakhir dan mengambil baris **pertama yang sudah settle**, bukan baris pertama begitu saja.
+2. **Urutan tidak diasumsikan.** Dokumentasi menyatakan data terurut terbaru-dulu, tapi kode tetap mengurutkan ulang berdasarkan `date` sebelum memilih — supaya tidak bergantung pada urutan API yang bisa berubah tanpa pemberitahuan.
+
+**Farside tetap dipertahankan sebagai cadangan** kalau SoSoValue sedang bermasalah atau `SOSO_KEY` belum diisi — bukan dihapus. Kalau keduanya gagal, jalur carry-forward yang sudah ada (lihat di atas) yang mengambil alih.
+
+Key-nya **gratis** lewat `sosovalue.com/developer`, disimpan sebagai secret `SOSO_KEY` (lihat "5. Isi GitHub Secrets"). Endpoint dan bentuk respons diverifikasi langsung dari dokumentasi resmi (termasuk contoh JSON dan catatan T+1 di atas) sebelum kode ini ditulis — bukan tebakan.
 
 ### Data tingkat institusional
 
@@ -506,6 +528,7 @@ Kalau sebuah slug ternyata sudah pensiun, sistem tidak akan mogok: model cadanga
 | `TELEGRAM_CHAT_ID` | Ya |
 | `FRED_API_KEY` | Tidak — dilewati kalau kosong |
 | `TELEGRAM_SUBSCRIBER_KEY` | Tidak — hanya kalau ingin fitur pelanggan `/start` |
+| `SOSO_KEY` | Tidak — tanpa ini arus ETF jatuh langsung ke Farside (lihat "Arus ETF lewat API resmi SoSoValue") |
 
 ### 6. Aktifkan GitHub Pages
 
@@ -700,7 +723,7 @@ Pengguna harus bisa membedakan sekilas mana angka faktual dan mana interpretasi 
 | Log `Balasan yang gagal diparse` berisi `"kekuatan": III` | Model menulis skala 1-5 sebagai angka Romawi, yang bukan JSON valid — satu kemunculan menggugurkan seluruh batch. Terjadi di produksi pada langkah `statements` setelah pindah ke DeepSeek. `_perbaiki_json()` sekarang menerjemahkan angka Romawi telanjang (I..V) yang berdiri sebagai nilai, dan prompt-nya juga sudah diperjelas. Kalau muncul di luar jangkauan I..V, perluas `_POLA_ROMAWI_NILAI` di `src/analysis/llm.py`. |
 | Log `Balasan step 'revisi' terpotong di batas max_tokens` | Step revisi menulis ulang SELURUH narasi (bukan cuma bagian yang salah), jadi butuh ruang sebanyak sintesis sendiri. Kalau masih terpotong meski sudah dinaikkan, naikkan lagi `max_tokens` di `revisi_narasi()` (`src/analysis/news_analysis.py`). |
 | Log berhenti di `BERHENTI: data harga tidak tersedia` | Binance, OKX, dan CoinGecko sama-sama tidak bisa diakses. Biasanya sementara; cek lagi run berikutnya. |
-| `failed_sources` memuat `etf_flow` | Farside (di belakang Cloudflare) menolak atau strukturnya berubah. Kalau brief sebelumnya punya angka ETF, angka itu dipakai ulang lengkap dengan tanggal aslinya dan ditandai `etf_flow_kedaluwarsa`. |
+| `failed_sources` memuat `etf_flow` | SoSoValue (kalau `SOSO_KEY` diisi) dan Farside sama-sama gagal — cek log untuk tahu yang mana. Kalau brief sebelumnya punya angka ETF, angka itu dipakai ulang lengkap dengan tanggal aslinya dan ditandai `etf_flow_kedaluwarsa`. |
 | Funding/OI kosong | Binance (451) dan Bybit (CloudFront) sama-sama memblokir IP runner AS. Deribit dipakai sebagai lapis ketiga. |
 | Analisa bertanda "belum terverifikasi" | Critic gagal dijalankan pada run itu. Analisanya tetap dikirim supaya tidak hilang, tapi statusnya ditandai terus terang di web dan Telegram. |
 | Riwayat OI kosong | Tidak ada bursa yang menyediakannya dari IP runner. Perubahan OI diturunkan dari brief sebelumnya sebagai gantinya. |

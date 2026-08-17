@@ -313,7 +313,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
 
     # -- 3. Data pasar + posisi whale ------------------------------------
     log.info("[3/21] Ambil data pasar dan posisi whale")
-    hasil_pasar = market.collect(cfg.symbol)
+    hasil_pasar = market.collect(cfg.symbol, cfg.secrets.soso_api_key)
     gagal.extend(hasil_pasar["failed"])
     # Funding rate SAAT INI bisa positif/negatif tanpa berarti apa-apa; yang
     # membedakan sinyal kuat dari derau adalah SUDAH BERAPA LAMA bertahan di

@@ -41,6 +41,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           TELEGRAM_SUBSCRIBER_KEY: ${{ secrets.TELEGRAM_SUBSCRIBER_KEY }}
+          SOSO_KEY: ${{ secrets.SOSO_KEY }}
 
       - name: Commit hasil
         run: |
