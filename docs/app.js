@@ -1,4 +1,4 @@
-/* Ringkasan Pasar Bitcoin — logika halaman.
+/* Nawala — Ringkasan Pasar Kripto. Logika halaman.
  * Tanpa build step: Alpine.js untuk state, Chart.js untuk grafik, Lucide untuk ikon.
  */
 
