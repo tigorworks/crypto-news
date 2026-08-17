@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=cf6bb122"></script>
+<script src="app.js?v=412c3cb1"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -353,100 +353,61 @@
     <template x-if="data && !memuat">
       <div class="space-y-5">
 
-        <!-- ============ SIAGA KEBIJAKAN AS (paling atas saat menyala) ============
-             Ditempatkan DI ATAS ringkasan AI karena sifatnya alarm: kalau ia
-             menyala, itu hal pertama yang perlu diketahui pembaca.
+        <!-- ================= YANG DITUNGGU =================
+             Satu bar menggantikan dua kartu terpisah (siaga kebijakan dan
+             agenda besar). Keduanya menjawab pertanyaan yang sama — apa yang
+             bisa menggerakkan pasar, dan kapan — jadi satu garis waktu lebih
+             jujur daripada dua kotak yang saling berebut perhatian.
 
-             Isinya menjawab pertanyaan yang tidak bisa dijawab data harga —
-             seberapa berbahaya kalau kejutan kebijakan datang SEKARANG.
-             Kripto jalan 24/7, tapi bursa AS dan ETF spot tutup Jumat 16.00
-             waktu New York sampai Senin 09.30 (jeda ~65 jam). Di dalam jeda
-             itu tidak ada arus ETF yang menyerap tekanan dan meja institusi
-             tutup, jadi kejutan ditanggung pasar kripto sendirian.
+             Isinya sengaja pendek: uraian penuh ada di bagian SIAGA KEBIJAKAN
+             dan Agenda di bawah. Dengan begitu tinggi bagian teratas tidak
+             lagi bergantung pada seberapa panjang tulisan model hari itu.
 
-             Panel ini DIAM pada siaga rendah. Alarm yang menyala tiap hari
-             akan diabaikan justru pada hari ia benar-benar berarti. -->
-        <template x-if="siagaKebijakan">
-          <section class="rounded-xl border-2 p-4 sm:p-5" :class="kelasSiaga.kotak">
-            <div class="flex items-center gap-1.5 text-xs font-bold" :class="kelasSiaga.label">
-              <i :data-lucide="kelasSiaga.ikon" class="w-3.5 h-3.5"></i>
-              <span x-text="'SIAGA KEBIJAKAN: ' + siagaKebijakan.siaga.toUpperCase()"></span>
+             Warna kontainer mengikuti urgensi tertinggi di antara barisnya,
+             sehingga hari genting tetap berteriak walau widget-nya digabung.
+
+             Hitung mundurnya HIDUP, dihitung ulang tiap menit dari instant
+             absolut. Halaman ini dibaca kapan saja; selisih yang dibekukan
+             saat brief dibuat akan berbohong sepanjang sisa hari. -->
+        <template x-if="barisDitunggu.length">
+          <section class="rounded-xl p-4 sm:p-5" :class="kelasBarDitunggu">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400">
+              <i data-lucide="clock" class="w-3.5 h-3.5"></i> YANG DITUNGGU
             </div>
 
-            <!-- Warna aksen sengaja TIDAK dipakai di sini. Kalimat ini empat
-                 baris di ponsel, dan mewarnainya penuh membuat kartu jadi
-                 bidang oranye pekat — aksennya berhenti menandai apa pun
-                 karena semuanya ditandai. Bobotnya cukup dari font-semibold;
-                 warna alarm disimpan untuk label di atasnya. -->
-            <template x-if="kalimatJendela">
-              <p class="mt-2 text-sm font-semibold leading-relaxed text-slate-800 dark:text-slate-100"
-                 x-text="kalimatJendela"></p>
-            </template>
+            <div class="mt-2 divide-y divide-slate-200/70 dark:divide-slate-700/70">
+              <template x-for="(b, i) in barisDitunggu" :key="b.jenis">
+                <a :href="b.tautan" class="flex items-start gap-2.5 py-2.5 group">
+                  <i :data-lucide="b.ikon" class="w-4 h-4 mt-0.5 shrink-0" :class="kelasBarisDitunggu(b)"></i>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <span class="text-[11px] font-bold uppercase tracking-wide"
+                            :class="kelasBarisDitunggu(b)" x-text="b.label"></span>
+                      <!-- Hitung mundur hidup. Jangkar WIB di sebelahnya tidak
+                           bisa basi walau JavaScript mati, jadi keduanya
+                           selalu tampil berpasangan. -->
+                      <template x-if="b.mundur">
+                        <span class="text-sm font-semibold" :class="kelasBarisDitunggu(b)"
+                              x-text="b.mundur.teks"></span>
+                      </template>
+                      <template x-if="b.jangkar">
+                        <span class="text-xs text-slate-500 dark:text-slate-400"
+                              x-text="(b.awalan ? b.awalan + ' ' : '') + b.jangkar"></span>
+                      </template>
+                    </div>
 
-            <template x-if="siagaKebijakan.pemicu?.length">
-              <ul class="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-300">
-                <template x-for="(p, i) in siagaKebijakan.pemicu" :key="i">
-                  <li class="flex gap-1.5"><span class="shrink-0" :class="kelasSiaga.label">•</span><span x-text="p"></span></li>
-                </template>
-              </ul>
-            </template>
+                    <p class="mt-0.5 text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100"
+                       x-text="b.isi"></p>
 
-            <!-- Kerapuhan: kenapa kejutan yang sama bisa berdampak lebih jauh
-                 hari ini. Seluruh butirnya dihitung kode dari data yang sudah
-                 dikumpulkan, bukan tafsiran model.
-
-                 Nama faktornya tampil sebagai chip, penjelasannya disembunyikan
-                 di balik disclosure. Sebelumnya empat penjelasan panjang ini
-                 saja menyumbang sekitar seperempat dari tinggi kartu (1.077 px
-                 di ponsel), dan alarm yang perlu digulir dua layar berhenti
-                 berfungsi sebagai alarm. -->
-            <template x-if="siagaKebijakan.ringkasan || siagaKebijakan.kerapuhan?.faktor?.length">
-              <details class="mt-3 pt-3 border-t" :class="kelasSiaga.kotak"
-                       :open="siagaKebijakan.siaga === 'tinggi'">
-                <!-- Chip diberi latar penuh dan garis tipis, bukan bg-white/70.
-                     Di atas kartu bertint yang semi-transparan itu nyaris tak
-                     terlihat, sehingga nama faktor terbaca sebagai teks lepas
-                     dan barisnya kehilangan bentuk. -->
-                <summary class="cursor-pointer list-none flex flex-wrap items-center gap-1.5">
-                  <span class="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    <i data-lucide="chevron-down" class="w-3 h-3"></i>
-                    <span x-text="siagaKebijakan.kerapuhan?.faktor?.length
-                      ? 'Kerapuhan ' + siagaKebijakan.kerapuhan.tingkat + ' (' + siagaKebijakan.kerapuhan.skor + '/' + siagaKebijakan.kerapuhan.maks + ')'
-                      : 'Rincian'"></span>
-                  </span>
-                  <template x-for="(f, i) in (siagaKebijakan.kerapuhan?.faktor || [])" :key="i">
-                    <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"
-                          x-text="f.nama"></span>
-                  </template>
-                </summary>
-
-                <!-- Prosa model ditempatkan DI SINI, bukan di muka kartu.
-                     Diukur di ponsel ia 319 px — blok terbesar di kartu ini —
-                     sementara isinya sebagian besar mengulang daftar pemicu
-                     tepat di atasnya. Yang membuat alarm berguna adalah
-                     pemicunya yang konkret; esainya bacaan lanjutan. -->
-                <template x-if="siagaKebijakan.ringkasan">
-                  <p class="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-200"
-                     x-text="siagaKebijakan.ringkasan"></p>
-                </template>
-
-                <template x-if="siagaKebijakan.kerapuhan?.faktor?.length">
-                  <ul class="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
-                    <template x-for="(f, i) in siagaKebijakan.kerapuhan.faktor" :key="i">
-                      <li class="flex gap-1.5">
-                        <span class="text-slate-400 shrink-0">→</span>
-                        <span><span class="font-medium" x-text="f.nama"></span><span x-text="' — ' + f.keterangan"></span></span>
-                      </li>
+                    <template x-if="b.jalur">
+                      <p class="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400 jalur-ringkas"
+                         x-text="b.jalur"></p>
                     </template>
-                  </ul>
-                </template>
-              </details>
-            </template>
-
-            <template x-if="siagaKebijakan.yang_diperhatikan">
-              <p class="mt-2 text-xs text-slate-500 dark:text-slate-400"
-                 x-text="'Diawasi: ' + siagaKebijakan.yang_diperhatikan"></p>
-            </template>
+                  </div>
+                  <i data-lucide="chevron-right" class="w-4 h-4 shrink-0 text-slate-400 mt-0.5"></i>
+                </a>
+              </template>
+            </div>
           </section>
         </template>
 
@@ -518,51 +479,6 @@
 
              Kartunya HILANG sepenuhnya kalau tidak ada yang lolos ambang —
              slot teratas terlalu mahal untuk diisi kalimat "tidak ada apa-apa". -->
-        <!-- Bentuknya STRIP, bukan kartu. Isinya tetap sama persis, tapi
-             perannya di halaman berbeda: ini pengingat, bukan interupsi.
-             Sebelumnya ia memakai border-2 bertint sama seperti panel siaga,
-             jadi agenda tiga hari lagi tampil sama mendesaknya dengan alarm
-             yang sedang berbunyi.
-
-             Warna urgensi pindah ke garis aksen kiri, dan seluruh strip jadi
-             satu tautan — sehingga CTA terpisah di bawah tidak lagi perlu. -->
-        <template x-if="agendaSorot">
-          <a href="#s-agenda"
-             class="strip-agenda block rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-             :style="'--aksen-agenda: ' + kelasAgendaSorot.aksen">
-            <div class="flex items-start gap-2.5">
-              <i data-lucide="calendar-clock" class="w-4 h-4 mt-0.5 shrink-0" :class="kelasAgendaSorot.teks"></i>
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <span class="text-[11px] font-bold uppercase tracking-wide" :class="kelasAgendaSorot.label">Agenda besar</span>
-                  <span class="text-sm font-semibold" :class="kelasAgendaSorot.teks"
-                        x-text="hitungMundurAgenda(agendaSorot.jam_lagi)"></span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400"
-                        x-text="agendaSorot.hari + ' · ' + agendaSorot.waktu_wib"></span>
-                  <template x-if="agendaSorot.perkiraan">
-                    <span class="text-xs text-slate-400">(perkiraan)</span>
-                  </template>
-                </div>
-
-                <div class="mt-0.5 flex flex-wrap items-baseline gap-x-2">
-                  <span class="text-sm sm:text-base font-bold leading-snug" x-text="agendaSorot.nama"></span>
-                  <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                        x-text="labelRelevansiAgenda(agendaSorot.relevansi_kripto)"></span>
-                </div>
-
-                <!-- `jalur` = rantai transmisi ke BTC, hasil analisa agenda.
-                     Tanpa ini pembaca cuma tahu ADA agenda, bukan kenapa ia
-                     perlu peduli — jadi tetap tampil, hanya diperkecil. -->
-                <template x-if="agendaSorot.jalur">
-                  <p class="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400 jalur-ringkas"
-                     x-text="agendaSorot.jalur"></p>
-                </template>
-              </div>
-              <i data-lucide="chevron-right" class="w-4 h-4 shrink-0 text-slate-400 mt-0.5"></i>
-            </div>
-          </a>
-        </template>
-
         <!-- ================= HARGA ================= -->
         <section id="s-harga" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div class="lg:col-span-2 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5">
@@ -1054,6 +970,101 @@
                 </li>
               </template>
             </ul>
+          </section>
+        </template>
+
+        <!-- ================= SIAGA KEBIJAKAN (rincian) =================
+             Uraian penuh dari alarm yang diringkas di bar teratas. Dipisah ke
+             sini supaya bagian atas halaman tetap pendek berapa pun panjang
+             tulisan agen hari itu — pola yang sama dengan ringkasan AI dan
+             analisa AI.
+
+             Ditempatkan tepat sebelum analisa AI karena keduanya sama-sama
+             tafsir ke depan, bukan data mentah. -->
+        <template x-if="siagaKebijakan">
+          <section id="s-siaga" class="rounded-xl border-2 p-4 sm:p-5" :class="kelasSiaga.kotak">
+            <div class="flex items-center gap-1.5 text-xs font-bold" :class="kelasSiaga.label">
+              <i :data-lucide="kelasSiaga.ikon" class="w-3.5 h-3.5"></i>
+              <span x-text="'SIAGA KEBIJAKAN: ' + siagaKebijakan.siaga.toUpperCase()"></span>
+            </div>
+
+            <template x-if="kalimatJendela">
+              <p class="mt-2 text-sm font-semibold leading-relaxed text-slate-800 dark:text-slate-100"
+                 x-text="kalimatJendela"></p>
+            </template>
+
+            <!-- Hitung mundur hidup + jangkar WIB, sama seperti di bar atas.
+                 Angkanya berasal dari instant absolut yang sama, jadi tidak
+                 mungkin berbeda antara dua tempat. -->
+            <template x-if="hitungMundurJendela">
+              <div class="mt-2 flex flex-wrap items-baseline gap-x-2 text-sm">
+                <span class="font-semibold" :class="kelasSiaga.label"
+                      x-text="hitungMundurJendela.lewat ? 'Jendela sudah lewat' : hitungMundurJendela.teks"></span>
+                <template x-if="siagaKebijakan.jendela?.buka_berikutnya_wib">
+                  <span class="text-slate-500 dark:text-slate-400"
+                        x-text="'bursa AS buka ' + siagaKebijakan.jendela.buka_berikutnya_wib"></span>
+                </template>
+              </div>
+            </template>
+
+            <template x-if="siagaKebijakan.ringkasan">
+              <p class="mt-3 text-sm leading-relaxed text-slate-700 dark:text-slate-200"
+                 x-text="siagaKebijakan.ringkasan"></p>
+            </template>
+
+            <template x-if="siagaKebijakan.pemicu?.length">
+              <div class="mt-3">
+                <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Yang sedang dipantau
+                </div>
+                <ul class="mt-1.5 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                  <template x-for="(p, i) in siagaKebijakan.pemicu" :key="i">
+                    <li class="flex gap-1.5"><span class="shrink-0" :class="kelasSiaga.label">•</span><span x-text="p"></span></li>
+                  </template>
+                </ul>
+              </div>
+            </template>
+
+            <!-- Skenario: KONDISIONAL dan berbasis mekanisme, bukan ramalan
+                 angka. Butir yang menyelipkan level harga sudah dibuang di
+                 pipeline, jadi yang sampai sini hanya sebab-akibat. -->
+            <template x-if="siagaKebijakan.skenario?.length">
+              <div class="mt-3">
+                <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Kalau kejutan datang di jendela ini
+                </div>
+                <ul class="mt-1.5 space-y-1.5 text-sm text-slate-700 dark:text-slate-300">
+                  <template x-for="(s, i) in siagaKebijakan.skenario" :key="i">
+                    <li class="flex gap-1.5">
+                      <span class="shrink-0 text-slate-400">→</span><span x-text="s"></span>
+                    </li>
+                  </template>
+                </ul>
+                <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  Kemungkinan, bukan ramalan — dan bukan saran investasi.
+                </p>
+              </div>
+            </template>
+
+            <template x-if="siagaKebijakan.kerapuhan?.faktor?.length">
+              <div class="mt-3 pt-3 border-t" :class="kelasSiaga.kotak">
+                <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                     x-text="'Kerapuhan pasar: ' + siagaKebijakan.kerapuhan.tingkat + ' (' + siagaKebijakan.kerapuhan.skor + '/' + siagaKebijakan.kerapuhan.maks + ')'"></div>
+                <ul class="mt-1.5 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                  <template x-for="(f, i) in siagaKebijakan.kerapuhan.faktor" :key="i">
+                    <li class="flex gap-1.5">
+                      <span class="text-slate-400 shrink-0">→</span>
+                      <span><span class="font-medium" x-text="f.nama"></span><span x-text="' — ' + f.keterangan"></span></span>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+            </template>
+
+            <template x-if="siagaKebijakan.yang_diperhatikan">
+              <p class="mt-3 text-xs text-slate-500 dark:text-slate-400"
+                 x-text="'Diawasi: ' + siagaKebijakan.yang_diperhatikan"></p>
+            </template>
           </section>
         </template>
 

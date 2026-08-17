@@ -622,6 +622,128 @@ function briefApp() {
       return a;
     },
 
+    /* ===== Hitung mundur HIDUP =====
+       Dihitung ulang tiap menit dari instant absolut, bukan dibaca dari
+       selisih yang dibekukan pipeline.
+
+       Ini bukan kenyamanan, ini soal benar-salah. Brief dibuat sekali sehari
+       lalu halamannya dibuka kapan saja: selisih yang dibekukan pukul 06.12
+       masih akan menulis "7 jam lagi" pada pukul 18.00, dan tetap mengaku
+       bursa tutup setelah bursa buka. Untuk halaman market outlook, angka
+       yang membeku lebih berbahaya daripada tidak ada angka sama sekali.
+
+       Telegram TIDAK memakai ini: pesan dibaca dekat waktu kirim, jadi
+       snapshot di sana justru benar. */
+    hitungMundurLive(iso) {
+      this._detak; // dependensi supaya Alpine menyegarkan tiap menit
+      if (!iso) return null;
+      const t = new Date(iso);
+      if (Number.isNaN(t.getTime())) return null;
+
+      const detik = (t.getTime() - Date.now()) / 1000;
+      if (detik <= 0) return { lewat: true, teks: 'sudah lewat', jam: 0 };
+
+      const jam = detik / 3600;
+      let teks;
+      // Dibulatkan SEKALI ke satuan terkecil yang ditampilkan, lalu dipecah
+      // dengan bagi-sisa. Membulatkan tiap komponen sendiri-sendiri
+      // menghasilkan sisa yang tidak menyimpan: 2,9998 jam pernah keluar
+      // sebagai "2 jam 60 menit lagi", dan 29,999 jam sebagai "1 hari 5 jam"
+      // — hampir satu jam penuh hilang karena dibulatkan ke bawah.
+      const totalMenit = Math.round(detik / 60);
+      if (totalMenit < 60) {
+        teks = `${Math.max(1, totalMenit)} menit lagi`;
+      } else if (totalMenit < 1440) {
+        const j = Math.floor(totalMenit / 60);
+        const m = totalMenit % 60;
+        teks = m ? `${j} jam ${m} menit lagi` : `${j} jam lagi`;
+      } else {
+        const totalJam = Math.round(detik / 3600);
+        const h = Math.floor(totalJam / 24);
+        const s = totalJam % 24;
+        teks = s ? `${h} hari ${s} jam lagi` : `${h} hari lagi`;
+      }
+      return { lewat: false, teks, jam };
+    },
+
+    /* ===== Bar "Yang ditunggu" =====
+       Siaga kebijakan dan agenda besar digabung karena keduanya menjawab
+       pertanyaan yang sama: apa yang bisa menggerakkan pasar, dan kapan.
+       Satu berupa jendela struktural (bursa tutup), satu berupa acara
+       terjadwal — menaruhnya di satu garis waktu lebih jujur daripada dua
+       kartu terpisah yang saling berebut perhatian.
+
+       Barnya sengaja PENDEK. Uraian panjang pindah ke bagian tersendiri di
+       bawah, sehingga tinggi bagian atas tidak lagi bergantung pada seberapa
+       panjang tulisan model hari itu. */
+    get barisDitunggu() {
+      const baris = [];
+
+      const s = this.siagaKebijakan;
+      if (s) {
+        const j = s.jendela || {};
+        const mundur = this.hitungMundurLive(j.buka_berikutnya_utc);
+        // Jendela yang sudah lewat TIDAK disembunyikan diam-diam: prosa
+        // agennya ditulis saat jendela masih terbuka, jadi menyisakannya
+        // tanpa penanda akan membiarkan alarm lama berbunyi setelah
+        // sebabnya hilang. Barisnya berganti keadaan secara terbuka.
+        const lewat = !!mundur?.lewat;
+        baris.push({
+          jenis: 'siaga',
+          ikon: lewat ? 'check-circle' : (s.siaga === 'tinggi' ? 'siren' : 'landmark'),
+          label: lewat ? 'JENDELA SUDAH LEWAT' : `SIAGA KEBIJAKAN: ${s.siaga.toUpperCase()}`,
+          mundur,
+          jangkar: j.buka_berikutnya_wib || '',
+          awalan: lewat ? 'Bursa AS buka' : 'Bursa AS buka',
+          isi: lewat
+            ? 'Bursa AS dan ETF sudah buka — jendela akhir pekan ini berakhir, '
+              + 'dan tekanan mulai bisa diserap arus institusi lagi.'
+            : this.kalimatJendelaRingkas,
+          tautan: '#s-siaga',
+          mendesak: !lewat && s.siaga === 'tinggi',
+          perhatian: !lewat,
+        });
+      }
+
+      const a = this.agendaSorot;
+      if (a) {
+        const mundur = this.hitungMundurLive(a.waktu_utc);
+        baris.push({
+          jenis: 'agenda',
+          ikon: 'calendar-clock',
+          label: 'AGENDA BESAR',
+          mundur,
+          jangkar: `${a.hari} · ${a.waktu_wib}`,
+          awalan: '',
+          isi: a.nama,
+          jalur: a.jalur || '',
+          tautan: '#s-agenda',
+          mendesak: false,
+          perhatian: !mundur?.lewat && (mundur?.jam ?? Infinity) < 24,
+        });
+      }
+      return baris;
+    },
+
+    /* Warna kontainer mengikuti urgensi TERTINGGI di antara barisnya, supaya
+       hari genting tetap berteriak walau widget-nya sudah digabung. */
+    get kelasBarDitunggu() {
+      const b = this.barisDitunggu;
+      if (b.some((x) => x.mendesak)) {
+        return 'border-2 border-rose-300 dark:border-rose-700/70 bg-rose-50/70 dark:bg-rose-900/20';
+      }
+      if (b.some((x) => x.perhatian)) {
+        return 'border-2 border-amber-300 dark:border-amber-700/70 bg-amber-50/70 dark:bg-amber-900/20';
+      }
+      return 'border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60';
+    },
+
+    kelasBarisDitunggu(b) {
+      if (b.mendesak) return 'text-rose-700 dark:text-rose-300';
+      if (b.perhatian) return 'text-amber-700 dark:text-amber-300';
+      return 'text-slate-600 dark:text-slate-300';
+    },
+
     /* Kalimat posisi waktu — bagian yang membuat berita yang sama berbahaya
        atau biasa saja. Dirakit dari angka yang dihitung pipeline. */
     get kalimatJendela() {
@@ -635,6 +757,27 @@ function briefApp() {
       if (j.fase === 'jelang_tutup_pekan') {
         return 'Menjelang penutupan Jumat — berita yang mendarat sekarang tidak sempat '
              + 'dicerna pasar AS sebelum jeda akhir pekan.';
+      }
+      return '';
+    },
+
+    /* Hitung mundur jendela untuk bagian rincian. Sengaja memakai getter yang
+       sama dengan bar atas: satu sumber angka, jadi keduanya tidak mungkin
+       menampilkan sisa waktu yang berbeda. */
+    get hitungMundurJendela() {
+      return this.hitungMundurLive(this.siagaKebijakan?.jendela?.buka_berikutnya_utc);
+    },
+
+    /* Versi satu baris untuk bar atas. Angka jamnya sengaja TIDAK ikut di
+       sini — hitung mundur hidup di sebelahnya yang memegang angka, dan
+       menuliskannya dua kali membuka peluang keduanya berbeda. */
+    get kalimatJendelaRingkas() {
+      const f = this.siagaKebijakan?.jendela?.fase;
+      if (f === 'jeda_akhir_pekan') {
+        return 'Bursa AS & ETF tutup — kejutan kebijakan ditanggung pasar kripto sendirian.';
+      }
+      if (f === 'jelang_tutup_pekan') {
+        return 'Menjelang penutupan Jumat — berita sekarang tidak sempat dicerna pasar AS.';
       }
       return '';
     },
@@ -1193,6 +1336,7 @@ function briefApp() {
        baru waktu sebagai pemutus. Dengan begitu FOMC Minutes tiga hari lagi
        tetap menang atas rilis kelas menengah besok. */
     get agendaSorot() {
+      this._detak; // ikut menyegar: penyaringan di bawah memakai waktu sekarang
       const acuan = this.data?.generated_at ? new Date(this.data.generated_at) : null;
       if (!acuan || Number.isNaN(acuan.getTime())) return null;
       const hariAcuan = this._hariWIB(acuan);
@@ -1204,8 +1348,10 @@ function briefApp() {
         if (Number.isNaN(t.getTime())) return false;
         const selisihHari = this._hariWIB(t) - hariAcuan;
         if (selisihHari < 0 || selisihHari > 3) return false;
-        // Agenda yang jamnya sudah lewat hari ini bukan lagi pengingat.
-        return a.jam_lagi === null || a.jam_lagi === undefined || a.jam_lagi >= 0;
+        // Kelewatannya diukur terhadap WAKTU SEKARANG, bukan `jam_lagi` yang
+        // dibekukan saat brief dibuat. Acara yang lewat beberapa jam setelah
+        // brief terbit tidak boleh terus dipajang sebagai "akan datang".
+        return t.getTime() > Date.now();
       });
       if (!layak.length) return null;
 
