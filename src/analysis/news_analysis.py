@@ -1013,6 +1013,77 @@ def analisa_whale(
 # --------------------------------------------------------------------------
 # LLM — outlook ke depan
 # --------------------------------------------------------------------------
+# Panjang minimum sebelum sebuah blok prosa layak dipecah. Di bawah ini,
+# memecahnya justru menghasilkan paragraf sepotong-sepotong.
+_MIN_KARAKTER_PECAH = 420
+_MIN_KALIMAT_PECAH = 4
+# Panjang paragraf yang enak dibaca di ponsel: sekitar 10 baris.
+_TARGET_KARAKTER_PARAGRAF = 400
+
+_POLA_AKHIR_KALIMAT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'\u201c])")
+
+
+def _pecah_paragraf(teks: str, maks_paragraf: int = 3) -> str:
+    """Pecah satu blok prosa panjang jadi 2-3 paragraf di batas kalimat.
+
+    Prompt sudah meminta model memisahkan paragraf sendiri, tapi permintaan
+    format seperti ini tidak pernah konvergen di repo ini — yang bertahan
+    selalu penegakan di sisi kode. Hasil nyatanya satu dinding teks berisi
+    semua isu sekaligus: melelahkan dibaca dan menyamarkan mana isu yang mana.
+
+    Tidak menyentuh apa pun yang sudah dipecah model, dan tidak memecah blok
+    yang memang pendek. Pemisahnya batas kalimat, jadi tidak ada kalimat yang
+    terbelah.
+    """
+    teks = (teks or "").strip()
+    if not teks or "\n\n" in teks or len(teks) < _MIN_KARAKTER_PECAH:
+        return teks
+
+    kalimat = [k.strip() for k in _POLA_AKHIR_KALIMAT.split(teks) if k.strip()]
+    if len(kalimat) < _MIN_KALIMAT_PECAH:
+        return teks
+
+    # Jumlah paragraf ditentukan PANJANG, bukan cacah kalimat: kalimat
+    # analisa pasar sering sangat panjang, dan aturan "<=5 kalimat jadi 2
+    # paragraf" menghasilkan paragraf 947 karakter pada narasi produksi —
+    # masih dinding teks. Sasarannya sekitar 400 karakter per paragraf.
+    jumlah = min(maks_paragraf, max(2, round(len(teks) / _TARGET_KARAKTER_PARAGRAF)))
+    jumlah = min(jumlah, len(kalimat))
+
+    # Titik potong dipilih dari panjang KUMULATIF: untuk tiap batas ke-j,
+    # ambil batas kalimat yang panjang kumulatifnya PALING DEKAT ke j/jumlah
+    # bagian teks. Memotong per cacah kalimat menaruh semua kalimat panjang
+    # di satu paragraf; cara ini menyeimbangkan berdasarkan yang benar-benar
+    # dilihat pembaca, yaitu panjang teksnya.
+    kumulatif, jalan = [], 0
+    for k in kalimat:
+        jalan += len(k) + 1
+        kumulatif.append(jalan)
+    total = kumulatif[-1]
+
+    potong: List[int] = []
+    for j in range(1, jumlah):
+        sasaran = total * j / jumlah
+        # Kandidat batas: setelah kalimat ke-i (i+1 kalimat terpakai), selalu
+        # menyisakan minimal satu kalimat untuk tiap paragraf berikutnya.
+        kandidat = [
+            i for i in range(len(kalimat) - 1)
+            if (not potong or i > potong[-1]) and (len(kalimat) - 1 - i) >= (jumlah - j - 1)
+        ]
+        if not kandidat:
+            break
+        potong.append(min(kandidat, key=lambda i: abs(kumulatif[i] - sasaran)))
+
+    paragraf: List[str] = []
+    mulai = 0
+    for i in potong + [len(kalimat) - 1]:
+        paragraf.append(" ".join(kalimat[mulai:i + 1]))
+        mulai = i + 1
+
+    log.info("Narasi panjang dipecah jadi %d paragraf", len(paragraf))
+    return "\n\n".join(paragraf)
+
+
 def outlook(
     client: LLMClient, models: List[str], konteks: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
@@ -1054,10 +1125,14 @@ def outlook(
         "karangan.\n\n"
         "Balas objek JSON:\n"
         "  ringkasan: 2-3 kalimat pandangan umum ke depan\n"
-        "  narasi_geopolitik: 3-5 kalimat MENGALIR (bukan daftar) yang "
+        "  narasi_geopolitik: 4-8 kalimat MENGALIR (bukan daftar) yang "
         "menjelaskan kaitan situasi geopolitik/regulasi/makro saat ini dengan "
-        "pasar kripto. Ini bagian yang paling dibaca — tulis sebagai paragraf "
-        "utuh, bukan potongan poin. Wajib menelusuri RANTAI TRANSMISI sampai "
+        "pasar kripto. Ini bagian yang paling dibaca.\n"
+        "    PECAH JADI 2-3 PARAGRAF, dipisah baris kosong (\\n\\n di dalam "
+        "string JSON) — satu isu per paragraf. Satu blok panjang berisi "
+        "semua isu sekaligus melelahkan dibaca dan menyamarkan mana isu "
+        "yang mana. Tetap prosa mengalir di dalam tiap paragraf, bukan "
+        "potongan poin. Wajib menelusuri RANTAI TRANSMISI sampai "
         "ke harga BTC, bukan sekadar menyebut peristiwanya: bukan 'ada "
         "pertemuan Gedung Putih soal kripto', tapi 'pertemuan Gedung Putih "
         "soal kripto berpotensi menurunkan premi risiko regulasi yang selama "
@@ -1124,7 +1199,9 @@ def outlook(
     return {
         "ringkasan": str(hasil["ringkasan"]).strip(),
         "narasi_geopolitik": (
-            str(hasil["narasi_geopolitik"]).strip()[:1500]
+            # Dipecah di kode, bukan cuma diminta lewat prompt — lihat
+            # _pecah_paragraf() untuk alasannya.
+            _pecah_paragraf(str(hasil["narasi_geopolitik"]).strip()[:1500])
             if hasil.get("narasi_geopolitik") else ""
         ),
         "skenario_naik": skenario("skenario_naik"),
@@ -1331,7 +1408,21 @@ def sintesis(
         "saat pertama muncul, lalu boleh dipakai singkat.\n\n"
 
         "STRUKTUR — isi setiap field ini:\n"
-        "  judul: temuan utama, BUKAN 'Update Harga BTC'. Mulai dari temuannya.\n"
+        "  judul: HEADLINE. Ini satu-satunya kalimat yang tampil paling atas "
+        "halaman, dan sering satu-satunya yang sempat dibaca — perlakukan "
+        "seperti judul utama koran keuangan, bukan label bagian.\n"
+        "    Syaratnya: 8-14 kata; MEMUAT TEMUANNYA, bukan topiknya; "
+        "sertakan angka atau level konkret kalau itu inti temuannya; "
+        "sebutkan KETEGANGANNYA (apa lawan apa) kalau memang ada.\n"
+        "    Buruk (label, bukan temuan): 'Update Harga BTC', 'Analisa "
+        "Pasar Harian', 'BTC Bergerak Sideways'.\n"
+        "    Baik: 'Rebound BTC ke $64.300 ditopang short yang tertutup, "
+        "bukan pembeli baru'; 'Dua hari beruntun arus keluar ETF menahan "
+        "BTC di bawah $65.000'; 'BTC datar menjelang FOMC Minutes sementara "
+        "Bollinger menyempit ke level tersempit sebulan'.\n"
+        "    Dilarang: kata hype ('meledak', 'roket', 'waspada!'), tanda "
+        "seru, dan judul yang memancing tanpa menjawab ('Ada apa dengan "
+        "BTC hari ini?'). Menarik di sini berarti PADAT ISI, bukan heboh.\n"
         "  posisi_harga: angka terkini, perubahan 24 jam, konteks jarak ke "
         "support/resistance kunci (2-3 kalimat)\n"
         "  karakter_pergerakan: WAJIB DIISI. 2-4 kalimat yang menjawab tuntas: "

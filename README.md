@@ -146,6 +146,38 @@ Prompt-nya menuntut hal yang sering dilewatkan: menelusuri rantai transmisi alih
 
 Kata-kata hype dilarang, begitu pula prediksi harga sebagai kepastian dan rekomendasi beli/jual langsung.
 
+### Pandangan ke depan punya angkanya sendiri
+
+"Pandangan ke depan" (market outlook) tadinya murni prosa, padahal angkanya SUDAH ADA dan dihitung kode: level kunci, level invalidasi, dan kisaran harian normal (ATR). Yang kurang cuma menempatkannya pada satu sumbu.
+
+**Peta jangkauan harga** adalah sebuah **meter** — posisi satu nilai di dalam rentang berbatas, bukan grafik — yang menampilkan sekaligus: di mana harga berdiri, support dan resistance terdekat, kedua level pembatalan skenario, dan seberapa besar satu hari normal dibanding jarak ke level itu. Ditemani tiga angka: jarak ke support, jarak ke resistance, dan kisaran harian (ATR).
+
+Pita terang di batangnya adalah jangkauan satu hari yang normal. Itu yang memberi SKALA pada jaraknya: "1,2% lagi ke resistance" berarti lain kalau satu hari normal saja bergerak 1,8%.
+
+Tiga keputusan desain yang sengaja diambil:
+
+- **Pewarnaannya emphasis, bukan kategorikal** — satu aksen indigo untuk harga sekarang, sisanya netral. Batas atas dan bawah dibedakan lewat POSISI dan huruf S/R, bukan warna: merah/hijau bersebelahan di satu batang gagal uji keterbacaan buta warna (ΔE deutan 5,8, di bawah ambang 6). Aksennya sendiri lolos seluruh pemeriksaan pada latar terang maupun gelap.
+- **Geometri dan warnanya ditulis inline / lewat variabel CSS, bukan utility class.** Ini bukan preferensi gaya: utility yang kebetulan tidak ikut ter-generate membuat label menumpuk di atas batangnya dan penanda hilang **tanpa error apa pun** — kegagalan diam yang cuma ketahuan kalau ada yang benar-benar melihat halamannya. Persis itu yang terjadi saat pengujian.
+- **Bukan ramalan.** Meter ini mengukur JARAK, bukan memperkirakan arah; kalimat penutup di bawahnya menyatakan itu terang-terangan.
+
+### Judul sintesis diperlakukan sebagai HEADLINE
+
+`ai.bagian.judul` adalah satu-satunya kalimat yang tampil di kartu teratas halaman, dan sering satu-satunya yang sempat dibaca. Prompt lamanya cuma melarang label ("BUKAN 'Update Harga BTC'"); sekarang ia diberi syarat yang bisa diperiksa: 8-14 kata, memuat TEMUANNYA bukan topiknya, menyertakan angka atau level konkret kalau itu inti temuannya, dan menyebut KETEGANGANNYA kalau ada — disertai contoh baik dan buruk.
+
+Yang tetap dilarang: kata hype, tanda seru, dan judul yang memancing tanpa menjawab. Menarik di sini berarti PADAT ISI, bukan heboh.
+
+### Catatan editorial pindah ke dasar bagian AI
+
+Panel "Sebagian kalimat menyerempet anjuran tindakan" dulu duduk tepat di bawah judul bagian AI — menyela sebelum pembaca sempat membaca satu kalimat pun analisa. Isinya catatan kaki editorial, bukan temuan pasar, jadi tempatnya di paling bawah bagian itu dengan font kecil.
+
+### Geopolitik dipecah jadi paragraf oleh kode
+
+Narasi geopolitik terbit sebagai satu blok 1.463 karakter — dinding teks yang menyamarkan mana isu yang mana. Prompt sudah meminta model memecahnya sendiri, tapi permintaan format seperti ini tidak pernah konvergen di repo ini; yang bertahan selalu penegakan di sisi kode.
+
+`_pecah_paragraf()` memecahnya di batas kalimat jadi 2-3 paragraf. Titik potongnya dipilih dari panjang KUMULATIF — untuk tiap batas, ambil batas kalimat yang panjang kumulatifnya paling dekat ke bagian yang dituju. Memotong per cacah kalimat menaruh semua kalimat panjang di satu paragraf: aturan "≤5 kalimat jadi 2 paragraf" menghasilkan paragraf 947 karakter pada narasi produksi, masih dinding teks. Menyeimbangkan per panjang menghasilkan 372/574/515 pada teks yang sama.
+
+Algoritma yang sama ada **dua kali**: di pipeline (`src/analysis/news_analysis.py`) untuk brief baru, dan di halaman (`docs/app.js`) untuk brief yang SUDAH tersimpan. Tanpa yang kedua, seluruh arsip akan selamanya terbaca sebagai dinding teks. Keduanya dijaga identik dan diperiksa paritasnya.
+
 ### Naik atau turun — dan kenaikan/penurunan JENIS APA
 
 Pertanyaan pertama pembaca setiap pagi selalu sama: 24 jam ini naik atau turun, kenapa, dan itu pergerakan jenis apa. Jawabannya sekarang dijamin ada, dan tidak bergantung pada model mana pun.
@@ -349,11 +381,17 @@ Kosongkan daftarnya kalau tidak ingin ada tombol.
 
 Serangkaian penambahan berdasar audit "apa yang perlu diperbaiki dari sisi UI/UX yang paham market":
 
-- **Kartu RINGKASAN AI paling atas** — panel indigo di posisi teratas halaman, DI ATAS harga dan skor sentimen: vonis satu kalimat (`ai.bagian.judul`) + arah pergerakan 24 jam beserta jenisnya + tautan ke analisa lengkap. Pembaca yang cuma punya 10 detik dapat MAKNA, bukan cuma angka.
-  Analisa AI yang UTUH sengaja tidak ikut dipindah ke atas: bagian itu tingginya belasan ribu piksel di ponsel, dan menaruhnya di sana akan mengubur harga jauh di bawah lipatan. Kartu ini pintu masuknya.
-  Panel pergerakan di dalam kartu dihitung kode, jadi kartunya tetap berisi walaupun narasi AI gagal atau ditahan critic.
+- **Dua kartu di paling atas, DI ATAS harga dan skor sentimen.**
+  1. **RINGKASAN AI** — headline temuan hari itu (`ai.bagian.judul`) + arah pergerakan 24 jam beserta jenisnya + tautan ke analisa lengkap. Panel pergerakannya dihitung kode, jadi kartunya tetap berisi walaupun narasi AI ditahan critic.
+  2. **AGENDA BESAR 3 HARI KE DEPAN** — **satu** agenda saja: yang dampaknya ke kripto paling besar dalam tiga hari mendatang, lengkap dengan hitung mundur, waktu WIB, dan rantai transmisinya ke BTC (`jalur`). Sengaja satu, bukan daftar — daftar lengkapnya sudah ada di bagian Agenda, dan slot teratas ini gunanya justru memaksa satu hal saja yang diingat. Kartunya **hilang sepenuhnya** kalau tidak ada yang lolos ambang; slot teratas terlalu mahal untuk diisi kalimat "tidak ada apa-apa".
+
+  Ambang "besar" memakai `relevansi_kripto >= 4`, sama dengan ambang filter agenda dan notice <24 jam: kalau "besar" berarti hal berbeda di tiap tempat, pembaca tidak bisa mempercayai satu pun. Urutan pemilihannya relevansi kripto → bobot dampak ekonomi → waktu, karena yang dicari dampak TERBESAR, bukan yang terdekat.
+
+  **Jendelanya dihitung per HARI KALENDER WIB, bukan 72 jam mentah.** Bukan detail sepele: brief terbit sekitar 00:30 WIB, dan FOMC Meeting Minutes tiga hari kemudian jatuh di `jam_lagi` 72,6 — lewat 36 menit dari batas 72 jam, padahal siapa pun yang membaca "3 hari ke depan" jelas mengharapkannya muncul. Ini tertangkap saat pengujian dengan data produksi, bukan diperkirakan. Warna kartunya mengikuti KEDEKATAN waktu (merah <24 jam, kuning selebihnya), bukan besar dampaknya — yang lolos ke kartu ini semuanya sudah berdampak besar.
+
+  Analisa AI yang UTUH tidak ikut naik ke atas: bagian itu tingginya belasan ribu piksel di ponsel, dan menaruhnya di sana mengubur harga jauh di bawah lipatan (terukur `y=12.099` saat dicoba, vs `y=722` dengan kedua kartu ini).
 - **"Perubahan vs Brief Sebelumnya" berdiri sendiri di bagian bawah** sebagai konteks penutup, bukan lagi berbagi baris dengan agenda.
-- **Urutan bagian**: ringkasan AI → harga → **pembacaan teknikal** → analisa AI → pasar → opsi & valuasi → whale → agenda → berita → perubahan vs brief sebelumnya. Analisa AI naik dari urutan keenam, dan teknikal ditaruh tepat di atasnya supaya pembaca sudah memegang kondisi harga sebelum membaca tafsirannya. Nav lompat ponsel mengikuti urutan yang sama.
+- **Urutan bagian**: ringkasan AI → agenda besar → harga → **pembacaan teknikal** → pasar → opsi & valuasi → whale → **analisa AI** → agenda 30 hari → berita → perubahan vs brief sebelumnya. Analisa AI yang utuh duduk tepat sebelum agenda 30 hari: vonisnya sudah disampaikan kartu teratas, jadi uraian panjangnya tidak perlu lagi menghalangi data mentah — dan menempel ke agenda karena keduanya sama-sama bicara soal apa yang BELUM terjadi. Nav lompat ponsel mengikuti urutan yang sama.
 - **Skor sentimen diperbaiki labelnya** — skalanya -100 (bearish penuh) sampai +100 (bullish penuh), tapi label lama menulis "/100" yang gampang salah dibaca seolah skornya selalu positif, apalagi saat angkanya negatif. Sekarang eksplisit "dari -100..+100" dengan tanda `+`/`-` pada angkanya.
 - **Sumber gagal TIDAK lagi ditulis sebagai label di halaman.** Sempat ditampilkan terang-terangan di header, lalu di footer, lalu dihapus seluruhnya — lihat "Label peringatan dihapus, penyebabnya dibereskan". Yang tersisa cuma tooltip pada badge kualitas data, dan penyebabnya dikerjakan di sumber masing-masing.
 - **Corong berita di footer** — "Berita terkumpul" (jumlah KOTOR yang ditarik dari seluruh feed, sebelum saringan umur) dan "Lolos saringan" (yang benar-benar dipakai di brief, plus persentasenya). Angka ini menunjukkan apakah menambah feed benar-benar menambah bahan atau cuma menambah derau yang tetap dibuang di langkah filter.
