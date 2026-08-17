@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=2fc1836b"></script>
+<script src="app.js?v=ed8344d7"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -67,9 +67,31 @@
   .baris-sorotan {
     border-left: 4px solid var(--aksen-baris, transparent);
     background: var(--latar-baris, transparent);
+    transition: background-color 0.15s ease;
     padding-left: 0.75rem;
     border-top-right-radius: 0.375rem;
     border-bottom-right-radius: 0.375rem;
+  }
+
+  /* Latar hover disetel per baris lewat `--latar-hover` (lihat
+     gayaBarisSorotan di app.js): baris mendesak menebalkan tint-nya sendiri,
+     baris netral memakai abu transparan. Sama seperti di atas, nilainya rgba
+     supaya satu angka bekerja di tema terang dan gelap. */
+  .baris-sorotan:hover { background: var(--latar-hover, transparent); }
+
+  /* Chevron ditengahkan lewat properti langsung, bukan utility `self-center`.
+     Utility itu terbukti tidak selalu ikut ter-generate, dan kalau hilang
+     chevron-nya diam-diam kembali menggantung di pojok atas mengikuti
+     `items-start` milik barisnya — persis keluhan yang memicu perbaikan ini,
+     tanpa satu pun error. */
+  .baris-sorotan__chevron { align-self: center; }
+  .baris-sorotan:focus-visible {
+    background: var(--latar-hover, transparent);
+    outline: 2px solid var(--aksen-baris, #94a3b8);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .baris-sorotan { transition: none; }
   }
 
   .strip-agenda {
@@ -461,8 +483,15 @@
                     <!-- Panah menyamping. Ke bawah sempat dicoba karena lebih
                          harfiah — target ketiga tautan memang berada di bawah —
                          tapi hasilnya berat dipandang, dan chevron kanan sudah
-                         jadi afordans baku untuk baris yang menuju rincian. -->
-                    <i data-lucide="chevron-right" class="w-4 h-4 shrink-0 text-slate-400 mt-0.5"></i>
+                         jadi afordans baku untuk baris yang menuju rincian.
+
+                         `self-center` melawan `items-start` milik barisnya:
+                         ikon di kiri memang harus sejajar baris teks PERTAMA,
+                         tapi chevron ini menandai seluruh baris sebagai satu
+                         tautan, jadi tempatnya di tengah tinggi baris. Dengan
+                         mt-0.5 ia menggantung di pojok atas dan terlihat
+                         seperti tidak sengaja. -->
+                    <i data-lucide="chevron-right" class="baris-sorotan__chevron w-4 h-4 shrink-0 text-slate-400"></i>
                   </a>
                 </template>
               </div>
