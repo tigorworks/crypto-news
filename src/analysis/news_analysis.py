@@ -674,6 +674,159 @@ SIKAP_PERNYATAAN = ["mendukung", "menentang", "netral"]
 STATUS_PERNYATAAN = ["verbatim", "dilaporkan_media", "rumor"]
 
 
+def agen_kebijakan(
+    client: LLMClient,
+    models: List[str],
+    pernyataan: List[Dict[str, Any]],
+    berita: List[Dict[str, Any]],
+    jendela: Dict[str, Any],
+    rapuh: Dict[str, Any],
+    maks_item: int = 10,
+) -> Optional[Dict[str, Any]]:
+    """Agen pemantau kebijakan AS: seberapa berbahaya kalau kejutan datang SEKARANG.
+
+    Ini bukan pengumpul data — pengumpulannya sudah dikerjakan collectors
+    (whitehouse.gov, Google News, X lewat Grok). Tugas langkah ini
+    mempertemukan tiga hal yang selama ini tidak pernah disandingkan:
+
+      1. sinyal kebijakan/pernyataan AS yang sudah tersaring,
+      2. POSISI WAKTUNYA terhadap jam bursa AS (dihitung kode), dan
+      3. KERAPUHAN pasar saat ini (dihitung kode).
+
+    Poin 2 yang paling sering terlewat. Kebijakan yang sama berdampak jauh
+    berbeda tergantung kapan ia mendarat: pada Rabu siang pasar AS bisa
+    langsung mencernanya lewat ETF dan lindung nilai; pada Jumat malam
+    kripto menanggungnya sendirian sampai Senin.
+
+    Angka jendela dan kerapuhan TIDAK dihitung ulang model — keduanya
+    disodorkan sudah jadi, dan model hanya menafsirkan artinya.
+    """
+    if not jendela:
+        return None
+
+    kandidat = [
+        {
+            "tokoh": p.get("tokoh"),
+            "ringkasan": p.get("ringkasan"),
+            "topik": p.get("topik"),
+            "dampak_btc": p.get("dampak_btc"),
+            "kekuatan": p.get("kekuatan"),
+            "status": p.get("status"),
+            "waktu_utc": p.get("waktu_utc"),
+        }
+        for p in (pernyataan or [])[:maks_item]
+    ]
+    # Berita kebijakan/geopolitik ikut disertakan: kebijakan besar sering
+    # muncul sebagai berita lebih dulu sebelum ada pernyataan resminya.
+    kandidat_berita = [
+        {
+            "judul": b.get("judul_id") or b.get("judul"),
+            "kategori": b.get("kategori"),
+            "sentimen": b.get("sentimen"),
+            "kekuatan": b.get("kekuatan"),
+            "status_kepastian": b.get("status_kepastian"),
+        }
+        for b in (berita or [])
+        if b.get("kategori") in ("regulasi", "geopolitik", "makro")
+        and (b.get("kekuatan") or 0) >= 3
+    ][:maks_item]
+
+    if not kandidat and not kandidat_berita:
+        return None
+
+    system = (
+        "Kamu pemantau risiko kebijakan AS untuk pasar kripto. Tugasmu SATU: "
+        "menilai seberapa besar risiko kejutan kebijakan bagi pemegang BTC "
+        "pada JENDELA WAKTU saat ini.\n\n"
+
+        "KENAPA WAKTU PENTING — pahami ini sebelum menilai:\n"
+        "Kripto diperdagangkan 24/7, tapi bursa saham AS dan ETF spot Bitcoin "
+        "tutup Jumat 16.00 waktu New York dan baru buka Senin 09.30 — jeda "
+        "sekitar 65 jam. Di dalam jeda itu tidak ada penciptaan/penebusan unit "
+        "ETF, meja institusi AS tutup, dan likuiditas order book menipis. "
+        "Kejutan kebijakan yang mendarat di jendela itu ditanggung SENDIRIAN "
+        "oleh pasar kripto sampai Senin — itu sebabnya sebagian akhir pekan "
+        "berakhir dengan penurunan tajam.\n\n"
+
+        "Angka jendela dan kerapuhan SUDAH DIHITUNG KODE dan diberikan "
+        "kepadamu. JANGAN menghitung ulang, jangan membantahnya, dan jangan "
+        "mengarang angka baru. Tugasmu menafsirkan artinya.\n\n"
+
+        "ATURAN PENILAIAN\n"
+        "  - Kalau tidak ada sinyal kebijakan yang berarti, katakan begitu "
+        "terus terang dan beri siaga 'rendah'. Menakut-nakuti tanpa dasar "
+        "lebih merugikan daripada diam.\n"
+        "  - Bedakan yang SUDAH TERJADI dari yang BARU WACANA. Wacana yang "
+        "belum jadi kebijakan bukan alasan siaga tinggi.\n"
+        "  - Siaga 'tinggi' hanya kalau KETIGANYA bertemu: ada sinyal "
+        "kebijakan berdampak, waktunya di jendela rawan, dan pasarnya rapuh.\n"
+        "  - Dilarang menyebut target harga atau ajakan bertindak.\n\n"
+
+        "Balas objek JSON:\n"
+        "  siaga: 'rendah' | 'sedang' | 'tinggi'\n"
+        "  ringkasan: 2-3 kalimat. Apa yang sedang dipantau dan kenapa "
+        "tingkat siaganya segitu. Sebut posisi waktunya secara eksplisit.\n"
+        "  pemicu: array maksimal 3 string — sinyal kebijakan spesifik yang "
+        "sedang dipantau, masing-masing satu kalimat pendek. Array kosong "
+        "kalau memang tidak ada.\n"
+        "  yang_diperhatikan: satu kalimat — apa yang paling layak diawasi "
+        "sampai jendela ini lewat.\n\n"
+        + ATURAN_DASAR
+    )
+
+    konteks = {
+        "jendela_pasar_as": jendela,
+        "kerapuhan_pasar": rapuh,
+        "pernyataan_tokoh": kandidat,
+        "berita_kebijakan": kandidat_berita,
+    }
+    try:
+        hasil = client.chat_json(
+            models,
+            system,
+            "Data:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
+            step="agen_kebijakan",
+            temperature=0.2,
+            max_tokens=2000,
+        )
+    except (LLMError, BudgetExceeded) as exc:
+        log.warning("Agen kebijakan gagal: %s", exc)
+        return None
+
+    if not isinstance(hasil, dict):
+        log.warning("Agen kebijakan mengembalikan struktur tak terduga")
+        return None
+
+    siaga = hasil.get("siaga")
+    if siaga not in ("rendah", "sedang", "tinggi"):
+        siaga = "rendah"
+
+    # Siaga TIDAK boleh melebihi apa yang dibenarkan kondisi terhitung.
+    # Tanpa penjagaan ini model bisa berteriak "tinggi" pada Rabu siang di
+    # pasar yang tebal — persis jenis alarm palsu yang lama-lama membuat
+    # alarm sungguhan ikut diabaikan.
+    if siaga == "tinggi" and not (
+        jendela.get("dalam_jendela_rawan")
+        and rapuh.get("tingkat") in ("sedang", "tinggi")
+    ):
+        log.info(
+            "Siaga agen diturunkan tinggi->sedang (jendela rawan=%s, kerapuhan=%s)",
+            jendela.get("dalam_jendela_rawan"), rapuh.get("tingkat"),
+        )
+        siaga = "sedang"
+
+    return {
+        "siaga": siaga,
+        "ringkasan": str(hasil.get("ringkasan") or "").strip()[:700],
+        "pemicu": [str(x)[:200] for x in (hasil.get("pemicu") or [])[:3]],
+        "yang_diperhatikan": str(hasil.get("yang_diperhatikan") or "").strip()[:300],
+        # Disalin apa adanya supaya konsumen (web, Telegram) tidak perlu
+        # menghitung ulang dan tidak bisa menyimpang dari yang dinilai agen.
+        "jendela": jendela,
+        "kerapuhan": rapuh,
+    }
+
+
 def analisa_pernyataan(
     client: LLMClient,
     models: List[str],

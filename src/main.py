@@ -17,7 +17,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from .analysis import news_analysis, riset, technical
+from .analysis import jendela_pasar, news_analysis, riset, technical
 from .analysis.llm import LLMClient
 from .collectors import (
     binance,
@@ -109,6 +109,7 @@ def _etf_terlalu_tua(tanggal: Optional[str]) -> bool:
 def _konteks_llm(
     price: Dict[str, Any],
     teknikal: Dict[str, Any],
+    jendela_agen: Dict[str, Any],
     pasar: Dict[str, Any],
     makro: Dict[str, Any],
     berita: List[Dict[str, Any]],
@@ -134,6 +135,11 @@ def _konteks_llm(
         # bertumpu pada arah dan jenis yang sama dengan yang dilihat pembaca
         # di halaman — dan supaya critic punya patokan untuk memeriksanya.
         "pergerakan_24j": teknikal.get("pergerakan_24j"),
+        # Jendela jam bursa AS + kerapuhan pasar, keduanya hitungan kode.
+        # Dikirim supaya narasi tahu apakah kejutan hari ini akan ditanggung
+        # SENDIRIAN oleh pasar kripto (jeda akhir pekan) atau bisa langsung
+        # diserap ETF dan meja institusi AS.
+        "jendela_pasar_as": jendela_agen,
         # Hanya candle harian. Sebelumnya 4H dan 1H ikut dikirim, dan itu
         # justru menimbulkan masalah: model menulis EMA 1H lalu critic
         # mencocokkannya dengan EMA 4H dan memvonisnya karangan. Untuk laporan
@@ -537,6 +543,40 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     agregat["dominant_themes"] = news_analysis.tema_dominan(artikel)
     agregat["narrative_shift"] = ""
 
+    # Jendela jam bursa AS dan kerapuhan pasar — keduanya murni hitungan
+    # kode. Dipakai agen kebijakan di bawah, dan ikut dikirim ke sintesis
+    # supaya narasinya tahu apakah kejutan hari ini akan ditanggung sendirian
+    # oleh pasar kripto atau bisa langsung diserap ETF dan meja institusi.
+    jendela = jendela_pasar.fase_pasar()
+    rapuh = jendela_pasar.kerapuhan(
+        {"technical": teknikal, "market": pasar, "whale": posisi_whale}
+    )
+    log.info(
+        "Jendela pasar AS: %s (%s) · kerapuhan %s (%d/%d)",
+        jendela["fase"], jendela["waktu_ny"], rapuh["tingkat"], rapuh["skor"], rapuh["maks"],
+    )
+
+    # Agen pemantau kebijakan AS. Dijalankan SETELAH pernyataan disaring dan
+    # berita diklasifikasi, karena ia membaca hasil keduanya — bukan data
+    # mentah. Gagal di sini tidak menggagalkan brief: alarmnya hilang, sisa
+    # laporan tetap terbit.
+    agen = None
+    if client:
+        log.info("[14c/21] Agen pemantau kebijakan AS")
+        agen = news_analysis.agen_kebijakan(
+            client, cfg.llm_models("agen_kebijakan"),
+            pernyataan, artikel, jendela, rapuh,
+        )
+        if agen:
+            log.info(
+                "Siaga kebijakan: %s — %s",
+                agen["siaga"], (agen.get("ringkasan") or "")[:100],
+            )
+    # Tanpa LLM (atau saat agennya gagal), jendela dan kerapuhan TETAP
+    # disimpan: keduanya hitungan kode dan tetap berguna walau tanpa prosa.
+    if agen is None:
+        agen = {"siaga": None, "jendela": jendela, "kerapuhan": rapuh}
+
     # Karakter pergerakan 24 jam: arah, besaran, dan JENISNYA (uang baru vs
     # posisi ditutup). Dihitung di sini karena butuh berita yang SUDAH
     # diklasifikasi — sentimen dan kekuatannya dipakai untuk mencari kandidat
@@ -616,7 +656,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
 
     if client:
         konteks = _konteks_llm(
-            price, teknikal, pasar, makro, artikel, agregat, conflicts,
+            price, teknikal, agen, pasar, makro, artikel, agregat, conflicts,
             diff_sementara, posisi_whale, agenda, pernyataan,
             opsi, onchain_data, aliran,
         )
@@ -897,6 +937,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             for k in klines.get("1d", [])[-60:]
         ],
         tautan_luar=cfg.tautan_luar,
+        agen_kebijakan=agen,
         bot_telegram=str(cfg.telegram.get("bot_username") or "").lstrip("@"),
         previous=sebelumnya,
     )
