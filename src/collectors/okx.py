@@ -289,7 +289,22 @@ def tren_funding(history: List[Dict[str, Any]]) -> Dict[str, Any]:
 # rasio whale, taker, dan riwayat OI semuanya berhasil lewat sini. Jadi OKX
 # ditaruh sebagai cadangan PERTAMA: candle asli jauh lebih baik daripada
 # candle hasil resampling.
-_INTERVAL_OKX = {"1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1D"}
+# Bar harian memakai "1Dutc", BUKAN "1D".
+#
+# Bar "1D" OKX diselaraskan ke waktu Hong Kong, sehingga candle hariannya
+# dibuka pukul 16.00 UTC — bukan 00.00 UTC seperti Binance. Perbedaan itu
+# tidak terlihat di harga, tapi merusak semua yang bergantung pada BATAS
+# HARI, dan kegagalannya senyap.
+#
+# Terbukti pada brief 18 Agustus 06.33 WIB: saat Binance terblokir dan data
+# jatuh ke OKX, candle "harian" terakhir dibuka 17 Agustus 16.00 UTC,
+# sehingga pada jam cron (23.15 UTC) ia baru berjalan 7,3 jam — 31% terisi,
+# bukan 97% seperti yang diasumsikan jadwalnya. Volume harian ikut terbaca
+# 0,44x rata-rata padahal harinya belum berjalan sepertiga.
+#
+# Dengan "1Dutc" batas harinya sama dengan Binance, jadi jadwal cron dan
+# penjaga kelengkapan candle berlaku untuk kedua sumber.
+_INTERVAL_OKX = {"1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc"}
 SPOT_INST = "BTC-USDT"
 
 
