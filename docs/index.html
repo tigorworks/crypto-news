@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=460fe16a"></script>
+<script src="app.js?v=91b9af01"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -304,9 +304,32 @@
           <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <span class="text-slate-500 dark:text-slate-400">Terakhir diperbarui:</span>
             <span class="font-semibold text-slate-900 dark:text-white" x-text="data?.generated_at_wib || '—'"></span>
-            <span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+            <!-- Chip umur brief berubah warna begitu isinya basi. Sebelumnya
+                 ia selalu kelabu, jadi "3 hari lalu" tampil dengan tenang
+                 yang sama seperti "20 menit lalu" — dan pembaca yang datang
+                 setelah cron gagal beberapa hari tidak punya alasan curiga
+                 bahwa harga di layarnya sudah tidak berlaku. -->
+            <span class="text-xs px-1.5 py-0.5 rounded" :class="kelasUmurBrief"
                   x-text="waktuRelatif"></span>
           </div>
+
+          <!-- Peringatan brief basi. Sengaja sebuah PITA, bukan chip:
+               ambangnya (36 jam) berarti setidaknya satu jadwal terbit
+               terlewat, dan pada titik itu angka di seluruh halaman —
+               harga, teknikal, hitung mundur agenda — sudah menggambarkan
+               hari yang lain. -->
+          <template x-if="briefBasi">
+            <div class="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 dark:border-amber-700
+                        bg-amber-50 dark:bg-amber-900/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+              <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 mt-px"></i>
+              <span>
+                <span class="font-semibold" x-text="'Brief ini sudah ' + waktuRelatif + '.'"></span>
+                Jadwal terbit harian tampaknya terlewat, jadi seluruh angka di halaman
+                ini — termasuk harga dan hitung mundur agenda — menggambarkan keadaan
+                saat brief dibuat, bukan sekarang.
+              </span>
+            </div>
+          </template>
         </div>
 
         <div class="flex items-center gap-2 shrink-0">
@@ -503,11 +526,18 @@
                           <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"
                                 x-text="b.tingkat"></span>
                         </template>
-                        <!-- Hitung mundur disembunyikan begitu jendelanya
-                             lewat: labelnya sudah berbunyi "JENDELA LEWAT",
-                             dan menambahkan teks "sudah lewat" di sebelahnya
-                             hanya mengulang hal yang sama dua kali. Jam
-                             pastinya tetap ada di jangkar WIB di bawahnya. -->
+                        <!-- Penjagaannya untuk BARIS AGENDA. Agenda bisa lewat
+                             di sela satu menit antar penyegaran, dan saat itu
+                             terjadi "sudah lewat" lebih baik hilang daripada
+                             tampil sebagai hitung mundur yang keliru. Jam
+                             pastinya tetap ada di jangkar WIB di bawahnya.
+
+                             Baris JENDELA tidak pernah sampai ke sini dalam
+                             keadaan lewat: sejak siagaKebijakan memadamkan
+                             dirinya begitu bursa yang ditunggu buka, barisnya
+                             ikut hilang lebih dulu. Komentar lama di tempat
+                             ini masih menerangkan label "JENDELA LEWAT" yang
+                             sudah tidak bisa terjadi lagi. -->
                         <template x-if="b.mundur && !b.mundur.lewat">
                           <span class="text-sm font-semibold" :class="kelasBarisDitunggu(b)"
                                 x-text="b.mundur.teks"></span>
@@ -593,25 +623,87 @@
             </dl>
           </div>
 
-          <!-- Sentimen berita + level kunci -->
-          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5 flex flex-col">
-            <div class="text-sm text-slate-500 dark:text-slate-400">Skor sentimen berita</div>
-            <div class="mt-1 flex items-baseline gap-2">
-              <!-- Skalanya -100 (bearish penuh) sampai +100 (bullish penuh),
-                   BUKAN 0-100 — "/100" lama gampang salah dibaca seolah skor
-                   selalu positif, apalagi saat angkanya negatif. -->
-              <span class="text-3xl font-bold" :class="warnaAngka(data.aggregate.sentiment_score)"
-                    x-text="(data.aggregate.sentiment_score > 0 ? '+' : '') + angka(data.aggregate.sentiment_score, 1)"></span>
-              <span class="text-sm text-slate-500">dari -100..+100</span>
-            </div>
-            <div class="text-sm font-medium mt-0.5" x-text="data.aggregate.sentiment_label || '—'"></div>
+          <!-- Suasana pasar + level kunci
 
-            <!-- Batang -100..+100 -->
-            <div class="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-700 relative overflow-hidden">
-              <div class="absolute top-0 bottom-0 w-px bg-slate-400 dark:bg-slate-500 left-1/2"></div>
-              <div class="absolute top-0 bottom-0 rounded-full transition-all"
-                   :class="data.aggregate.sentiment_score >= 0 ? 'bg-emerald-500' : 'bg-rose-500'"
-                   :style="gayaBatangSentimen"></div>
+               URUTANNYA DISENGAJA: Fear & Greed lebih dulu, skor sentimen
+               berita di bawahnya.
+
+               Sebelumnya kebalikannya, dan itu menyesatkan. Angka besar di
+               puncak kartu ini terbaca sebagai "indeks suasana pasar" —
+               nama yang dikenal orang untuk itu adalah Fear & Greed — padahal
+               yang dipajang skor sentimen berita: rata-rata nada beberapa
+               puluh artikel yang lolos saringan hari ini, sesuatu yang sama
+               sekali lain dan tidak punya nama publik. Keduanya bahkan kerap
+               berlawanan (lihat narrative_shift 21 Agustus: sentimen berita
+               melemah sementara Fear & Greed melonjak 10 poin), jadi salah
+               baca di sini bukan soal rapi-rapian.
+
+               Yang dikenal pembaca dinaikkan, yang khas laporan ini tetap ada
+               tapi dengan penjelasan siapa dirinya. -->
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5 flex flex-col">
+            <template x-if="data.market.fear_greed">
+              <div>
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="text-sm text-slate-500 dark:text-slate-400">Fear &amp; Greed Index</span>
+                  <span class="text-[11px] text-slate-400">seluruh pasar kripto</span>
+                </div>
+                <div class="mt-1 flex items-baseline gap-2 flex-wrap">
+                  <span class="text-3xl font-bold" x-text="data.market.fear_greed.value"></span>
+                  <span class="text-sm font-medium" x-text="data.market.fear_greed.label"></span>
+                  <!-- Perubahan vs pembacaan kemarin. Angkanya sudah ikut di
+                       respons sumbernya (`previous`), jadi tidak ada yang
+                       dihitung ulang di sini. -->
+                  <template x-if="selisihFearGreed">
+                    <span class="text-xs text-slate-500 dark:text-slate-400" x-text="selisihFearGreed"></span>
+                  </template>
+                </div>
+                <div class="mt-3 h-2.5 rounded-full relative"
+                     style="background:linear-gradient(90deg,#f43f5e 0%,#f59e0b 35%,#a3a3a3 50%,#84cc16 70%,#10b981 100%)">
+                  <div class="absolute -top-1 w-1 h-[18px] bg-slate-900 dark:bg-white rounded-full ring-2 ring-white dark:ring-slate-800 transition-all"
+                       :style="'left: calc(' + data.market.fear_greed.value + '% - 2px)'"></div>
+                </div>
+                <div class="flex justify-between text-[11px] sm:text-[10px] text-slate-400 mt-1">
+                  <span>Takut</span><span>Netral</span><span>Serakah</span>
+                </div>
+                <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  Skala 0-100 dari perilaku pasar: volatilitas, momentum harga, dan
+                  dominasi BTC. Bukan dari berita.
+                </p>
+              </div>
+            </template>
+
+            <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700"
+                 :class="data.market.fear_greed ? '' : 'mt-0 pt-0 border-t-0'">
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-sm text-slate-500 dark:text-slate-400">Sentimen berita hari ini</span>
+                <span class="text-[11px] text-slate-400"
+                      x-text="data.aggregate.jumlah_dinilai ? 'dari ' + data.aggregate.jumlah_dinilai + ' berita' : 'hasil analisa AI'"></span>
+              </div>
+              <div class="mt-1 flex items-baseline gap-2">
+                <!-- Skalanya -100 (bearish penuh) sampai +100 (bullish penuh),
+                     BUKAN 0-100 — "/100" lama gampang salah dibaca seolah skor
+                     selalu positif, apalagi saat angkanya negatif. Ukuran
+                     angkanya kini setingkat di bawah Fear & Greed supaya
+                     hierarki bacanya sesuai: yang dikenal luas dulu. -->
+                <span class="text-2xl font-bold" :class="warnaAngka(data.aggregate.sentiment_score)"
+                      x-text="(data.aggregate.sentiment_score > 0 ? '+' : '') + angka(data.aggregate.sentiment_score, 1)"></span>
+                <span class="text-xs text-slate-500">dari -100..+100</span>
+                <span class="text-sm font-medium" x-text="data.aggregate.sentiment_label || '—'"></span>
+              </div>
+
+              <!-- Batang -100..+100 -->
+              <div class="mt-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700 relative overflow-hidden">
+                <div class="absolute top-0 bottom-0 w-px bg-slate-400 dark:bg-slate-500 left-1/2"></div>
+                <div class="absolute top-0 bottom-0 rounded-full transition-all"
+                     :class="data.aggregate.sentiment_score >= 0 ? 'bg-emerald-500' : 'bg-rose-500'"
+                     :style="gayaBatangSentimen"></div>
+              </div>
+              <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                Nada berita yang masuk brief ini, ditimbang kredibilitas sumber dan
+                seberapa baru. <span class="font-medium">Bukan Fear &amp; Greed</span> — ini
+                mengukur KABARNYA, bukan perilaku pasarnya, jadi keduanya wajar berbeda
+                arah.
+              </p>
             </div>
 
             <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2 text-sm">
@@ -729,10 +821,25 @@
                               x-text="'hari berjalan ' + persen(tfAktif.volume.kelengkapan * 100, 0).replace('+','')"></span>
                       </template>
                     </dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">OBV</dt>
-                    <dd x-text="tfAktif.volume.obv_arah"></dd></div>
-                  <div class="flex justify-between"><dt class="text-slate-500 dark:text-slate-400">VWAP harian</dt>
-                    <dd x-text="uang(tfAktif.volume.vwap_harian)"></dd></div>
+                  <!-- Dua baris di bawah ini ikut menyandang tanda candle
+                       berjalan, dengan alasan yang sama seperti rasio volume
+                       di atasnya: keduanya bertumpu pada volume, yang menumpuk
+                       sepanjang hari. Arah OBV sudah dihitung tanpa candle
+                       berjalan (lihat technical.py), jadi tandanya menerangkan
+                       apa yang IKUT dihitung; VWAP-nya memang masih bergerak
+                       sampai tengah malam UTC. -->
+                  <div class="flex justify-between gap-2"><dt class="text-slate-500 dark:text-slate-400">OBV</dt>
+                    <dd class="text-right"><span x-text="tfAktif.volume.obv_arah"></span>
+                      <template x-if="tfAktif.volume.obv_arah_tanpa_candle_berjalan">
+                        <span class="block text-[11px] text-slate-400">tanpa candle hari berjalan</span>
+                      </template>
+                    </dd></div>
+                  <div class="flex justify-between gap-2"><dt class="text-slate-500 dark:text-slate-400">VWAP harian</dt>
+                    <dd class="text-right"><span x-text="uang(tfAktif.volume.vwap_harian)"></span>
+                      <template x-if="tfAktif.volume.vwap_harian_parsial">
+                        <span class="block text-[11px] text-slate-400">masih berjalan hari ini</span>
+                      </template>
+                    </dd></div>
                 </dl>
               </div>
 
@@ -796,6 +903,15 @@
                      peringatan) supaya pembaca tahu angka ini per kapan. -->
                 <template x-if="data.market.etf_flow_kedaluwarsa && data.market.etf_flow_date">
                   <div class="text-xs font-normal text-slate-400" x-text="'per ' + data.market.etf_flow_date"></div>
+                </template>
+                <!-- Pemeriksaan silang dua sumber. Hanya muncul saat keduanya
+                     BERBEDA JAUH: kecocokan adalah keadaan normal dan tidak
+                     perlu diumumkan, sedangkan perbedaan berarti salah satu
+                     angkanya keliru dan pembaca berhak ragu sebelum
+                     mengutipnya. -->
+                <template x-if="etfBerbedaAntarSumber">
+                  <div class="mt-1 text-xs font-normal text-amber-700 dark:text-amber-300"
+                       x-text="etfBerbedaAntarSumber"></div>
                 </template></div>
               <div><div class="text-slate-500 dark:text-slate-400">Hashrate</div>
                 <div class="font-semibold text-base" x-text="data.market.hashrate ? angka(data.market.hashrate, 0) + ' EH/s' : '—'"></div></div>
@@ -805,26 +921,41 @@
                 <div class="font-semibold text-base" x-text="data.market.fee_fastest_sat_vb ? data.market.fee_fastest_sat_vb + ' sat/vB' : '—'"></div></div>
             </div>
 
-            <!-- Gauge Fear & Greed -->
-            <template x-if="data.market.fear_greed">
+            <!-- Likuidasi 24 jam. Hanya muncul kalau sumbernya menjawab —
+                 angka ini datang dari SATU bursa, dan lebih baik absen
+                 daripada tampil sebagai nol yang terbaca "tidak ada
+                 likuidasi hari ini".
+
+                 Nama bursanya ditulis di bawah angkanya, bukan disembunyikan
+                 di tooltip: pembaca yang membandingkan dengan situs
+                 agregator (yang menjumlahkan belasan bursa) akan melihat
+                 angka jauh lebih besar di sana, dan itu bukan pertanda salah
+                 satunya keliru. -->
+            <template x-if="data.market.likuidasi_total_usd">
               <div class="mt-5 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <div class="flex items-center justify-between text-sm">
-                  <span class="text-slate-500 dark:text-slate-400">Fear &amp; Greed Index</span>
-                  <span class="font-semibold">
-                    <span x-text="data.market.fear_greed.value"></span>
-                    <span class="text-slate-400 font-normal" x-text="'· ' + data.market.fear_greed.label"></span>
-                  </span>
+                <div class="flex items-baseline justify-between gap-2 text-sm">
+                  <span class="text-slate-500 dark:text-slate-400">Likuidasi 24 jam</span>
+                  <span class="font-semibold" x-text="ringkasUang(data.market.likuidasi_total_usd)"></span>
                 </div>
-                <div class="mt-2 h-2.5 rounded-full relative"
-                     style="background:linear-gradient(90deg,#f43f5e 0%,#f59e0b 35%,#a3a3a3 50%,#84cc16 70%,#10b981 100%)">
-                  <div class="absolute -top-1 w-1 h-[18px] bg-slate-900 dark:bg-white rounded-full ring-2 ring-white dark:ring-slate-800 transition-all"
-                       :style="'left: calc(' + data.market.fear_greed.value + '% - 2px)'"></div>
+                <div class="mt-2 flex h-2 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700">
+                  <div class="bg-rose-500" :style="'width:' + porsiLikuidasiLong + '%'"></div>
+                  <div class="bg-emerald-500 flex-1"></div>
                 </div>
-                <div class="flex justify-between text-[11px] sm:text-[10px] text-slate-400 mt-1">
-                  <span>Takut</span><span>Netral</span><span>Serakah</span>
+                <div class="mt-1.5 flex justify-between text-xs">
+                  <span class="text-rose-600 dark:text-rose-400"
+                        x-text="'posisi beli ' + ringkasUang(data.market.likuidasi_long_usd)"></span>
+                  <span class="text-emerald-600 dark:text-emerald-400"
+                        x-text="'posisi jual ' + ringkasUang(data.market.likuidasi_short_usd)"></span>
                 </div>
+                <p class="mt-1.5 text-[11px] text-slate-400"
+                   x-text="keteranganLikuidasi"></p>
               </div>
             </template>
+
+            <!-- Gauge Fear & Greed sengaja TIDAK di sini lagi: ia pindah ke
+                 kartu di sebelah harga, tempat pembaca mencarinya lebih dulu.
+                 Menampilkannya dua kali membuat pembaca mengira ada dua angka
+                 berbeda. -->
 
             <!-- Interpretasi OI (hasil kode, bukan AI) -->
             <template x-if="data.technical.oi_price_interpretasi">
@@ -2085,6 +2216,61 @@
             </span>
           </template>
         </p>
+      </template>
+
+      <!-- ===== RIWAYAT SIAGA =====
+           Panel jendela risiko hanya bisa menggambarkan SEKARANG. Tanpa
+           riwayat, tidak ada cara menjawab pertanyaan yang paling menentukan
+           apakah fitur itu layak dipertahankan: "waktu siaganya tinggi, apa
+           yang sebenarnya terjadi setelah itu?"
+
+           Angkanya datang dari telemetri lintas hari (state/telemetri.jsonl,
+           di luar arsip supaya selamat dari reset), dan perbandingan harganya
+           memakai run berikutnya yang jaraknya minimal 18 jam. Dimuat
+           terpisah dan best-effort: kalau berkasnya belum ada, bagian ini
+           cuma tidak muncul. -->
+      <template x-if="riwayatSiaga.length">
+        <details class="text-xs rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+          <summary class="font-semibold text-slate-700 dark:text-slate-200 cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="history" class="w-3.5 h-3.5 shrink-0"></i>
+            Riwayat siaga jendela
+            <span class="font-normal text-slate-400" x-text="'· ' + telemetri.jumlah_run + ' run tercatat'"></span>
+          </summary>
+
+          <!-- Rata-rata per tingkat lebih dulu: satu baris ini yang menjawab
+               "prediktif atau tidak", sisanya bukti pendukungnya. -->
+          <div class="mt-3 flex flex-wrap gap-2">
+            <template x-for="s in (telemetri.siaga_vs_harga || [])" :key="s.tingkat">
+              <div class="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+                <span class="uppercase tracking-wide text-[10px] text-slate-400" x-text="'siaga ' + s.tingkat"></span>
+                <span class="ml-1" x-text="s.jumlah + '×'"></span>
+                <span class="ml-1 font-semibold" :class="warnaAngka(s.rata_perubahan_pct)"
+                      x-text="'rata-rata ' + persen(s.rata_perubahan_pct, 2) + ' sesudahnya'"></span>
+              </div>
+            </template>
+          </div>
+
+          <ul class="mt-3 space-y-1">
+            <template x-for="r in riwayatSiaga" :key="r.waktu_utc">
+              <li class="flex flex-wrap items-baseline gap-x-2">
+                <span class="text-slate-400" x-text="tanggalSingkat(r.waktu_utc)"></span>
+                <span class="font-medium" x-text="'siaga ' + r.tingkat"></span>
+                <span class="text-slate-400" x-text="'· ' + uang(r.harga)"></span>
+                <template x-if="r.perubahan_pct !== null">
+                  <span :class="warnaAngka(r.perubahan_pct)"
+                        x-text="'→ ' + persen(r.perubahan_pct, 2) + ' pada run berikutnya'"></span>
+                </template>
+                <template x-if="r.perubahan_pct === null">
+                  <span class="text-slate-400">→ belum ada pembanding</span>
+                </template>
+              </li>
+            </template>
+          </ul>
+          <p class="mt-2 text-slate-400">
+            Perubahan diukur ke run berikutnya yang berjarak minimal 18 jam. Ini
+            catatan pengamatan, bukan bukti sebab-akibat — jumlah runnya masih kecil.
+          </p>
+        </details>
       </template>
 
       <!-- Ketentuan penggunaan.

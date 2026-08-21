@@ -25,6 +25,7 @@ from .collectors import (
     ff_calendar,
     flows,
     investing,
+    likuidasi,
     macro,
     market,
     news,
@@ -35,7 +36,7 @@ from .collectors import (
     whale,
 )
 from .config import Config, SUBSCRIBERS_PATH, load_config
-from .output import builder, stylist, subscribers, telegram
+from .output import builder, stylist, subscribers, telegram, telemetri
 from .utils import istilah
 from .utils.timezone import format_wib, iso_utc, now_utc
 
@@ -151,15 +152,17 @@ def _konteks_llm(
         "jendela_pasar_as": jendela_pasar.ringkas_untuk_llm(
             (jendela_agen or {}).get("jendela") or jendela_agen
         ),
-        # Bacaan agen kebijakan diteruskan ke sintesis, bukan lagi ditampilkan
-        # sebagai panel sendiri: tempat kebijakan AS adalah sebagai SEBAB
-        # naik/turun harga di dalam analisa, bukan alarm terpisah.
-        "sinyal_kebijakan": {
-            "tingkat": (jendela_agen or {}).get("siaga"),
-            "ringkasan": (jendela_agen or {}).get("ringkasan"),
-            "pemicu": (jendela_agen or {}).get("pemicu") or [],
-            "pendaratan": (jendela_agen or {}).get("pendaratan") or {},
-        } if (jendela_agen or {}).get("siaga") else None,
+        # Berapa sinyal KUAT yang mendarat saat pasar AS tidak bisa
+        # menyerapnya — hitungan kode, bukan tafsir model.
+        #
+        # Sebelumnya bagian ini membawa juga tingkat siaga dan ringkasan dari
+        # sebuah langkah LLM terpisah. Langkah itu sudah dibuang: penilaian
+        # kebijakan AS memang tempatnya DI SINI, sebagai sebab naik/turun
+        # harga di dalam analisa, dan sintesis sudah menerima berita serta
+        # pernyataan yang sama persis — lengkap dengan `mendarat` per item.
+        # Menyodorkan penilaian model lain lebih dulu cuma membuat sintesis
+        # mengulang kesimpulan yang bahannya sudah ia pegang sendiri.
+        "pendaratan_sinyal": (jendela_agen or {}).get("pendaratan") or {},
         # Hanya candle harian. Sebelumnya 4H dan 1H ikut dikirim, dan itu
         # justru menimbulkan masalah: model menulis EMA 1H lalu critic
         # mencocokkannya dengan EMA 4H dan memvonisnya karangan. Untuk laporan
@@ -379,6 +382,24 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             )
             log.info("Arus ETF memakai nilai terakhir yang diketahui")
 
+    # Pemeriksaan silang arus ETF (SoSoValue vs Farside). Dicatat sebagai
+    # catatan kualitas HANYA saat keduanya berbeda jauh: angka ini termasuk
+    # yang paling sering dikutip pembaca, dan kalau dua sumber tidak sepakat
+    # itu artinya salah satunya rusak — jauh lebih baik ketahuan daripada
+    # terbit dengan percaya diri.
+    verifikasi_etf = pasar.get("etf_flow_verifikasi") or {}
+    if verifikasi_etf.get("status") == "berbeda":
+        pesan = (
+            "Arus ETF berbeda antar sumber: "
+            f"{pasar.get('etf_flow_sumber')} ${pasar.get('etf_flow_usd'):,.0f} vs "
+            f"{verifikasi_etf.get('pembanding_sumber')} "
+            f"${verifikasi_etf.get('pembanding_usd', 0):,.0f}"
+            + ("" if verifikasi_etf.get("tanggal_sama") else " (tanggalnya juga berbeda)")
+            + "."
+        )
+        catatan.append(pesan)
+        log.warning(pesan)
+
     hasil_whale = whale.collect(cfg.symbol)
     posisi_whale = hasil_whale["data"]
     # Sumber ini punya tiga jalur cadangan; yang menentukan gagal atau tidak
@@ -423,6 +444,18 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     aliran = hasil_aliran["data"]
     gagal.extend(hasil_aliran["failed"])
 
+    # Agregat likuidasi 24 jam. Digabung ke `pasar` supaya ikut mengalir ke
+    # konteks LLM, halaman, dan Telegram tanpa jalur baru — angkanya memang
+    # sejenis dengan funding dan open interest: kondisi posisi derivatif.
+    #
+    # TIDAK dimasukkan ke bobot kualitas data (BOBOT_SUMBER): sumbernya satu
+    # bursa dan endpoint publiknya pernah berganti bentuk, jadi kegagalannya
+    # tidak boleh menyeret label keyakinan seluruh brief. Ia tetap muncul di
+    # daftar sumber gagal supaya keseringannya terlihat di telemetri.
+    hasil_likuidasi = likuidasi.collect()
+    pasar.update(hasil_likuidasi["data"])
+    gagal.extend(hasil_likuidasi["failed"])
+
     # -- 5. Makro --------------------------------------------------------
     log.info("[5/21] Ambil data makro")
     hasil_makro = macro.collect(cfg.secrets.fred_api_key)
@@ -438,6 +471,7 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             base_url=cfg.llm_base_url,
             max_cost_usd=cfg.max_cost_usd,
             referer=cfg.repo_url,
+            reasoning_effort=cfg.reasoning_effort,
         )
     else:
         catatan.append("OPENROUTER_API_KEY kosong; seluruh langkah LLM dilewati.")
@@ -475,6 +509,10 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         list(cfg.news.get("feeds", [])) + riset.feed_dari_query(query_riset),
         max_fetch=int(cfg.news.get("max_fetch", 120)),
         max_age_hours=int(cfg.news.get("max_age_hours", 36)),
+        # Pemangkasan gratis sebelum artikelnya menyentuh model. Lihat
+        # catatan panjang di config.yaml dan collectors/news.py.
+        min_skor_kandidat=int(cfg.news.get("prefilter_min_skor", 0)),
+        maks_kandidat=int(cfg.news.get("maks_kandidat_llm", 0)),
     )
     artikel = hasil_berita["articles"]
     if hasil_berita["failed"]:
@@ -568,47 +606,26 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     agregat["dominant_themes"] = news_analysis.tema_dominan(artikel)
     agregat["narrative_shift"] = ""
 
-    # Jendela jam bursa AS dan kerapuhan pasar — keduanya murni hitungan
-    # kode. Dipakai agen kebijakan di bawah, dan ikut dikirim ke sintesis
-    # supaya narasinya tahu apakah kejutan hari ini akan ditanggung sendirian
-    # oleh pasar kripto atau bisa langsung diserap ETF dan meja institusi.
+    # Jendela jam bursa AS, kerapuhan pasar, risiko waktu, dan berapa sinyal
+    # kuat yang mendarat saat pasar AS tutup. Keempatnya HITUNGAN KODE.
+    #
+    # Dulu blok ini keluaran satu langkah LLM tersendiri ("agen kebijakan"),
+    # tapi prosa yang dihasilkannya — siaga, ringkasan, pemicu, skenario —
+    # tidak lagi dirender di mana pun sejak kebijakan AS pindah ke dalam
+    # analisa AI sebagai sebab naik/turun harga. Yang dipakai halaman dan
+    # Telegram cuma bagian hitungan kodenya, jadi langkah modelnya dibuang:
+    # satu panggilan lebih hemat, dan panelnya kini tidak bisa lagi hilang
+    # gara-gara model gagal.
     jendela = jendela_pasar.fase_pasar()
     rapuh = jendela_pasar.kerapuhan(
         {"technical": teknikal, "market": pasar, "whale": posisi_whale}
     )
+    agen = jendela_pasar.rangkuman_kode(jendela, rapuh, pernyataan, artikel)
     log.info(
-        "Jendela pasar AS: %s (%s) · kerapuhan %s (%d/%d)",
-        jendela["fase"], jendela["waktu_ny"], rapuh["tingkat"], rapuh["skor"], rapuh["maks"],
+        "Jendela pasar AS: %s (%s) · kerapuhan %s (%d/%d) · risiko jendela %s",
+        jendela["fase"], jendela["waktu_ny"], rapuh["tingkat"],
+        rapuh["skor"], rapuh["maks"], agen["risiko_jendela"]["tingkat"],
     )
-
-    # Agen pemantau kebijakan AS. Dijalankan SETELAH pernyataan disaring dan
-    # berita diklasifikasi, karena ia membaca hasil keduanya — bukan data
-    # mentah. Gagal di sini tidak menggagalkan brief: alarmnya hilang, sisa
-    # laporan tetap terbit.
-    agen = None
-    if client:
-        log.info("[14c/21] Agen pemantau kebijakan AS")
-        agen = news_analysis.agen_kebijakan(
-            client, cfg.llm_models("agen_kebijakan"),
-            pernyataan, artikel, jendela, rapuh,
-        )
-        if agen:
-            log.info(
-                "Siaga kebijakan: %s — %s",
-                agen["siaga"], (agen.get("ringkasan") or "")[:100],
-            )
-    # Tanpa LLM (atau saat agennya gagal), jendela dan kerapuhan TETAP
-    # disimpan: keduanya hitungan kode dan tetap berguna walau tanpa prosa.
-    if agen is None:
-        agen = {
-            "siaga": None,
-            "jendela": jendela,
-            "kerapuhan": rapuh,
-            # Risiko waktu murni hitungan kode, jadi ia tetap tersedia walau
-            # prosa agennya gagal — justru pada hari LLM bermasalah, sinyal
-            # yang tidak bergantung model adalah yang paling berharga.
-            "risiko_jendela": jendela_pasar.risiko_jendela(jendela, rapuh),
-        }
 
     # Karakter pergerakan 24 jam: arah, besaran, dan JENISNYA (uang baru vs
     # posisi ditutup). Dihitung di sini karena butuh berita yang SUDAH
@@ -1039,6 +1056,34 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
     )
     for nama, path in ditulis.items():
         log.info("Ditulis %s -> %s", nama, path)
+
+    # -- Telemetri lintas hari --------------------------------------------
+    # Ditulis di luar docs/data/archive/, jadi ia SELAMAT dari pemangkasan
+    # retensi maupun reset data. Tanpa ini pertanyaan "seberapa sering critic
+    # menahan narasi" dan "langkah mana yang paling boros" hanya bisa dijawab
+    # dengan tebakan — dan sepanjang riwayat repo ini memang begitu.
+    #
+    # Dry-run pun ikut dicatat: yang menarik dari sisi biaya justru run
+    # percobaan, karena di situlah eksperimen dilakukan.
+    try:
+        telemetri.rekam(
+            brief=brief,
+            ringkasan_llm=client.ringkasan() if client else {},
+            panggilan_llm=client.calls if client else [],
+            budget_maks_usd=cfg.max_cost_usd,
+            feed_gagal=hasil_berita["failed"],
+        )
+        ringkasan_telemetri = telemetri.ringkas()
+        if ringkasan_telemetri:
+            log.info(
+                "Telemetri: %d run tersimpan · biaya rata-rata $%.3f · critic menahan %s%%",
+                ringkasan_telemetri["total_run_tersimpan"],
+                ringkasan_telemetri["biaya"]["rata_usd"] or 0.0,
+                ringkasan_telemetri["critic"]["persen_menahan"],
+            )
+    except OSError as exc:
+        # Telemetri tidak boleh menggagalkan brief yang sudah jadi.
+        log.warning("Telemetri gagal ditulis: %s", exc)
 
     # Stempel sidik jari app.js ke index.html. Tanpa ini, browser bisa terus
     # memakai app.js versi lama walaupun datanya sudah baru — halaman lalu

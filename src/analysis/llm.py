@@ -421,11 +421,20 @@ class LLMClient:
         max_cost_usd: float = 0.15,
         referer: str = "",
         title: str = "BTC Market Brief",
+        reasoning_effort: Optional[Dict[str, str]] = None,
     ):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.max_cost_usd = max_cost_usd
+        # Upaya penalaran per step. Hanya diterapkan pada step yang memang
+        # terdaftar — lihat catatan panjang di config.yaml soal kenapa ini
+        # TIDAK boleh dipasang sembarangan pada model non-penalar.
+        self.reasoning_effort = dict(reasoning_effort or {})
         self.total_cost = 0.0
+        # Peringatan anggaran hanya dibunyikan sekali per run; kalau tiap
+        # panggilan ikut berteriak, log-nya jadi tidak terbaca justru saat
+        # yang penting terjadi.
+        self._sudah_peringatkan_budget = False
         self.calls: List[Dict[str, Any]] = []
         self.models_used: List[str] = []
         self._headers = {
@@ -476,6 +485,24 @@ class LLMClient:
             step, model, tokens_in, tokens_out, cost, durasi, self.total_cost,
         )
 
+        # Peringatan dini sebelum anggaran benar-benar habis. Tanpa ini,
+        # satu-satunya pertanda adalah langkah yang tiba-tiba dilewati di
+        # ujung pipeline — dan yang berada di ujung justru revisi critic,
+        # bagian yang paling mahal kalau hilang. Ambang 85% dipilih supaya
+        # masih ada ruang untuk satu panggilan besar sesudahnya.
+        if (
+            not self._sudah_peringatkan_budget
+            and self.max_cost_usd
+            and self.total_cost >= self.max_cost_usd * 0.85
+        ):
+            self._sudah_peringatkan_budget = True
+            log.warning(
+                "Anggaran LLM sudah terpakai %.0f%% ($%.4f dari $%.4f) setelah step '%s' "
+                "— langkah berikutnya berisiko terpotong",
+                self.total_cost / self.max_cost_usd * 100,
+                self.total_cost, self.max_cost_usd, step,
+            )
+
     # -- panggilan -----------------------------------------------------
     def chat(
         self,
@@ -515,6 +542,14 @@ class LLMClient:
         # OpenRouter memakai `models` untuk fallback otomatis antar provider.
         if len(models) > 1:
             payload["models"] = models
+        # Upaya penalaran, kalau step ini memang diatur. Pada model penalar
+        # (GPT-5.x, Gemini) token penalaran ikut dihitung sebagai keluaran
+        # DAN ikut memakan jatah max_tokens — jadi ini sekaligus soal biaya
+        # dan soal balasan yang terpotong sebelum sempat menjawab.
+        effort = self.reasoning_effort.get(step)
+        if effort:
+            payload["reasoning"] = {"effort": effort}
+
         if json_schema:
             payload["response_format"] = {
                 "type": "json_schema",

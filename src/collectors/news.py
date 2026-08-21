@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional
@@ -179,19 +180,65 @@ def _dedup(articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return kept
 
 
-def collect(feeds: List[str], max_fetch: int = 120, max_age_hours: int = 36) -> Dict[str, Any]:
-    """Ambil semua feed, buang yang basi, dedup, lalu urutkan berdasar prioritas."""
-    raw: List[Dict[str, Any]] = []
-    failed: List[str] = []
+#: Berapa feed diambil berbarengan. Feed-nya puluhan dan hampir seluruh waktu
+#: pengambilan habis MENUNGGU jaringan, bukan memproses — jadi menariknya satu
+#: per satu membuat run harian ~40 x latensi feed terlambat tanpa alasan.
+#: Angkanya sengaja sederhana: cukup untuk memangkas waktu tunggu, tapi tidak
+#: sampai menyerbu satu situs (feed dari domain yang sama pun jumlahnya
+#: sedikit) atau membuka lebih banyak koneksi daripada yang mau diurus runner.
+_FEED_PARALEL = 8
 
-    for feed_url in feeds:
-        try:
-            items = _fetch_feed(feed_url)
-            log.info("Feed %s: %d artikel", _label_feed(feed_url), len(items))
-            raw.extend(items)
-        except Exception as exc:  # feedparser bisa melempar apa saja
-            log.warning("Feed %s gagal: %s", feed_url, exc)
-            failed.append(_domain(feed_url) or feed_url)
+
+def _ambil_semua_feed(feeds: List[str]) -> tuple:
+    """Ambil seluruh feed berbarengan; kembalikan (artikel, feed_gagal).
+
+    Urutan hasilnya mengikuti urutan `feeds` yang diminta, bukan urutan siapa
+    yang selesai duluan — supaya hasil run tidak berubah-ubah gara-gara
+    lomba jaringan, dan dedup selalu memilih artikel pertama yang sama.
+    """
+    hasil: Dict[int, List[Dict[str, Any]]] = {}
+    gagal: List[str] = []
+    with ThreadPoolExecutor(max_workers=_FEED_PARALEL) as pool:
+        tugas = {pool.submit(_fetch_feed, url): (i, url) for i, url in enumerate(feeds)}
+        for selesai in as_completed(tugas):
+            i, url = tugas[selesai]
+            try:
+                items = selesai.result()
+            except Exception as exc:  # feedparser bisa melempar apa saja
+                log.warning("Feed %s gagal: %s", url, exc)
+                gagal.append(_domain(url) or url)
+                continue
+            log.info("Feed %s: %d artikel", _label_feed(url), len(items))
+            hasil[i] = items
+
+    raw: List[Dict[str, Any]] = []
+    for i in range(len(feeds)):
+        raw.extend(hasil.get(i, []))
+    return raw, gagal
+
+
+def collect(
+    feeds: List[str],
+    max_fetch: int = 120,
+    max_age_hours: int = 36,
+    min_skor_kandidat: int = 0,
+    maks_kandidat: int = 0,
+) -> Dict[str, Any]:
+    """Ambil semua feed, buang yang basi, dedup, lalu urutkan berdasar prioritas.
+
+    `min_skor_kandidat` dan `maks_kandidat` memangkas daftar SEBELUM langkah
+    LLM menyentuhnya (0 = tanpa pemangkasan). Alasannya terlihat di corong
+    produksi: 1.318 artikel terkumpul, 407 unik, 25 dipakai — sisanya tetap
+    dikirim ke model penyaring dan ditagih token, padahal sebagian besar
+    tidak menyebut Bitcoin, kripto, bank sentral, maupun regulator sama
+    sekali (feed BBC World dan NYTimes Business ikut ditarik utuh).
+
+    Yang dipangkas hanya artikel berskor kata kunci NOL, artinya tidak satu
+    pun pola di KEYWORD_WEIGHTS cocok. Pemangkasan yang lebih agresif dari
+    itu akan mulai membuang kabar makro yang relevan lewat jalur tak terduga,
+    dan penilaian semacam itu memang tugas langkah filter.
+    """
+    raw, failed = _ambil_semua_feed(feeds)
 
     cutoff = now_utc() - timedelta(hours=max_age_hours)
     fresh = [
@@ -213,8 +260,19 @@ def collect(feeds: List[str], max_fetch: int = 120, max_age_hours: int = 36) -> 
     deduped.sort(key=lambda a: a["skor_prioritas"], reverse=True)
     log.info("Artikel unik setelah dedup: %d", len(deduped))
 
+    kandidat = deduped
+    if min_skor_kandidat > 0:
+        kandidat = [a for a in kandidat if a["skor_prioritas"] >= min_skor_kandidat]
+    if maks_kandidat > 0:
+        kandidat = kandidat[:maks_kandidat]
+    if len(kandidat) != len(deduped):
+        log.info(
+            "Kandidat untuk langkah filter: %d dari %d unik (skor kata kunci >= %d, batas %s)",
+            len(kandidat), len(deduped), min_skor_kandidat, maks_kandidat or "tanpa batas",
+        )
+
     return {
-        "articles": deduped,
+        "articles": kandidat,
         "failed": failed,
         # Corong penyaringan dilaporkan apa adanya supaya terlihat berapa
         # banyak yang benar-benar ditarik vs berapa yang akhirnya dipakai.
@@ -224,5 +282,8 @@ def collect(feeds: List[str], max_fetch: int = 120, max_age_hours: int = 36) -> 
             "terkumpul": len(raw),
             "segar": len(fresh),
             "unik": len(deduped),
+            # Yang benar-benar sampai ke langkah LLM. Selisihnya dengan
+            # `unik` adalah artikel yang dibuang gratis oleh kode.
+            "kandidat_llm": len(kandidat),
         },
     }

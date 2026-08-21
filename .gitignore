@@ -4,3 +4,9 @@ __pycache__/
 venv/
 .env
 .DS_Store
+
+# Aset uji halaman (Tailwind/Alpine/Chart.js/Lucide yang di-vendor).
+# Dibangkitkan `python -m scripts.bangun_aset_uji`, versinya sudah dikunci di
+# skrip itu — tidak perlu ikut di-commit.
+tests/aset/
+.pytest_cache/

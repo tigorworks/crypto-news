@@ -396,3 +396,40 @@ def risiko_jendela(jendela: Dict[str, Any], rapuh: Dict[str, Any]) -> Dict[str, 
         "dalam_jendela_rawan": rawan,
         "kerapuhan": tingkat_rapuh,
     }
+
+
+def rangkuman_kode(
+    jendela: Dict[str, Any],
+    rapuh: Dict[str, Any],
+    pernyataan: Optional[list] = None,
+    berita: Optional[list] = None,
+) -> Dict[str, Any]:
+    """Blok `agen_kebijakan` di brief, dirakit TANPA satu pun panggilan model.
+
+    Dulu blok ini keluaran sebuah langkah LLM tersendiri, dan bagian
+    prosanya (siaga, ringkasan, pemicu, skenario) tidak pernah dirender di
+    mana pun setelah kebijakan AS pindah ke dalam analisa AI. Yang benar-
+    benar dipakai halaman dan Telegram cuma empat hal di bawah ini,
+    semuanya aritmetika kalender dan data yang sudah dikumpulkan.
+
+    Karena tidak lagi bergantung model, panel jendela risiko kini tetap
+    lengkap justru pada hari yang paling membutuhkannya: hari ketika
+    OpenRouter bermasalah dan seluruh langkah AI gagal.
+
+    `pernyataan` dan `berita` dipakai sekadar menghitung berapa sinyal KUAT
+    yang mendarat saat pasar AS tidak bisa menyerapnya — bukan untuk
+    menafsirkan isinya.
+    """
+    sinyal = [
+        {
+            "kekuatan": x.get("kekuatan") or 0,
+            "mendarat": klasifikasi_sinyal(x.get("waktu_utc")),
+        }
+        for x in list(pernyataan or []) + list(berita or [])
+    ]
+    return {
+        "jendela": jendela,
+        "kerapuhan": rapuh,
+        "risiko_jendela": risiko_jendela(jendela, rapuh),
+        "pendaratan": ringkas_pendaratan(sinyal),
+    }

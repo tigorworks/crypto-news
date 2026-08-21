@@ -21,7 +21,6 @@ from dateutil import parser as date_parser
 
 from ..utils.format import persen_id
 from ..utils.timezone import now_utc, to_utc
-from . import jendela_pasar
 from .llm import BudgetExceeded, LLMClient, LLMError
 
 log = logging.getLogger(__name__)
@@ -88,7 +87,13 @@ def filter_relevansi(
         "Relevansi tinggi: kebijakan moneter, regulasi kripto, arus ETF, likuidasi besar, "
         "keamanan jaringan, adopsi institusional. Relevansi rendah: harga altcoin, NFT, "
         "gosip selebritas, siaran pers proyek kecil.\n\n"
-        "Balas array JSON: [{\"id\": \"...\", \"relevansi_btc\": 0-100}]\n\n" + ATURAN_DASAR
+        f"Balas array JSON: [{{\"id\": \"...\", \"relevansi_btc\": 0-100}}]\n"
+        f"HANYA artikel dengan relevansi {min_score} ke atas yang perlu kamu "
+        "tulis. Artikel yang di bawah itu cukup DIHILANGKAN dari jawabanmu — "
+        "jangan tulis barisnya, jangan beri penjelasan kenapa dibuang. "
+        "Sebagian besar kandidat memang akan gugur, jadi array yang jauh "
+        "lebih pendek dari daftar masukan adalah hasil yang benar.\n\n"
+        + ATURAN_DASAR
     )
 
     # Dibatch: satu panggilan untuk SELURUH artikel pernah nyaris menyentuh
@@ -97,6 +102,12 @@ def filter_relevansi(
     # brief jatuh ke fallback kata kunci. Batch juga membuat satu batch yang
     # gagal tidak menjatuhkan yang lain.
     skor: Dict[str, int] = {}
+    # Model kini hanya menuliskan artikel yang LOLOS ambang, jadi batch yang
+    # sah bisa saja mengembalikan array kosong. Tanpa penanda ini, hari yang
+    # benar-benar sepi berita relevan akan tertukar dengan langkah filter yang
+    # gagal total, dan brief jatuh ke fallback kata kunci — memasukkan 25
+    # artikel yang baru saja dinilai tidak relevan oleh model.
+    ada_batch_berhasil = False
     total_batch = (len(articles) + batch_size - 1) // batch_size
     for i in range(0, len(articles), batch_size):
         batch = articles[i : i + batch_size]
@@ -121,11 +132,17 @@ def filter_relevansi(
             log.warning("Batch filter %d/%d gagal: %s", i // batch_size + 1, total_batch, exc)
             continue
 
+        if isinstance(hasil, list):
+            ada_batch_berhasil = True
         for item in hasil if isinstance(hasil, list) else []:
             try:
                 skor[str(item["id"])] = int(item["relevansi_btc"])
             except (KeyError, TypeError, ValueError):
                 continue
+
+    if not skor and ada_batch_berhasil:
+        log.info("Filter relevansi: tidak ada artikel yang mencapai ambang %d", min_score)
+        return []
 
     if not skor:
         log.warning("Filter relevansi tidak menghasilkan skor, pakai skor prioritas kata kunci")
@@ -675,329 +692,26 @@ SIKAP_PERNYATAAN = ["mendukung", "menentang", "netral"]
 STATUS_PERNYATAAN = ["verbatim", "dilaporkan_media", "rumor"]
 
 
-_KURUNG = re.compile(r"\s*\([^()]*\)")
-_JAM_DALAM_TEKS = re.compile(r"(\d+(?:[.,]\d+)?)\s*jam")
-
-
-def _angka_jendela(jendela: Dict[str, Any]) -> set:
-    """Angka jam milik jendela, dalam semua ejaan yang mungkin ditulis model."""
-    keluar = set()
-    for kunci in ("panjang_jeda_jam", "jam_sampai_buka", "jeda_berjalan_jam"):
-        nilai = jendela.get(kunci)
-        if nilai is None:
-            continue
-        for bentuk in (f"{nilai:.1f}", f"{nilai:.0f}", str(nilai)):
-            keluar.add(bentuk.replace(".", ","))
-            keluar.add(bentuk.replace(",", "."))
-    return keluar
-
-
-def _buang_jam_jendela(teks: str, jendela: Dict[str, Any]) -> str:
-    """Buang pengulangan angka jam jendela dari prosa model.
-
-    Kalimat waktunya sudah ditulis kode tepat di atas teks ini, lengkap
-    dengan titik awal jeda. Model yang mengulangnya cenderung memampatkan
-    dua besaran berbeda jadi satu frasa — terbukti pada run 17 Agustus, yang
-    keluar "jeda 65.5 jam sampai Senin 09:30 EDT" di hari Senin, seolah
-    bursa baru buka hampir tiga hari lagi padahal tinggal tujuh jam.
-
-    Penyaringan sengaja SEMPIT: hanya tanda kurung yang memuat angka jam
-    milik jendela. Angka jam lain dibiarkan, karena ada yang memang sah —
-    "funding bertahan 192 jam" adalah fakta kerapuhan, bukan salah baca.
-    """
-    if not teks:
-        return teks
-    angka = _angka_jendela(jendela or {})
-    if not angka:
-        return teks
-
-    def ganti(m: "re.Match") -> str:
-        isi = m.group(0)
-        cocok = [x.group(1) for x in _JAM_DALAM_TEKS.finditer(isi)]
-        if any(c in angka for c in cocok):
-            log.info("Angka jam jendela dibuang dari prosa agen: %s", isi.strip())
-            return ""
-        return isi
-
-    sisa = _KURUNG.sub(ganti, teks).strip()
-    # Bentuk tanpa kurung tidak ikut dipotong — memotongnya di tengah kalimat
-    # merusak tata bahasa. Cukup dicatat supaya kalau pola ini berulang, ia
-    # terlihat di log dan bisa ditangani dengan bentuk yang tepat.
-    luar = [m.group(1) for m in _JAM_DALAM_TEKS.finditer(sisa)]
-    if any(x in angka for x in luar):
-        log.info("Agen masih menyebut jam jendela di luar kurung: %s", sisa[:160])
-    return sisa
-
-
-_ANGKA_UMUM = re.compile(r"\d+(?:[.,]\d+)*")
-_KATA_TARGET = re.compile(
-    r"\b(target|sasaran|proyeksi harga|akan menyentuh|akan mencapai|tembus ke)\b",
-    re.IGNORECASE,
-)
-#: Di atas ini sebuah angka praktis hanya bisa berarti level harga BTC.
-#: Di bawahnya masih wajar: "192 jam", "4/5", "$57,6 juta", "0,72%".
-_AMBANG_ANGKA_HARGA = 1000
-
-
-def _nilai_angka(teks: str) -> float:
-    """Baca angka bergaya Indonesia ("63.517", "57,6") jadi float."""
-    t = teks.replace(".", "").replace(",", ".") if "." in teks and "," in teks else teks
-    if "," in t and "." not in t:
-        t = t.replace(",", ".")
-    elif t.count(".") >= 1 and len(t.split(".")[-1]) == 3:
-        t = t.replace(".", "")     # pemisah ribuan
-    try:
-        return float(t)
-    except ValueError:
-        return 0.0
-
-
-def _skenario_layak(teks: str) -> bool:
-    """Skenario harus menjelaskan MEKANISME, bukan menebak angka.
-
-    Critic yang ada menandai kalimat beraroma anjuran, tapi belum menangkap
-    ramalan berangka — "turun ke 61.000" lolos begitu saja padahal itu
-    persis jenis kalimat yang tidak boleh terbit dari halaman ini.
-
-    Ambangnya dipilih supaya angka yang sah tetap lewat: durasi funding,
-    skor kerapuhan, persentase, dan nilai arus dalam juta/miliar semuanya
-    di bawah seribu, sementara level harga BTC selalu jauh di atasnya.
-    """
-    if not teks or len(teks) < 15:
-        return False
-    if _KATA_TARGET.search(teks):
-        return False
-    return not any(
-        _nilai_angka(m.group(0)) >= _AMBANG_ANGKA_HARGA
-        for m in _ANGKA_UMUM.finditer(teks)
-    )
-
-
-def _saring_skenario(mentah: Any, jendela: Dict[str, Any]) -> List[str]:
-    """Ambil paling banyak tiga skenario yang lolos pagar angka."""
-    keluar: List[str] = []
-    for x in (mentah or [])[:6]:
-        teks = _buang_jam_jendela(str(x or "").strip(), jendela)[:220]
-        if _skenario_layak(teks):
-            keluar.append(teks)
-        elif teks:
-            log.info("Skenario agen dibuang (menyebut angka harga): %s", teks[:90])
-        if len(keluar) == 3:
-            break
-    return keluar
-
-
-def agen_kebijakan(
-    client: LLMClient,
-    models: List[str],
-    pernyataan: List[Dict[str, Any]],
-    berita: List[Dict[str, Any]],
-    jendela: Dict[str, Any],
-    rapuh: Dict[str, Any],
-    maks_item: int = 10,
-) -> Optional[Dict[str, Any]]:
-    """Agen pemantau kebijakan AS: seberapa berbahaya kalau kejutan datang SEKARANG.
-
-    Ini bukan pengumpul data — pengumpulannya sudah dikerjakan collectors
-    (whitehouse.gov, Google News, X lewat Grok). Tugas langkah ini
-    mempertemukan tiga hal yang selama ini tidak pernah disandingkan:
-
-      1. sinyal kebijakan/pernyataan AS yang sudah tersaring,
-      2. POSISI WAKTUNYA terhadap jam bursa AS (dihitung kode), dan
-      3. KERAPUHAN pasar saat ini (dihitung kode).
-
-    Poin 2 yang paling sering terlewat. Kebijakan yang sama berdampak jauh
-    berbeda tergantung kapan ia mendarat: pada Rabu siang pasar AS bisa
-    langsung mencernanya lewat ETF dan lindung nilai; pada Jumat malam
-    kripto menanggungnya sendirian sampai Senin.
-
-    Angka jendela dan kerapuhan TIDAK dihitung ulang model — keduanya
-    disodorkan sudah jadi, dan model hanya menafsirkan artinya.
-    """
-    if not jendela:
-        return None
-
-    # `mendarat` = di fase pasar mana sinyal ini terbit. Dihitung kode dari
-    # stempel waktunya sendiri, bukan ditebak model. Inilah yang membedakan
-    # tarif Rabu siang — langsung diserap ETF — dari tarif Sabtu sore yang
-    # ditanggung pasar kripto sendirian sampai Senin.
-    kandidat = [
-        {
-            "tokoh": p.get("tokoh"),
-            "ringkasan": p.get("ringkasan"),
-            "topik": p.get("topik"),
-            "dampak_btc": p.get("dampak_btc"),
-            "kekuatan": p.get("kekuatan"),
-            "status": p.get("status"),
-            "waktu_utc": p.get("waktu_utc"),
-            "mendarat": jendela_pasar.klasifikasi_sinyal(p.get("waktu_utc")),
-        }
-        for p in (pernyataan or [])[:maks_item]
-    ]
-    # Berita kebijakan/geopolitik ikut disertakan: kebijakan besar sering
-    # muncul sebagai berita lebih dulu sebelum ada pernyataan resminya.
-    kandidat_berita = [
-        {
-            "judul": b.get("judul_id") or b.get("judul"),
-            "kategori": b.get("kategori"),
-            "sentimen": b.get("sentimen"),
-            "kekuatan": b.get("kekuatan"),
-            "status_kepastian": b.get("status_kepastian"),
-            "mendarat": jendela_pasar.klasifikasi_sinyal(b.get("waktu_utc")),
-        }
-        for b in (berita or [])
-        if b.get("kategori") in ("regulasi", "geopolitik", "makro")
-        and (b.get("kekuatan") or 0) >= 3
-    ][:maks_item]
-
-    if not kandidat and not kandidat_berita:
-        return None
-
-    system = (
-        "Kamu pemantau risiko kebijakan AS untuk pasar kripto. Tugasmu SATU: "
-        "menilai seberapa besar risiko kejutan kebijakan bagi pemegang BTC "
-        "pada JENDELA WAKTU saat ini.\n\n"
-
-        "KENAPA WAKTU PENTING — pahami ini sebelum menilai:\n"
-        "Kripto diperdagangkan 24/7, tapi bursa saham AS dan ETF spot Bitcoin "
-        "tutup Jumat 16.00 waktu New York dan baru buka Senin 09.30 — jeda "
-        "sekitar 65 jam. Di dalam jeda itu tidak ada penciptaan/penebusan unit "
-        "ETF, meja institusi AS tutup, dan likuiditas order book menipis. "
-        "Kejutan kebijakan yang mendarat di jendela itu ditanggung SENDIRIAN "
-        "oleh pasar kripto sampai Senin — itu sebabnya sebagian akhir pekan "
-        "berakhir dengan penurunan tajam.\n\n"
-
-        "Angka jendela dan kerapuhan SUDAH DIHITUNG KODE dan diberikan "
-        "kepadamu. JANGAN menghitung ulang, jangan membantahnya, dan jangan "
-        "mengarang angka baru. Tugasmu menafsirkan artinya.\n\n"
-
-        "JANGAN menyebut ulang angka jam jendela (panjang jeda, sisa waktu, "
-        "jam buka/tutup) di dalam jawabanmu. Kalimat waktunya sudah ditulis "
-        "kode persis di atas teksmu, jadi mengulangnya hanya menduplikasi dan "
-        "gampang tertukar: 'panjang_jeda_jam' adalah total jeda dari tutup "
-        "terakhir sampai buka berikutnya, BUKAN sisa waktu. Sebut posisi "
-        "waktu dengan kata saja — misalnya 'di dalam jeda akhir pekan' atau "
-        "'menjelang pembukaan Senin'.\n\n"
-
-        "TIAP SINYAL MEMBAWA FIELD `mendarat` — di fase pasar mana ia terbit, "
-        "dihitung dari stempel waktunya sendiri. Timbanglah ini: kebijakan "
-        "yang mendarat saat bursa buka sudah sempat dicerna ETF dan meja "
-        "institusi, sedangkan yang mendarat menjelang penutupan Jumat atau di "
-        "dalam jeda akhir pekan belum diserap siapa pun dan efeknya masih "
-        "menunggu. Sebutkan secara eksplisit kalau ada sinyal kuat yang "
-        "mendarat di jendela rawan.\n\n"
-
-        "ATURAN PENILAIAN\n"
-        "  - Kalau tidak ada sinyal kebijakan yang berarti, katakan begitu "
-        "terus terang dan beri siaga 'rendah'. Menakut-nakuti tanpa dasar "
-        "lebih merugikan daripada diam.\n"
-        "  - Bedakan yang SUDAH TERJADI dari yang BARU WACANA. Wacana yang "
-        "belum jadi kebijakan bukan alasan siaga tinggi.\n"
-        "  - Siaga di sini menilai ISI KEBIJAKANNYA saja, bukan kalendernya. "
-        "Bahaya yang datang dari waktu dihitung terpisah oleh kode, jadi "
-        "jangan menurunkan penilaianmu cuma karena hari ini bukan akhir "
-        "pekan. Siaga 'tinggi' butuh sinyal yang benar-benar berdampak "
-        "besar dan sudah pasti, bukan wacana.\n"
-        "  - Dilarang menyebut target harga atau ajakan bertindak.\n\n"
-
-        "Balas objek JSON:\n"
-        "  siaga: 'rendah' | 'sedang' | 'tinggi'\n"
-        "  ringkasan: 2-3 kalimat. Apa yang sedang dipantau dan kenapa "
-        "tingkat siaganya segitu. Sebut posisi waktunya secara eksplisit.\n"
-        "  pemicu: array maksimal 3 string — sinyal kebijakan spesifik yang "
-        "sedang dipantau, masing-masing satu kalimat pendek. Array kosong "
-        "kalau memang tidak ada.\n"
-        "  skenario: array 2-3 string — kemungkinan yang masuk akal KALAU "
-        "kejutan datang di jendela ini. Tiap butir harus KONDISIONAL dan "
-        "menjelaskan MEKANISMEnya, bersandar pada faktor kerapuhan yang "
-        "sudah dihitung. Contoh bentuk yang benar: 'Kalau funding berbalik, "
-        "posisi long yang bertahan 192 jam jadi bahan likuidasi beruntun.' "
-        "DILARANG menyebut level harga, target, atau arah harga berangka — "
-        "butir seperti itu akan dibuang kode dan sia-sia. Jelaskan sebab "
-        "dan akibat, bukan ramalan angka.\n"
-        "  yang_diperhatikan: satu kalimat — apa yang paling layak diawasi "
-        "sampai jendela ini lewat.\n\n"
-        + ATURAN_DASAR
-    )
-
-    pendaratan = jendela_pasar.ringkas_pendaratan(kandidat + kandidat_berita)
-    konteks = {
-        # Versi ringkas: tanpa total panjang jeda, yang terbukti dibaca model
-        # sebagai sisa waktu. Bentuk lengkapnya tetap disimpan di hasil untuk
-        # web dan Telegram.
-        "jendela_pasar_as": jendela_pasar.ringkas_untuk_llm(jendela),
-        "kerapuhan_pasar": rapuh,
-        # Dihitung kode: berapa sinyal kuat yang mendarat saat pasar AS tidak
-        # bisa menyerapnya. Angka ini tidak boleh dikarang model.
-        "pendaratan_sinyal": pendaratan,
-        "pernyataan_tokoh": kandidat,
-        "berita_kebijakan": kandidat_berita,
-    }
-    try:
-        hasil = client.chat_json(
-            models,
-            system,
-            "Data:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
-            step="agen_kebijakan",
-            temperature=0.2,
-            max_tokens=2000,
-        )
-    except (LLMError, BudgetExceeded) as exc:
-        log.warning("Agen kebijakan gagal: %s", exc)
-        return None
-
-    if not isinstance(hasil, dict):
-        log.warning("Agen kebijakan mengembalikan struktur tak terduga")
-        return None
-
-    siaga = hasil.get("siaga")
-    if siaga not in ("rendah", "sedang", "tinggi"):
-        siaga = "rendah"
-
-    # Siaga "tinggi" harus dibenarkan oleh KEKUATAN SINYALNYA, bukan oleh
-    # kalender.
-    #
-    # Penjagaan sebelumnya menuntut jendela rawan, dan itu keliru dua arah:
-    # kebijakan besar di hari Rabu tertahan di "sedang" hanya karena harinya
-    # biasa, sementara bahaya yang datang dari waktu justru bukan urusan
-    # tingkat ini — ia dihitung terpisah oleh `risiko_jendela()`.
-    #
-    # Gantinya syarat substansi: harus ada setidaknya satu sinyal berkekuatan
-    # 4 ke atas yang bukan rumor. Itu tetap bisa diperiksa kode, tapi memeriksa
-    # hal yang benar — seberapa besar kabarnya, bukan hari apa sekarang.
-    kuat_pasti = [
-        x for x in (kandidat + kandidat_berita)
-        if (x.get("kekuatan") or 0) >= 4
-        and x.get("status") != "rumor"
-        and x.get("status_kepastian") != "rumor"
-    ]
-    if siaga == "tinggi" and not kuat_pasti:
-        log.info("Siaga agen diturunkan tinggi->sedang (tidak ada sinyal kuat yang pasti)")
-        siaga = "sedang"
-
-    bersih = lambda t: _buang_jam_jendela(str(t or "").strip(), jendela)
-    return {
-        "siaga": siaga,
-        "ringkasan": bersih(hasil.get("ringkasan"))[:700],
-        "pemicu": [bersih(x)[:200] for x in (hasil.get("pemicu") or [])[:3]],
-        # Butir yang menyelipkan level harga DIBUANG, bukan diperbaiki:
-        # memperbaikinya berarti menebak maksud model, dan skenario yang
-        # hilang jauh lebih murah daripada ramalan angka yang terbit.
-        "skenario": _saring_skenario(hasil.get("skenario"), jendela),
-        "yang_diperhatikan": bersih(hasil.get("yang_diperhatikan"))[:300],
-        # Disalin apa adanya supaya konsumen (web, Telegram) tidak perlu
-        # menghitung ulang dan tidak bisa menyimpang dari yang dinilai agen.
-        "jendela": jendela,
-        "kerapuhan": rapuh,
-        # Bahaya dari WAKTU, dihitung kode dan berdiri sendiri di samping
-        # siaga kebijakan di atas. Keduanya sengaja tidak dilebur: yang satu
-        # menilai isi kabarnya, yang satu menilai kapan kabar itu datang.
-        "risiko_jendela": jendela_pasar.risiko_jendela(jendela, rapuh),
-        # Dihitung kode: berapa sinyal kuat yang mendarat saat pasar AS tidak
-        # bisa menyerapnya — inti dari "keputusan menjelang akhir pekan".
-        "pendaratan": pendaratan,
-    }
-
+# Langkah LLM "agen kebijakan" DIHAPUS dari sini, beserta seluruh pagar
+# skenarionya (_saring_skenario, _skenario_layak, _buang_jam_jendela).
+#
+# Riwayatnya: agen ini menilai risiko kejutan kebijakan AS lalu menghasilkan
+# `siaga`, `ringkasan`, `pemicu`, dan `skenario`. Sejak kebijakan AS pindah
+# ke dalam analisa AI sebagai SEBAB naik/turun harga, tidak satu pun field
+# itu dirender di web maupun Telegram — `skenario` bahkan tidak pernah
+# sampai ke konteks sintesis, jadi tokennya terbakar tiap run untuk keluaran
+# yang tidak dibaca siapa pun.
+#
+# Yang benar-benar dipakai halaman dan pesan Telegram — jendela jam bursa,
+# kerapuhan, risiko_jendela, dan ringkasan pendaratan sinyal — semuanya
+# HITUNGAN KODE dan tidak pernah membutuhkan model. Semuanya sekarang
+# dirakit `jendela_pasar.rangkuman_kode()`, sehingga panel jendela risiko
+# tetap lengkap bahkan pada hari seluruh langkah LLM gagal.
+#
+# Penilaian kebijakannya sendiri tidak hilang: sintesis sudah menerima
+# berita dan pernyataan yang sama, lengkap dengan field `mendarat` per item
+# dan ringkasan pendaratan, dan memang di situlah tempatnya — sebagai sebab
+# di dalam analisa, bukan alarm terpisah yang menduplikasi bahannya.
 
 def analisa_pernyataan(
     client: LLMClient,
@@ -1177,6 +891,20 @@ def interpretasi_teknikal(
         "BERBEDA dari volume_24h karena batas waktu candle (00:00 UTC) tidak sama "
         "dengan jendela 24 jam bergulir. Sebut ini \"volume candle harian\" atau "
         "\"volume hari ini\", JANGAN \"volume 24 jam\".\n\n"
+
+        "CANDLE HARI INI BISA BELUM PENUH. Kalau `volume.parsial` bernilai "
+        "true, candle harian yang berjalan baru terisi sebagian "
+        "(`volume.kelengkapan`, 0..1), dan tiga hal berikut BELUM boleh "
+        "dipakai menyimpulkan apa pun:\n"
+        "  - `volume.rasio_vs_rata` — volume menumpuk sepanjang hari, jadi "
+        "rasio dari hari setengah jalan selalu terbaca rendah tanpa berarti "
+        "pasarnya sepi. Jangan menulis \"volume tipis\" atas dasar ini.\n"
+        "  - `volume.vwap_harian` — masih bergerak sampai tengah malam UTC; "
+        "sebut sebagai harga rata-rata HARI BERJALAN, bukan level yang "
+        "sudah pasti.\n"
+        "  - Arah OBV sudah dihitung tanpa candle berjalan "
+        "(`obv_arah_tanpa_candle_berjalan`), jadi ia BOLEH dipakai — tapi "
+        "katakan bahwa hari ini belum ikut terhitung kalau kamu menyebutnya.\n\n"
 
         "Yang harus kamu jelaskan:\n"
         "  - Apa yang sedang diberitahukan struktur harga harian\n"
@@ -1736,15 +1464,29 @@ def sintesis(
         "  judul: HEADLINE. Ini satu-satunya kalimat yang tampil paling atas "
         "halaman, dan sering satu-satunya yang sempat dibaca — perlakukan "
         "seperti judul utama koran keuangan, bukan label bagian.\n"
-        "    Syaratnya: 8-14 kata; MEMUAT TEMUANNYA, bukan topiknya; "
-        "sertakan angka atau level konkret kalau itu inti temuannya; "
-        "sebutkan KETEGANGANNYA (apa lawan apa) kalau memang ada.\n"
+        "    Syaratnya: 8-16 kata; MEMUAT TEMUANNYA, bukan topiknya; "
+        "sertakan angka atau level konkret kalau itu inti temuannya.\n"
+        "    HARUS UTUH SENDIRI. Pembaca yang cuma sempat membaca judul ini "
+        "tidak boleh ditinggal bertanya-tanya. Pakai bahasa sehari-hari, "
+        "bukan bahasa meja dagang: istilah posisi ditulis mekanismenya "
+        "('short yang tertutup' -> 'pedagang yang bertaruh harga turun "
+        "menutup posisinya'), dan singkatan teknis tidak dipakai di judul "
+        "sama sekali.\n"
+        "    KONTRAS 'A, bukan B' hanya boleh kalau sisi B menjelaskan "
+        "dirinya sendiri. Potongan seperti 'bukan pembeli baru' atau 'bukan "
+        "permintaan riil' menggantung — pembaca tidak diberi tahu apa "
+        "bedanya dan kenapa itu penting. Kalau judulnya menyebut JENIS "
+        "pergerakan, sebutkan sekalian ARTINYA bagi pembaca (rapuh, "
+        "bertenaga, gampang habis), jangan berhenti di kontras teknis.\n"
         "    Buruk (label, bukan temuan): 'Update Harga BTC', 'Analisa "
         "Pasar Harian', 'BTC Bergerak Sideways'.\n"
-        "    Baik: 'Rebound BTC ke $64.300 ditopang short yang tertutup, "
-        "bukan pembeli baru'; 'Dua hari beruntun arus keluar ETF menahan "
-        "BTC di bawah $65.000'; 'BTC datar menjelang FOMC Minutes sementara "
-        "Bollinger menyempit ke level tersempit sebulan'.\n"
+        "    Buruk (menggantung): 'Rebound BTC ke $64.300 ditopang short "
+        "yang tertutup, bukan pembeli baru' — dua istilah meja dagang dan "
+        "pembaca tidak pernah diberi tahu apa akibatnya.\n"
+        "    Baik: 'BTC naik 5,3% ke $73.132 karena penjual menutup posisi, "
+        "kenaikan yang gampang kehabisan tenaga'; 'Dua hari beruntun arus "
+        "keluar ETF menahan BTC di bawah $65.000'; 'BTC nyaris tak bergerak "
+        "menjelang notulen FOMC, rentang hariannya tersempit dalam sebulan'.\n"
         "    Dilarang: kata hype ('meledak', 'roket', 'waspada!'), tanda "
         "seru, dan judul yang memancing tanpa menjawab ('Ada apa dengan "
         "BTC hari ini?'). Menarik di sini berarti PADAT ISI, bukan heboh.\n"
@@ -1752,8 +1494,9 @@ def sintesis(
         "support/resistance kunci (2-3 kalimat)\n"
         "  karakter_pergerakan: WAJIB DIISI. 2-4 kalimat yang menjawab tuntas: "
         "24 jam ini naik atau turun dan berapa; itu pergerakan jenis apa "
-        "(pakai `pergerakan_24j.jenis` — uang baru masuk, penutupan posisi "
-        "jual, posisi jual baru, atau posisi beli dilikuidasi) DAN apa artinya "
+        "(pakai `pergerakan_24j.jenis` — pembeli baru masuk, pedagang yang "
+        "bertaruh harga turun menutup posisi, taruhan turun baru dibuka, atau "
+        "pemegang posisi beli keluar/dilikuidasi) DAN apa artinya "
         "bagi ketahanan pergerakan itu; apa pemicunya (berita tertentu, atau "
         "murni mekanis kalau tidak ada berita searah). Tulis dalam bahasa "
         "manusia, tanpa nama field. Ini bagian yang dibaca paling awal — "
@@ -2282,7 +2025,20 @@ def critic(
     )
 
     try:
-        hasil = client.chat_json(models, system, user, step="critic", temperature=0.0, max_tokens=6000)
+        hasil = client.chat_json(
+            models, system, user, step="critic", temperature=0.0,
+            # Dinaikkan dari 6000. Model critic (gpt-5.1) adalah model
+            # PENALAR, dan token penalarannya ikut memakan jatah ini sebelum
+            # satu huruf jawaban ditulis — balasan yang mentok di batas
+            # dianggap gagal oleh chat(), sehingga tokennya terbayar tanpa
+            # menghasilkan pemeriksaan. Pada 5 dari 9 run terakhir di arsip,
+            # critic memang tercatat tidak pernah berhasil dijalankan.
+            #
+            # Plafon yang longgar praktis gratis: yang ditagih token yang
+            # benar-benar dipakai, bukan plafonnya. Upaya penalarannya
+            # sendiri diturunkan lewat llm.reasoning_effort di config.
+            max_tokens=14000,
+        )
     except (LLMError, BudgetExceeded) as exc:
         # Critic tidak jalan bukan berarti narasi salah, tapi juga belum terverifikasi.
         log.warning("Critic gagal dijalankan: %s", exc)

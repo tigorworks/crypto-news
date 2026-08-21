@@ -79,9 +79,13 @@ Kueri yang diusulkan dicatat di `data_quality.catatan` supaya terlihat apa yang 
 
 ### Penyaringan relevansi
 
-Dengan 36 feed tetap plus feed riset, satu run bisa menarik ratusan artikel. Tiga hal menjaga agar yang lolos ke brief tetap sedikit dan beragam:
+**Feed ditarik berbarengan** (delapan sekaligus), bukan satu per satu: hampir seluruh waktunya habis MENUNGGU jaringan, dan puluhan permintaan berurutan menambah menit ke sebuah run yang plafon workflow-nya 15 menit. Urutan hasilnya tetap mengikuti urutan feed di config, bukan siapa yang selesai duluan — dedup menyimpan artikel yang pertama terlihat, jadi urutan yang berayun berarti isi brief ikut berayun tanpa satu pun data berubah.
 
-- **Dinilai per batch (60 artikel/panggilan).** Sebelumnya seluruh artikel dinilai dalam satu panggilan; pada 132 artikel keluarannya sudah 3.027 token dan mendekati batas. Sekali terpotong, SELURUH penilaian hilang dan brief jatuh ke fallback kata kunci. Dengan batch, satu batch yang gagal tidak menjatuhkan yang lain.
+Dengan 36 feed tetap plus feed riset, satu run bisa menarik ratusan artikel. Empat hal menjaga agar yang lolos ke brief tetap sedikit dan beragam:
+
+- **Dipangkas kode SEBELUM menyentuh model.** Corong produksi 21 Agustus: 1.318 terkumpul → 413 segar → 407 unik → **25 dipakai**. Keempat ratus artikel itu tetap dikirim ke langkah `filter` dan ditagih token, padahal sebagian besar tidak menyebut Bitcoin, kripto, bank sentral, maupun regulator sama sekali — ikut tertarik karena feed makro (BBC World, NYTimes Business) memang ditarik utuh. Sekarang artikel yang skor kata kuncinya **nol** dibuang lebih dulu (`news.prefilter_min_skor`), dan jumlah kandidat dibatasi (`news.maks_kandidat_llm`). Ambangnya sengaja tidak lebih tinggi dari 1: di atas itu kabar makro yang relevan lewat jalur tak terduga mulai ikut terbuang, dan penilaian semacam itu memang tugas langkah `filter`. Berapa yang benar-benar sampai ke model dilaporkan di `berita_corong.kandidat_llm`.
+- **Dinilai per batch (60 artikel/panggilan), dan hanya yang LOLOS yang dituliskan model.** Sebelumnya model menuliskan skor untuk setiap kandidat — ratusan baris keluaran yang langsung dibuang kode. Sekarang artikel di bawah ambang cukup dihilangkan dari jawabannya. Array kosong karena itu jawaban yang **sah** (tidak ada yang relevan hari ini) dan dibedakan dari langkah filter yang gagal; kalau tertukar, brief akan memuat 25 artikel yang baru saja dinilai tidak relevan.
+- **Batching itu sendiri.** Sebelumnya seluruh artikel dinilai dalam satu panggilan; pada 132 artikel keluarannya sudah 3.027 token dan mendekati batas. Sekali terpotong, SELURUH penilaian hilang dan brief jatuh ke fallback kata kunci. Dengan batch, satu batch yang gagal tidak menjatuhkan yang lain.
 - **Kredibilitas sumber jadi pemecah imbang.** Pada relevansi setara, sumber tier 1 menang (tier 1 ×1,30 … tier 3 ×1,00). Sengaja ringan, bukan bobot penuh `1,0/0,7/0,4` yang dipakai skor sentimen: berita Bitcoin paling banyak datang dari media kripto yang kebanyakan tier 2–3, dan bobot penuh akan membuat berita makro tier 1 yang cuma menyerempet BTC menggusur berita kripto yang justru jadi pokok laporan.
 - **Diisi bergiliran per outlet.** Ronde pertama mengambil artikel terbaik dari tiap domain, ronde kedua yang terbaik kedua, dan seterusnya. Satu outlet yang rajin menerbitkan (Blockworks pernah 50 artikel dalam satu tarikan) tidak bisa memborong kuota semata-mata karena jumlahnya banyak. Cara ini juga tidak pernah menyisakan slot kosong kalau kandidatnya memang terkonsentrasi di sedikit outlet.
 
@@ -196,10 +200,12 @@ Empat jenis pergerakan, dan kenapa bedanya penting:
 
 | Jenis | Artinya | Kenapa berbeda |
 |---|---|---|
-| `long_baru` | naik, open interest bertambah | **Uang baru** masuk ke sisi beli |
-| `short_covering` | naik, open interest berkurang | Naik karena **posisi jual ditutup** — cenderung kehilangan tenaga begitu posisi jual habis tertutup |
-| `short_baru` | turun, open interest bertambah | **Posisi jual baru** masuk, bukan sekadar pembeli keluar |
-| `long_ditutup` | turun, open interest berkurang | **Posisi beli dilikuidasi** — tekanan mereda begitu posisi rapuh selesai keluar |
+| `long_baru` | naik, open interest bertambah | **Pembeli baru masuk dan menahan posisinya** |
+| `short_covering` | naik, open interest berkurang | Naik karena **pedagang yang bertaruh harga turun menutup posisinya dengan membeli** — cenderung kehilangan tenaga begitu taruhan itu habis tertutup |
+| `short_baru` | turun, open interest bertambah | **Pedagang membuka taruhan baru bahwa harga akan turun** |
+| `long_ditutup` | turun, open interest berkurang | **Pemegang posisi beli keluar, sebagian kena likuidasi paksa** — tekanan mereda begitu posisi rapuh selesai keluar |
+
+Label pendeknya ditulis sebagai kalimat yang menjelaskan dirinya sendiri, bukan kontras teknis. Bentuk lama (`"penutupan posisi jual, bukan permintaan baru"`) tampil di puncak halaman sebagai "Sifatnya: …" dan meninggalkan pembaca menebak: potongan "bukan permintaan baru" hanya bisa dipahami orang yang sudah paham mekanismenya — dan justru merekalah yang paling tidak membutuhkan kalimat itu. Aturan yang sama berlaku untuk judul yang ditulis model (lihat prompt `judul` di `news_analysis.sintesis`).
 
 Naik 3% karena uang baru masuk tidak sama artinya dengan naik 3% karena short tertutup, walaupun angkanya sama persis. Itu yang membuat klasifikasi ini layak dihitung sendiri, bukan disimpulkan ulang tiap hari oleh model.
 
@@ -313,6 +319,31 @@ Dua hal dari dokumentasi resminya yang wajib ditangani di kode, bukan diasumsika
 
 Key-nya **gratis** lewat `sosovalue.com/developer`, disimpan sebagai secret `SOSO_KEY` (lihat "5. Isi GitHub Secrets"). Endpoint dan bentuk respons diverifikasi langsung dari dokumentasi resmi (termasuk contoh JSON dan catatan T+1 di atas) sebelum kode ini ditulis — bukan tebakan.
 
+**Pemeriksaan silang dua sumber.** Arus ETF termasuk angka yang paling sering dikutip pembaca dan salah satu yang paling rapuh cara pengambilannya: satu API dan satu scrape HTML, tanpa satu pun pembanding. Kalau salah satunya rusak — kolom bergeser, satuan berubah dari juta ke ribu — angkanya tetap terbit dengan percaya diri. Sekarang, saat SoSoValue berhasil, Farside tetap dicoba sebagai **pembanding** (timeout pendek, tanpa retry) dan hasilnya disimpan di `market.etf_flow_verifikasi`:
+
+| Status | Artinya |
+|---|---|
+| `cocok` | selisihnya ≤5% — keadaan normal, tidak diumumkan ke pembaca |
+| `berbeda` | selisihnya >5% — muncul sebagai keterangan di kartu Posisi Pasar dan sebagai catatan kualitas |
+| `terlalu_kecil_untuk_dibandingkan` | kedua angkanya di bawah $20 juta; pada arus mendekati nol, persentase selisih meledak tanpa satu pun sumber bermasalah |
+| `tanpa_pembanding` | Farside menolak (yang memang lazim), atau ia sendiri yang jadi sumber utama |
+
+Angka utamanya **tidak pernah diganti diam-diam** oleh pembanding. Kalau keduanya berbeda jauh, yang benar adalah memberi tahu — bukan menebak siapa yang betul. Tanggal masing-masing ikut dilaporkan, karena selisih besar sering cuma berarti satu sumber sudah memuat hari baru dan satunya belum.
+
+### Likuidasi 24 jam
+
+Butir yang paling lama tertunda di daftar tugas repo ini, karena sumber yang lazim dipakai orang — stream likuidasi bursa — menuntut koneksi WebSocket yang **hidup terus**, sementara pipeline ini berjalan sekali lalu mati. Menyalakan WebSocket beberapa detik per run hanya akan menangkap likuidasi yang kebetulan terjadi dalam detik-detik itu: lebih buruk daripada tidak punya data, karena angkanya terlihat sah padahal cuma cuplikan acak.
+
+Jalan keluarnya endpoint **REST yang menyimpan riwayat** order likuidasi (`src/collectors/likuidasi.py`, kontrak perpetual BTC di OKX). Sekali ambil, cakupannya jam-jaman ke belakang, dan hasilnya sama untuk siapa pun yang memanggilnya.
+
+Tiga hal yang gampang salah dan karena itu diuji:
+
+1. **Ukuran order dihitung dalam KONTRAK, bukan BTC.** Lupa pengalinya (0,01 BTC per kontrak) membuat angkanya meleset seratus kali lipat — dan tetap terlihat wajar.
+2. **`side` adalah sisi ORDER LIKUIDASINYA.** Posisi beli dilikuidasi dengan cara *dijual*, jadi `sell` berarti long yang kena. Tertukar di sini membalik seluruh maknanya tanpa satu pun error.
+3. **Penelusuran halaman berhenti kalau halaman baru tidak lebih tua.** Endpoint yang mengabaikan parameter kursor akan memulangkan halaman yang sama terus-menerus, dan totalnya membengkak sebanyak jumlah halaman yang diminta.
+
+**Batas yang disebut terang-terangan:** angkanya dari SATU bursa, bukan seluruh pasar. Situs agregator menjumlahkan belasan bursa dan angkanya akan jauh lebih besar — itu bukan pertanda salah satunya keliru. Karena itu nama bursanya ditulis di bawah batangnya di halaman, bukan disembunyikan di tooltip. Sumber ini juga **tidak** ikut menentukan skor kualitas data: endpoint publiknya pernah berganti bentuk, dan kegagalannya tidak boleh menyeret label keyakinan seluruh brief. Kegagalannya tetap tercatat di `failed_sources` supaya keseringannya terlihat di telemetri.
+
 ### Data tingkat institusional
 
 Sebagian besar dashboard kripto berhenti di harga, RSI, dan Fear & Greed — semuanya data retail. Yang berikut ini biasanya dijual berlangganan mahal, padahal tersedia gratis lewat API publik:
@@ -363,11 +394,15 @@ Dua keputusan yang menentukan benar-tidaknya modul ini:
 
 Hari libur bursa AS sengaja **tidak** diperhitungkan — daftarnya berubah tiap tahun dan menebaknya akan salah diam-diam. Akibatnya jendela rawan sesekali dilaporkan lebih PENDEK dari kenyataan: arah kesalahan yang aman, karena tidak pernah membuat pasar terlihat lebih tenang dari sesungguhnya.
 
-**Agennya sendiri** (`news_analysis.agen_kebijakan`) mempertemukan tiga hal yang sebelumnya tidak pernah disandingkan: sinyal kebijakan/pernyataan AS yang sudah tersaring, posisi waktunya terhadap jam bursa, dan kerapuhan pasar. Angka jendela dan kerapuhan disodorkan **sudah jadi** — model tidak menghitung ulang, hanya menafsirkan.
+**Langkah LLM-nya sudah dibuang.** Dulu ada satu panggilan model ("agen kebijakan") yang menilai sinyal kebijakan AS lalu menghasilkan `siaga`, `ringkasan`, `pemicu`, dan `skenario`. Sejak kebijakan AS pindah ke dalam analisa AI sebagai **sebab** naik/turun harga, tidak satu pun field itu dirender di web maupun Telegram — `skenario` bahkan tidak pernah sampai ke konteks sintesis. Tokennya terbakar tiap run untuk keluaran yang tidak dibaca siapa pun.
 
-**Alarm palsu dijaga kode, bukan kepercayaan pada model.** Siaga `tinggi` otomatis diturunkan jadi `sedang` kecuali dua syarat terhitung terpenuhi: waktunya memang di jendela rawan DAN pasarnya memang rapuh. Tanpa penjagaan itu model bisa berteriak "tinggi" pada Rabu siang di pasar yang tebal — persis jenis alarm yang lama-lama membuat alarm sungguhan ikut diabaikan.
+Yang benar-benar dipakai halaman dan pesan Telegram — fase jendela, kerapuhan, `risiko_jendela`, dan ringkasan pendaratan sinyal — semuanya **hitungan kode**, dan kini dirakit `jendela_pasar.rangkuman_kode()`. Efek sampingnya justru perbaikan: panel jendela risiko tetap lengkap pada hari seluruh langkah LLM gagal, yaitu hari ketika sinyal yang tidak bergantung model paling berharga.
 
-Pada siaga `rendah` panel ini **diam sepenuhnya** di web maupun Telegram. Di Telegram ia masuk `inti`, bukan blok opsional: alarm yang hilang begitu pesannya kepanjangan adalah alarm yang gagal justru saat paling dibutuhkan.
+Penilaian kebijakannya sendiri tidak hilang. Sintesis menerima berita dan pernyataan yang sama, lengkap dengan field `mendarat` per item (di fase pasar mana kabar itu terbit) dan ringkasan pendaratan — dan memang di situlah tempatnya.
+
+Pada risiko jendela `rendah` panel ini **diam sepenuhnya** di web maupun Telegram. Di Telegram ia masuk `inti`, bukan blok opsional: alarm yang hilang begitu pesannya kepanjangan adalah alarm yang gagal justru saat paling dibutuhkan.
+
+**Apakah alarmnya benar-benar prediktif?** Sekarang bisa ditanyakan, bukan cuma dirasakan: telemetri lintas hari mencatat tingkat siaga tiap run beserta harga saat itu, lalu membandingkannya dengan run berikutnya yang berjarak minimal 18 jam. Hasilnya tampil di footer halaman sebagai riwayat siaga. Lihat bagian **Telemetri lintas hari**.
 
 ### Pelacakan pernyataan tokoh
 
@@ -444,6 +479,11 @@ Serangkaian penambahan berdasar audit "apa yang perlu diperbaiki dari sisi UI/UX
 - **"Perubahan vs Brief Sebelumnya" berdiri sendiri di bagian bawah** sebagai konteks penutup, bukan lagi berbagi baris dengan agenda.
 - **Urutan bagian**: ringkasan AI → agenda besar → harga → **pembacaan teknikal** → pasar → opsi & valuasi → whale → **analisa AI** → agenda 30 hari → berita → perubahan vs brief sebelumnya. Analisa AI yang utuh duduk tepat sebelum agenda 30 hari: vonisnya sudah disampaikan kartu teratas, jadi uraian panjangnya tidak perlu lagi menghalangi data mentah — dan menempel ke agenda karena keduanya sama-sama bicara soal apa yang BELUM terjadi. Nav lompat ponsel mengikuti urutan yang sama.
 - **Skor sentimen diperbaiki labelnya** — skalanya -100 (bearish penuh) sampai +100 (bullish penuh), tapi label lama menulis "/100" yang gampang salah dibaca seolah skornya selalu positif, apalagi saat angkanya negatif. Sekarang eksplisit "dari -100..+100" dengan tanda `+`/`-` pada angkanya.
+- **Fear & Greed naik ke kartu suasana pasar, skor sentimen berita turun ke bawahnya.** Sebelumnya kebalikannya, dan itu menyesatkan: angka besar di puncak kartu terbaca sebagai "indeks suasana pasar" — nama yang dikenal orang untuk itu adalah Fear & Greed — padahal yang dipajang skor sentimen berita, yaitu rata-rata nada beberapa puluh artikel yang lolos saringan hari itu. Keduanya bahkan kerap **berlawanan arah**: pada brief 21 Agustus, sentimen berita melemah dari 65 ke 61 sementara Fear & Greed melonjak 10 poin ke 72. Sekarang keduanya berdampingan dengan penjelasan singkat masing-masing dan satu kalimat tegas ("Bukan Fear & Greed — ini mengukur KABARNYA, bukan perilaku pasarnya"), plus perubahan Fear & Greed dibanding kemarin. Gauge-nya dihapus dari kartu Posisi Pasar supaya tidak muncul dua kali.
+- **Peringatan brief basi.** Kalau cron gagal beberapa hari, halaman tetap menampilkan brief lama dengan chip "3 hari lalu" yang nadanya sama persis dengan "20 menit lalu". Lewat 36 jam (artinya setidaknya satu jadwal terbit terlewat) chip itu berubah warna dan sebuah pita muncul di bawah judul: seluruh angka di halaman — termasuk harga dan hitung mundur agenda — menggambarkan keadaan saat brief dibuat. Ambangnya 36 jam, bukan 24, karena cron GitHub kerap tertunda dan 26 jam masih normal.
+- **Likuidasi 24 jam di kartu Posisi Pasar** — batang dua warna (posisi beli vs posisi jual) beserta nama bursanya. Angkanya dari satu bursa, bukan gabungan seluruh pasar, dan itu ditulis di bawah batangnya — pembaca yang membandingkan dengan situs agregator akan melihat angka jauh lebih besar di sana, dan itu bukan pertanda salah satunya keliru.
+- **VWAP harian dan arah OBV diberi tanda saat candle hari berjalan belum penuh**, sama seperti rasio volume. Arah OBV bahkan sudah dihitung tanpa candle berjalan, supaya jawabannya tidak berubah hanya karena jam menjalankan pipeline.
+- **Riwayat siaga di footer** — tingkat siaga tiap run beserta apa yang terjadi pada harga sesudahnya. Lihat bagian **Telemetri lintas hari**.
 - **Sumber gagal TIDAK lagi ditulis sebagai label di halaman.** Sempat ditampilkan terang-terangan di header, lalu di footer, lalu dihapus seluruhnya — lihat "Label peringatan dihapus, penyebabnya dibereskan". Yang tersisa cuma tooltip pada badge kualitas data, dan penyebabnya dikerjakan di sumber masing-masing.
 - **Corong berita di footer** — "Berita terkumpul" (jumlah KOTOR yang ditarik dari seluruh feed, sebelum saringan umur) dan "Lolos saringan" (yang benar-benar dipakai di brief, plus persentasenya). Angka ini menunjukkan apakah menambah feed benar-benar menambah bahan atau cuma menambah derau yang tetap dibuang di langkah filter.
 - **Perbandingan dua arsip** — di bagian Arsip, pilih satu arsip lagi untuk dibandingkan dengan yang sedang tampil. Tabel ringkas menampilkan harga, perubahan 24 jam, sentimen, funding, open interest, DVOL, dominasi BTC, dan MVRV berdampingan. Dimuat terpisah dari `data` supaya tidak mengganggu tampilan utama maupun grafik.
@@ -490,7 +530,7 @@ Untuk mengirim ke grup: tambahkan bot ke grup, kirim satu pesan di grup, lalu ul
 ### 3. Ambil API key OpenRouter
 
 1. Daftar di [openrouter.ai](https://openrouter.ai), buka **Keys**, buat key baru.
-2. Isi saldo secukupnya. `max_cost_usd_per_run: 0.60` adalah **plafon**, bukan tarif tetap — satu run terukur ~$0,26 (lihat tabel di langkah 4). Langkah yang kena batas dilewati dan brief tetap terbit.
+2. Isi saldo secukupnya. `max_cost_usd_per_run: 0.75` adalah **plafon**, bukan tarif tetap. Langkah yang kena batas dilewati dan brief tetap terbit. Angka biaya sesungguhnya ada di bagian **Biaya per run** di bawah.
 
 ### 4. Model LLM di `config.yaml`
 
@@ -517,9 +557,34 @@ Kesembilan step sudah terisi model yang wajar sebagai titik awal, jadi bisa lang
 
 Blok ini sempat dipindah ke DeepSeek demi hemat, lalu dikembalikan ke Haiku karena kepatuhan formatnya lebih bisa diandalkan: DeepSeek pernah menulis skala 1–5 sebagai angka Romawi (`"kekuatan": III`) dan menggugurkan satu batch pernyataan utuh. DeepSeek tetap terpasang sebagai cadangan supaya satu vendor bermasalah tidak mematikan langkahnya.
 
-Satu run terukur di produksi sekitar **$0,26**, di bawah plafon `max_cost_usd_per_run: 0.60`. Satu run per hari berarti sekitar **$8 per bulan**.
+#### Biaya per run
 
-Plafonnya diberi ruang lebih karena kalau critic menemukan masalah, sistem menjalankan satu putaran revisi. Tanpa ruang itu revisi akan terpotong budget dan analisanya hilang sama sekali.
+Catatan lama di berkas ini menyebut ~$0,26 per run. Telemetri sembilan run pertama (`state/telemetri.jsonl`, diisi dari arsip) memberi angka yang jauh berbeda:
+
+| | Nilai |
+|---|---|
+| Rata-rata | **$0,540** |
+| Tertinggi | **$0,759** |
+| Run yang memakai ≥85% plafon | **5 dari 9** |
+
+Run tertinggi bahkan **melampaui plafon $0,60** — pemeriksaan anggaran terjadi *sebelum* sebuah panggilan, jadi satu panggilan besar bisa menyeberanginya di tengah jalan.
+
+Yang sudah dikerjakan untuk menurunkannya:
+
+| Perubahan | Kenapa |
+|---|---|
+| Langkah `agen_kebijakan` dibuang | Prosanya tidak pernah dirender di mana pun; satu panggilan penuh terbakar tiap run untuk keluaran yang tidak dibaca siapa pun |
+| Kandidat berita dipangkas sebelum langkah `filter` | 407 artikel unik dikirim ke model untuk memilih 25; yang skor kata kuncinya nol dibuang gratis oleh kode lebih dulu |
+| `filter` hanya menulis artikel yang LOLOS ambang | Sebelumnya model menuliskan skor untuk **setiap** kandidat — ratusan baris keluaran yang langsung dibuang kode |
+| `critic` diberi `reasoning_effort: low` dan jatah token yang jauh lebih besar | Lihat di bawah |
+
+**Temuan yang paling mahal ada di `critic`.** Pada **5 dari 9** run terakhir di arsip, critic tercatat `dijalankan: false` — balasannya tidak pernah bisa dipakai, sementara tokennya sudah telanjur dibayar. Penjelasan yang paling masuk akal: `gpt-5.1` adalah model **penalar**, dan token penalarannya ikut memakan jatah `max_tokens` sebelum satu huruf jawaban ditulis; balasan yang mentok di batas ditolak oleh `llm.chat()`. Jatahnya dinaikkan 6.000 → 14.000 dan upaya penalarannya diturunkan lewat `llm.reasoning_effort`. Ini sekaligus soal kualitas: brief yang terbit tanpa critic adalah brief yang tidak pernah diperiksa.
+
+`reasoning_effort` **hanya boleh dipasang untuk langkah yang modelnya memang model penalar** (GPT-5.x, Gemini). Pada model Anthropic, `effort` justru *menyalakan* penalaran yang tadinya mati — hasilnya kebalikan dari hemat.
+
+Plafonnya dinaikkan ke **0.75** supaya putaran revisi critic tidak terpotong pada hari yang mahal. Itu bukan pelonggaran diam-diam: penghematannya dikerjakan di tempat yang benar, dan sejak sekarang hasilnya **terukur per langkah** lewat telemetri — bukan ditebak.
+
+Satu run per hari pada rata-rata lama berarti sekitar **$16 per bulan**; efek perubahan di atas akan terbaca pada telemetri run-run berikutnya.
 
 **Aturan keluarga model dijaga saat runtime.** Config boleh mendaftarkan cadangan yang bertumpang tindih — misalnya `synthesis` jatuh ke `openai/gpt-5.1` sementara `critic` juga OpenAI. Sebelum critic dijalankan, kode memeriksa model mana yang BENAR-BENAR melayani synthesis, lalu menyaring pilihan critic agar tetap beda keluarga.
 
@@ -677,6 +742,7 @@ src/
 │   ├── options.py          # opsi Deribit: DVOL, put/call, skew, max pain
 │   ├── onchain.py          # valuasi on-chain: MVRV, NVT, alamat aktif
 │   ├── flows.py            # premium Coinbase, pasokan stablecoin
+│   ├── likuidasi.py        # agregat likuidasi 24 jam (REST, satu bursa)
 │   ├── statements.py       # pernyataan tokoh berpengaruh
 │   ├── calendar.py         # agenda ekonomi 30 hari (dugaan pola bulanan)
 │   ├── ff_calendar.py      # agenda sungguhan: feed JSON ForexFactory
@@ -685,9 +751,11 @@ src/
 │   ├── technical.py        # indikator + deteksi sinyal palsu — murni kode
 │   ├── llm.py              # klien OpenRouter + budget + logging biaya
 │   ├── riset.py            # LLM mengusulkan kueri berita, kode yang mengambil
-│   └── news_analysis.py    # rangkaian 9 panggilan LLM
+│   ├── jendela_pasar.py    # fase bursa AS, kerapuhan, risiko jendela — murni kode
+│   └── news_analysis.py    # rangkaian panggilan LLM (filter, klasifikasi, sintesis, critic, …)
 ├── output/
 │   ├── builder.py          # susun brief.json, diff, arsip
+│   ├── telemetri.py        # metrik per run yang bertahan lintas hari
 │   └── telegram.py         # render + kirim
 ├── output/
 │   └── subscribers.py      # daftar pelanggan bot (terenkripsi)
@@ -697,7 +765,13 @@ src/
     └── timezone.py         # helper WIB + format tanggal Indonesia
 
 scripts/
-└── list_models.py          # bantu memelihara daftar model OpenRouter
+├── list_models.py          # bantu memelihara daftar model OpenRouter
+├── bangun_aset_uji.py      # bangkitkan CSS + pustaka untuk uji halaman offline
+└── telemetri_dari_arsip.py # isi telemetri awal dari arsip brief yang sudah ada
+
+tests/                      # uji halaman (Playwright) + uji unit
+├── conftest.py             # salinan situs offline + server lokal + jam palsu
+└── aset/                   # dibangkitkan, tidak di-commit
 
 docs/                       # GitHub Pages
 ├── index.html
@@ -705,8 +779,59 @@ docs/                       # GitHub Pages
 └── data/
     ├── latest.json         # brief terbaru
     ├── index.json          # daftar arsip
+    ├── telemetri.json      # ringkasan metrik lintas hari (untuk halaman)
     └── archive/            # brief lama (retensi 90 hari)
+
+state/                      # di luar docs/, tidak terbit ke Pages
+├── subscribers.enc         # daftar pelanggan bot (terenkripsi)
+└── telemetri.jsonl         # catatan mentah per run, selamat dari reset arsip
 ```
+
+---
+
+## Telemetri lintas hari
+
+Arsip brief dipangkas retensi dan ikut terhapus setiap kali data direset. Bersamanya hilang kemampuan melihat **tren**, dan justru tren yang menjawab pertanyaan paling penting tentang kesehatan pipeline ini: seberapa sering critic menahan narasi, berapa biaya rata-rata per run, sumber mana yang paling sering gagal, dan apakah siaga jendela benar-benar mendahului pergerakan harga. Selama ini semuanya dijawab dengan tebakan.
+
+Dua berkas, umurnya berbeda dari brief:
+
+| Berkas | Isi | Nasib saat data direset |
+|---|---|---|
+| `state/telemetri.jsonl` | satu baris per run: biaya total **dan per langkah**, token, durasi, status critic, sumber & feed yang gagal, corong berita, tingkat siaga, harga | selamat — di luar `docs/` |
+| `docs/data/telemetri.json` | ringkasan siap baca dari 60 run terakhir, dipakai halaman | dibangkitkan ulang tiap run |
+
+Bentuknya JSONL supaya satu baris rusak (run yang mati di tengah tulis) dilewati tanpa menghanguskan sisanya.
+
+**Biaya per langkah adalah alasan utama berkas ini ada.** Sebelumnya hanya total per run yang tersimpan, jadi setiap usaha menghemat berjalan di atas dugaan tentang langkah mana yang boros.
+
+**Riwayat siaga** menjawab apakah panel jendela risiko layak dipertahankan: tiap siaga dicatat bersama harga saat itu, lalu dibandingkan dengan run berikutnya yang berjarak **minimal 18 jam** (brief terbit sekali sehari, tapi run manual bisa menyelip beberapa jam setelahnya — selisih harga dua jam tidak menguji apa pun). Hasilnya tampil di footer halaman, disertai peringatan terbuka bahwa itu catatan pengamatan, bukan bukti sebab-akibat.
+
+Isian awal dari arsip yang sudah ada:
+
+```bash
+python -m scripts.telemetri_dari_arsip
+```
+
+Biaya per langkah tidak bisa dipulihkan dari arsip — rinciannya memang tidak pernah ikut disimpan di brief, dan itu justru sebabnya telemetri dibuat.
+
+---
+
+## Uji halaman
+
+Halaman produksi memuat Tailwind, Alpine, Chart.js, dan Lucide dari CDN. Uji tidak boleh bergantung pada jaringan, jadi aset yang setara dibangkitkan lokal lebih dulu:
+
+```bash
+python -m scripts.bangun_aset_uji     # butuh Node.js (npx)
+python -m pytest tests/               # butuh playwright + chromium
+```
+
+**Kenapa dibangkitkan, bukan disalin sekali.** CSS Tailwind yang di-vendor lalu dibiarkan akan tertinggal begitu halamannya berkembang, dan kegagalannya **senyap** — tidak ada error, cuma tata letak yang salah. Salinan sebelumnya terbukti kehilangan `.block`, `.line-clamp-2`, dan `.self-center`, dan tiga kali membuat perbaikan yang benar tampak gagal. Skrip di atas membangun ulang CSS dari `index.html` **dan** `app.js` (banyak kelas hanya muncul sebagai string di dalam getter Alpine), memakai konfigurasi Tailwind yang sama persis dengan halaman, lalu memeriksa bahwa ketiga utility itu benar-benar ada.
+
+Uji halamannya dijalankan lewat server HTTP lokal, bukan `file://` — `app.js` mengambil datanya dengan `fetch()`, dan fetch dari halaman `file://` ditolak browser sebagai pelanggaran CORS.
+
+Yang paling berguna di antaranya: **uji sehari penuh** untuk hitung mundur. Panel jendela risiko harus menyala dan **padam** pada saat yang tepat, dan itu bergantung pada waktu nyata — satu-satunya cara mengujinya tanpa jam palsu adalah menunggu hari berganti, yang berarti tidak pernah diuji sama sekali. `tests/test_hitung_mundur_seharian.py` memajukan jam palsu dari pagi ke malam dan memastikan panelnya hidup sepanjang jendela, lalu benar-benar padam sesudah bursa buka — tanpa ikut mematikan baris agenda yang berbagi kartu dan penjagaan yang sama.
+
+Belum ada workflow CI yang menjalankannya otomatis pada setiap pull request; menjalankannya masih manual.
 
 ---
 

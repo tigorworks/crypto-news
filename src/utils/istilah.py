@@ -29,10 +29,13 @@ from typing import Any, Dict, List
 # tidak keburu tertangkap pola `buy_sell_ratio`.
 KAMUS: Dict[str, str] = {
     # Sinyal open interest vs harga
-    "short_covering": "penutupan posisi short",
-    "long_liquidation": "likuidasi posisi long",
-    "short_buildup": "penumpukan posisi short",
-    "long_buildup": "penumpukan posisi long",
+    # Kata Indonesianya didahulukan, istilah pasarnya menyusul dalam kurung:
+    # pembaca yang belum kenal istilahnya tetap paham kalimatnya, dan yang
+    # sudah kenal tidak kehilangan padanan aslinya.
+    "short_covering": "penutupan posisi jual (short)",
+    "long_liquidation": "likuidasi posisi beli (long)",
+    "short_buildup": "penumpukan posisi jual (short)",
+    "long_buildup": "penumpukan posisi beli (long)",
     # Level kunci
     "invalidasi_turun": "batas pembatalan skenario turun",
     "invalidasi_naik": "batas pembatalan skenario naik",

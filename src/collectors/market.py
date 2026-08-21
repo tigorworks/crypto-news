@@ -92,8 +92,80 @@ def _parse_farside_amount(cell: str) -> Optional[float]:
     return -value if negative else value
 
 
+#: Selisih relatif yang masih dianggap "sama" antara dua sumber arus ETF.
+#: Keduanya menjumlahkan kumpulan ETF yang sama, jadi seharusnya nyaris
+#: identik; 5% memberi ruang untuk pembulatan dan revisi kecil satu emiten
+#: tanpa membiarkan perbedaan yang benar-benar berarti lolos diam-diam.
+_TOLERANSI_SELISIH_ETF = 0.05
+
+#: Di bawah nilai ini selisih relatif tidak bermakna: pada hari arus mendekati
+#: nol ($3 juta vs -$1 juta), persentase selisihnya meledak tanpa satu pun
+#: sumber benar-benar bermasalah.
+_MIN_NILAI_BANDING_ETF = 20_000_000
+
+
+def _verifikasi_silang_etf(utama: Dict[str, Any]) -> Dict[str, Any]:
+    """Bandingkan angka arus ETF dengan sumber kedua.
+
+    Arus ETF adalah salah satu angka yang paling sering dikutip pembaca dan
+    salah satu yang paling rapuh cara pengambilannya: satu API berbayar dan
+    satu scrape halaman HTML. Selama ini tidak ada pemeriksaan silang sama
+    sekali — kalau salah satunya rusak (kolom bergeser, satuan berubah dari
+    juta ke ribu), angkanya tetap terbit dengan percaya diri.
+
+    Pembandingnya best-effort dan MURAH: timeout pendek, tanpa retry. Farside
+    memang sering menolak IP pusat data, dan itu bukan kegagalan yang perlu
+    dilaporkan — hasilnya cuma "tidak ada pembanding".
+
+    Yang dikembalikan hanya CATATAN. Angka utamanya tidak pernah diganti
+    diam-diam oleh pembanding: kalau keduanya berbeda jauh, yang benar adalah
+    memberi tahu, bukan menebak siapa yang betul.
+    """
+    if utama.get("etf_flow_usd") is None:
+        return {}
+    try:
+        # Timeout lebih pendek daripada saat Farside jadi sumber utama:
+        # di sini ia cuma pembanding, dan pemeriksaan silang tidak boleh
+        # menambah lama run untuk sumber yang biasanya menolak.
+        pembanding = _etf_flow_farside(timeout=8)
+    except (HttpError, ValueError, KeyError, TypeError) as exc:
+        log.debug("Pembanding arus ETF tidak tersedia: %s", exc)
+        return {"etf_flow_verifikasi": {"status": "tanpa_pembanding"}}
+
+    a = float(utama["etf_flow_usd"])
+    b = float(pembanding["etf_flow_usd"])
+    selisih = a - b
+    acuan = max(abs(a), abs(b))
+    if acuan < _MIN_NILAI_BANDING_ETF:
+        status = "terlalu_kecil_untuk_dibandingkan"
+    elif abs(selisih) / acuan <= _TOLERANSI_SELISIH_ETF:
+        status = "cocok"
+    else:
+        status = "berbeda"
+        log.warning(
+            "Arus ETF BERBEDA antar sumber: %s $%.0f vs Farside $%.0f (tanggal %s vs %s)",
+            utama.get("etf_flow_sumber", "sumber utama"), a, b,
+            utama.get("etf_flow_date"), pembanding.get("etf_flow_date"),
+        )
+
+    return {
+        "etf_flow_verifikasi": {
+            "status": status,
+            "pembanding_sumber": "Farside",
+            "pembanding_usd": b,
+            "pembanding_tanggal": pembanding.get("etf_flow_date"),
+            "selisih_usd": round(selisih, 0),
+            "selisih_pct": round(selisih / acuan * 100, 1) if acuan else None,
+            # Tanggal yang berbeda menjelaskan sebagian besar selisih besar:
+            # satu sumber sudah memuat hari baru, satunya belum.
+            "tanggal_sama": str(utama.get("etf_flow_date") or "")
+            == str(pembanding.get("etf_flow_date") or ""),
+        }
+    }
+
+
 def _etf_flow(soso_api_key: Optional[str] = None) -> Dict[str, Any]:
-    """Total arus ETF BTC harian terakhir.
+    """Total arus ETF BTC harian terakhir, plus hasil pemeriksaan silangnya.
 
     SoSoValue (API resmi) dicoba lebih dulu kalau key-nya tersedia — Farside
     di belakang Cloudflare dan menolak IP pusat data secara PERMANEN dari
@@ -107,14 +179,22 @@ def _etf_flow(soso_api_key: Optional[str] = None) -> Dict[str, Any]:
             log.info(
                 "Arus ETF diambil dari SoSoValue (tanggal %s)", hasil["etf_flow_date"]
             )
+            hasil["etf_flow_sumber"] = "SoSoValue"
+            hasil.update(_verifikasi_silang_etf(hasil))
             return hasil
         except (HttpError, ValueError, KeyError, TypeError) as exc:
             log.warning("SoSoValue gagal (%s), coba Farside", exc)
 
-    return _etf_flow_farside()
+    hasil = _etf_flow_farside()
+    hasil["etf_flow_sumber"] = "Farside"
+    # Tidak ada pemeriksaan silang di sini: pembandingnya adalah sumber yang
+    # sama, dan membandingkan angka dengan dirinya sendiri cuma menghasilkan
+    # rasa aman yang palsu.
+    hasil["etf_flow_verifikasi"] = {"status": "tanpa_pembanding"}
+    return hasil
 
 
-def _etf_flow_farside() -> Dict[str, Any]:
+def _etf_flow_farside(timeout: int = 20) -> Dict[str, Any]:
     """Scrape total arus harian terakhir dari tabel Farside.
 
     Farside adalah halaman HTML biasa tanpa API. Struktur tabelnya bisa berubah
@@ -128,7 +208,7 @@ def _etf_flow_farside() -> Dict[str, Any]:
     # Timeout pendek dan TANPA retry. Ini scrape pihak ketiga yang boleh gagal,
     # dan kalau koneksinya menggantung (bukan ditolak) retry default membuat
     # satu sumber opsional menahan seluruh pipeline sampai ~2 menit.
-    html = get_text(FARSIDE_URL, timeout=20, retries=0, headers=HEADER_BROWSER)
+    html = get_text(FARSIDE_URL, timeout=timeout, retries=0, headers=HEADER_BROWSER)
     rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL | re.IGNORECASE)
 
     for row in reversed(rows):
@@ -178,6 +258,11 @@ def collect(symbol: str, soso_api_key: Optional[str] = None) -> Dict[str, Any]:
         "fee_hour_sat_vb": None,
         "etf_flow_usd": None,
         "etf_flow_date": None,
+        # Sumber yang benar-benar melayani angka di atas, dan hasil
+        # pemeriksaan silangnya terhadap sumber kedua (lihat
+        # _verifikasi_silang_etf).
+        "etf_flow_sumber": None,
+        "etf_flow_verifikasi": {"status": "tanpa_pembanding"},
         # Ditandai True oleh pipeline kalau angkanya dipakai ulang dari brief
         # sebelumnya karena scrape hari ini gagal.
         "etf_flow_kedaluwarsa": False,
