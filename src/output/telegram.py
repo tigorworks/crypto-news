@@ -255,6 +255,18 @@ def _blok_pasar(brief: Dict[str, Any]) -> List[str]:
     if potongan:
         baris.append(" · ".join(potongan))
 
+    # Likuidasi 24 jam. Sisinya diterjemahkan ("posisi beli/jual"), dan
+    # bursanya disebut — angka satu bursa tidak boleh terbaca seperti
+    # likuidasi seluruh pasar.
+    if market.get("likuidasi_total_usd"):
+        juta = market["likuidasi_total_usd"] / 1_000_000
+        baris.append(
+            f"Likuidasi 24j ${_angka(juta, 1)} jt · "
+            f"beli ${_angka(market.get('likuidasi_long_usd', 0) / 1_000_000, 1)} jt vs "
+            f"jual ${_angka(market.get('likuidasi_short_usd', 0) / 1_000_000, 1)} jt "
+            f"<i>({esc(market.get('likuidasi_sumber') or 'satu bursa')})</i>"
+        )
+
     if market.get("hashrate"):
         baris.append(f"Hashrate {_angka(market['hashrate'], 0)} EH/s")
     return baris if len(baris) > 2 else []
@@ -746,7 +758,7 @@ def _blok_ai(
     return baris
 
 
-def _blok_siaga_kebijakan(brief: Dict[str, Any]) -> List[str]:
+def _blok_jendela_risiko(brief: Dict[str, Any]) -> List[str]:
     """Peringatan JENDELA: seberapa berbahaya jamnya, bukan isi kebijakannya.
 
     Isi kebijakan sudah pindah ke analisa AI sebagai sebab naik/turun harga,
@@ -867,7 +879,7 @@ def render_terpisah(
         # hilang begitu pesannya kepanjangan adalah alarm yang gagal justru
         # saat paling dibutuhkan. Ongkosnya kecil, dan ia diam sendiri pada
         # siaga rendah.
-        + _blok_siaga_kebijakan(brief)
+        + _blok_jendela_risiko(brief)
         + _blok_teknikal(brief)
         + _blok_pasar(brief)
         + _blok_makro(brief)

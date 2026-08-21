@@ -313,9 +313,28 @@ def analyze_timeframe(klines: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
     kelengkapan = _kelengkapan_candle(df)
+    parsial = bool(kelengkapan is not None and kelengkapan < AMBANG_CANDLE_LENGKAP)
     volume_terakhir = float(df["volume"].iloc[-1])
     volume_rata = float(volume_ma20.iloc[-1]) if pd.notna(volume_ma20.iloc[-1]) else 0.0
-    obv_slope = float(obv_series.iloc[-1] - obv_series.iloc[-6]) if len(obv_series) > 6 else 0.0
+
+    # ARAH OBV DIHITUNG DARI CANDLE YANG SUDAH SELESAI SAJA.
+    #
+    # OBV menambahkan VOLUME candle (bertanda arah penutupan) ke akumulasi,
+    # jadi candle yang baru berjalan separuh menyumbang separuh volumenya.
+    # Pada hari dengan arah penutupan berlawanan dari beberapa hari
+    # sebelumnya, sumbangan yang terpotong itu bisa membalik tanda kemiringan
+    # enam candle terakhir — arahnya berubah bukan karena pasar berubah, tapi
+    # karena jam berapa pipeline dijalankan.
+    #
+    # Solusinya bukan menyembunyikan angkanya (nilai OBV kumulatif tetap
+    # ditampilkan apa adanya), melainkan mengukur KEMIRINGANNYA pada jendela
+    # yang seluruh candle-nya penuh, lalu menandai bahwa candle berjalan
+    # belum ikut dihitung.
+    seri_obv_selesai = obv_series.iloc[:-1] if parsial else obv_series
+    obv_slope = (
+        float(seri_obv_selesai.iloc[-1] - seri_obv_selesai.iloc[-6])
+        if len(seri_obv_selesai) > 6 else 0.0
+    )
 
     levels = support_resistance(df, price)
     macd_hist = macd_data["histogram"]
@@ -373,10 +392,21 @@ def analyze_timeframe(klines: List[Dict[str, Any]]) -> Dict[str, Any]:
             # penuh. Kedua field ini yang menentukan boleh-tidaknya rasio itu
             # dipakai menyimpulkan sesuatu — bukan rasionya sendiri.
             "kelengkapan": _f(kelengkapan, 3),
-            "parsial": bool(kelengkapan is not None and kelengkapan < AMBANG_CANDLE_LENGKAP),
+            "parsial": parsial,
             "obv": _f(obv_series.iloc[-1], 0),
             "obv_arah": "naik" if obv_slope > 0 else "turun" if obv_slope < 0 else "datar",
+            # Arahnya diukur sampai candle terakhir yang SUDAH SELESAI kalau
+            # hari berjalan belum penuh — supaya jawabannya tidak berubah
+            # hanya karena jam menjalankan pipeline.
+            "obv_arah_tanpa_candle_berjalan": parsial,
             "vwap_harian": _f(vwap_harian(df)),
+            # VWAP "harian" di atas dihitung dari candle-candle bertanggal
+            # hari ini. Pada brief harian yang cuma memakai timeframe 1D,
+            # isinya berarti satu candle: harga rata-rata tertimbang HARI
+            # BERJALAN, bukan sesi penuh. Selama candle-nya belum penuh,
+            # angka itu masih akan bergerak sampai tengah malam UTC — dan
+            # tanpa penanda ini ia terbaca seperti level yang sudah pasti.
+            "vwap_harian_parsial": parsial,
         },
         "level": {
             "support": levels["support"],
@@ -462,25 +492,36 @@ _AMBANG_BESARAN_PCT = ((1.0, "tipis"), (2.5, "wajar"), (5.0, "besar"))
 # pasar derivatif, dan yang paling menentukan KUALITAS sebuah pergerakan:
 # harga naik karena uang baru masuk berbeda sifatnya dari harga naik karena
 # posisi jual ditutup paksa, walaupun persentasenya sama.
+#
+# Label pendeknya ditulis sebagai KALIMAT YANG MENJELASKAN DIRINYA, bukan
+# kontras teknis. Bentuk lama ("penutupan posisi jual, bukan permintaan
+# baru") tampil di puncak halaman sebagai "Sifatnya: ..." dan meninggalkan
+# pembaca menebak apa yang sebenarnya terjadi — potongan "bukan permintaan
+# baru" cuma bisa dipahami orang yang sudah paham mekanismenya, dan justru
+# merekalah yang paling tidak membutuhkan kalimat itu.
 _ARTI_JENIS = {
     "long_baru": (
-        "uang baru masuk ke sisi beli",
-        "Kenaikan disertai open interest bertambah — posisi beli baru masuk, "
-        "bukan sekadar posisi lama ditutup.",
+        "pembeli baru masuk dan menahan posisinya",
+        "Kenaikan disertai open interest bertambah — artinya ada posisi beli "
+        "BARU yang dibuka, bukan sekadar posisi lama yang ditutup. Kenaikan "
+        "jenis ini punya penopang yang lebih nyata.",
     ),
     "short_covering": (
-        "penutupan posisi jual, bukan permintaan baru",
-        "Kenaikan disertai open interest berkurang — pendorongnya penutupan "
-        "posisi jual. Kenaikan jenis ini cenderung kehilangan tenaga setelah "
-        "posisi jual habis tertutup.",
+        "pedagang yang bertaruh harga turun menutup posisinya dengan membeli",
+        "Kenaikan disertai open interest berkurang. Yang mendorong harga naik "
+        "adalah pedagang yang sebelumnya bertaruh harga turun dan kini harus "
+        "membeli untuk menutup taruhannya — bukan pembeli yang datang karena "
+        "ingin memegang BTC. Kenaikan jenis ini cenderung kehilangan tenaga "
+        "begitu taruhan turun itu habis tertutup.",
     ),
     "short_baru": (
-        "posisi jual baru masuk",
+        "pedagang membuka taruhan baru bahwa harga akan turun",
         "Penurunan disertai open interest bertambah — pelaku pasar membuka "
-        "posisi jual baru, bukan sekadar keluar dari posisi beli.",
+        "posisi jual BARU, bukan sekadar keluar dari posisi beli. Tekanannya "
+        "cenderung bertahan selama taruhan itu belum ditutup.",
     ),
     "long_ditutup": (
-        "posisi beli keluar atau dilikuidasi",
+        "pemegang posisi beli keluar, sebagian kena likuidasi paksa",
         "Penurunan disertai open interest berkurang — posisi beli ditutup "
         "atau kena likuidasi. Tekanannya cenderung mereda begitu posisi yang "
         "rapuh selesai keluar.",

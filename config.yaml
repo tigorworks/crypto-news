@@ -32,8 +32,6 @@ llm:
   #   agenda_dampak -> Haiku, menilai dampak agenda ke kripto
   #   mechanism -> Haiku, keterangan pendek per berita
   #   statements-> Haiku (menyaring pernyataan tokoh dari derau berita)
-  #   agen_kebijakan -> Haiku, menilai risiko kejutan kebijakan AS
-  #                     terhadap jendela jam bursa (lihat jendela_pasar.py)
   #   technical -> model menengah/kuat (MENAFSIRKAN indikator, bukan menghitung)
   #   whale     -> model menengah/kuat (membaca posisi whale vs ritel)
   #   synthesis -> model kuat (menulis analisa panjang bersebab-akibat)
@@ -100,10 +98,11 @@ llm:
   mechanism:  ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
   agenda_dampak: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
   statements: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
-  # Agen pemantau kebijakan AS. Angka jendela bursa dan kerapuhan pasar
-  # sudah dihitung KODE sebelum sampai ke model, jadi tugasnya cuma
-  # menafsirkan — cukup model kecil.
-  agen_kebijakan: ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  # Langkah `agen_kebijakan` DIHAPUS (tidak ada lagi entri di sini):
+  # prosanya tidak pernah dirender setelah kebijakan AS pindah ke analisa AI,
+  # sementara bagian yang benar-benar dipakai halaman — jendela jam bursa,
+  # kerapuhan, risiko jendela, pendaratan sinyal — semuanya hitungan kode di
+  # src/analysis/jendela_pasar.py dan tidak butuh model sama sekali.
 
   # Menafsirkan data dan menulis panjang: di sini kualitas model paling terasa.
   technical:  ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
@@ -116,10 +115,34 @@ llm:
   # kesalahannya sendiri — kalau keduanya sekeluarga, critic jadi percuma.
   critic:     ["openai/gpt-5.1", "google/gemini-3.1-flash-lite-preview"]
 
-  # Dengan Sonnet, run terukur di produksi ~$0,26. Plafon 0.60 memberi ruang
-  # untuk satu putaran revisi kalau critic menemukan masalah — tanpa ruang
-  # itu, revisi akan terpotong budget dan analisa jadi hilang sama sekali.
-  max_cost_usd_per_run: 0.60
+  # UPAYA PENALARAN PER LANGKAH.
+  #
+  # HANYA untuk langkah yang modelnya memang model penalar (GPT-5.x, Gemini).
+  # Jangan dipasang untuk langkah berbasis Anthropic: di sana `effort` justru
+  # MENYALAKAN penalaran yang tadinya mati, jadi hasilnya kebalikan dari
+  # hemat.
+  #
+  # critic memakai gpt-5.1, dan token penalarannya ikut memakan jatah
+  # max_tokens. Itu penjelasan paling masuk akal untuk pola yang terlihat di
+  # arsip: pada 5 dari 9 run terakhir critic tercatat `dijalankan: false`,
+  # alias balasannya tidak pernah bisa dipakai — sementara tokennya sudah
+  # telanjur dibayar. Tugas critic memeriksa angka, bukan menulis esai, jadi
+  # upaya rendah sudah memadai dan sekaligus memperkecil peluang terpotong.
+  reasoning_effort:
+    critic: low
+
+  # Dengan Sonnet, run terukur di produksi ~$0,26 saat catatan ini ditulis.
+  # Telemetri 9 run pertama (state/telemetri.jsonl) memberi angka yang jauh
+  # lebih tinggi: rata-rata $0,54, tertinggi $0,76 — plafonnya SENDIRI pun
+  # terlampaui, karena pemeriksaan anggaran terjadi sebelum panggilan dan
+  # satu panggilan besar bisa melewatinya di tengah jalan.
+  #
+  # Plafon dinaikkan ke 0.75 supaya revisi critic tidak terpotong pada hari
+  # yang mahal — bukan supaya boros: penghematan dikerjakan di tempat yang
+  # benar (prefilter berita, langkah agen kebijakan yang dibuang, keluaran
+  # filter yang jauh lebih pendek, upaya penalaran critic), dan hasilnya
+  # sekarang bisa diukur per langkah lewat telemetri.
+  max_cost_usd_per_run: 0.75
 
 news:
   # Dinaikkan seiring bertambahnya feed. Langkah filter relevansi yang
@@ -128,6 +151,20 @@ news:
   # Langkah filter sudah dibatch (60 artikel/panggilan), jadi menaikkan
   # angka ini tidak lagi berisiko membuat balasan model terpotong.
   max_fetch: 420
+  # PEMANGKASAN SEBELUM LLM. Corong produksi 21 Agustus: 1.318 terkumpul ->
+  # 413 segar -> 407 unik -> 25 dipakai. Keempat ratus artikel itu tetap
+  # dikirim ke langkah filter dan ditagih token, padahal sebagian besar tidak
+  # menyebut Bitcoin, kripto, bank sentral, maupun regulator sama sekali —
+  # ikut tertarik karena feed makro (BBC World, NYTimes Business) memang
+  # ditarik utuh.
+  #
+  # `prefilter_min_skor` membuang artikel yang skor kata kuncinya NOL, yaitu
+  # yang tidak mencocoki satu pun pola di collectors/news.py. Sengaja tidak
+  # lebih tinggi dari 1: menaikkannya mulai membuang kabar makro yang relevan
+  # lewat jalur tak terduga, dan penilaian semacam itu memang tugas filter.
+  # `maks_kandidat_llm` adalah pagar atas kalau suatu hari feednya membanjir.
+  prefilter_min_skor: 1
+  maks_kandidat_llm: 220
   # Tambahkan feed hasil riset LLM di samping daftar tetap di bawah.
   # Matikan (false) kalau ingin sumbernya benar-benar tetap.
   riset_dinamis: true
@@ -150,6 +187,13 @@ news:
     - https://cryptobriefing.com/feed/
     - https://beincrypto.com/feed/
     - https://ambcrypto.com/feed/
+    # coinjournal.net DIPERTAHANKAN — sempat dicurigai gagal terus-menerus,
+    # ternyata tidak. Diperiksa ulang 21 Agustus 2026 terhadap sembilan arsip
+    # produksi: ia muncul sebagai "Feed gagal" HANYA pada run 17 Agustus
+    # 18.28, dan delapan run setelahnya tidak punya satu pun feed gagal.
+    # Membuangnya berarti kehilangan sumber yang bekerja karena satu
+    # kegagalan sesaat. Kalau ia gagal lagi, sekarang terlihat berulang atau
+    # tidaknya lewat telemetri per run (state/telemetri.jsonl).
     - https://coinjournal.net/feed/
     - https://bitcoinist.com/feed/
     - https://www.newsbtc.com/feed/

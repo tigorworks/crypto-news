@@ -76,6 +76,12 @@ class Config:
         return self.llm.get("base_url", "https://openrouter.ai/api/v1")
 
     @property
+    def reasoning_effort(self) -> Dict[str, str]:
+        """Upaya penalaran per step (hanya untuk model penalar; lihat config.yaml)."""
+        raw = self.llm.get("reasoning_effort") or {}
+        return {str(k): str(v) for k, v in raw.items() if v}
+
+    @property
     def max_cost_usd(self) -> float:
         return float(self.llm.get("max_cost_usd_per_run", 0.15))
 

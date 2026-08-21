@@ -1,0 +1,114 @@
+{
+  "dibuat": "2026-08-21T17:50:19Z",
+  "jumlah_run": 9,
+  "total_run_tersimpan": 9,
+  "sejak": "2026-08-17T11:28:02Z",
+  "biaya": {
+    "rata_usd": 0.5399,
+    "maks_usd": 0.75883,
+    "terakhir_usd": 0.50766,
+    "run_di_atas_85_persen_budget": 5
+  },
+  "biaya_per_langkah": [],
+  "durasi": {
+    "rata_detik": 496.1889,
+    "maks_detik": 662.4
+  },
+  "critic": {
+    "dijalankan": 4,
+    "menahan": 1,
+    "persen_menahan": 25.0,
+    "bagian_tersering": {
+      "narasi": 1
+    }
+  },
+  "sumber_paling_sering_gagal": [],
+  "riwayat_siaga": [
+    {
+      "waktu_utc": "2026-08-17T23:33:56Z",
+      "tingkat": "sedang",
+      "kerapuhan": "tinggi",
+      "fase": "tutup_harian",
+      "harga": 64431.9,
+      "harga_sesudah": 64759.9,
+      "perubahan_pct": 0.51
+    },
+    {
+      "waktu_utc": "2026-08-17T23:45:25Z",
+      "tingkat": "sedang",
+      "kerapuhan": "tinggi",
+      "fase": "tutup_harian",
+      "harga": 64503.2,
+      "harga_sesudah": 64759.9,
+      "perubahan_pct": 0.4
+    },
+    {
+      "waktu_utc": "2026-08-18T23:46:43Z",
+      "tingkat": "rendah",
+      "kerapuhan": "rendah",
+      "fase": "tutup_harian",
+      "harga": 64759.9,
+      "harga_sesudah": 69257.7,
+      "perubahan_pct": 6.95
+    },
+    {
+      "waktu_utc": "2026-08-19T23:48:19Z",
+      "tingkat": "rendah",
+      "kerapuhan": "rendah",
+      "fase": "tutup_harian",
+      "harga": 69257.7,
+      "harga_sesudah": 73133.1,
+      "perubahan_pct": 5.6
+    },
+    {
+      "waktu_utc": "2026-08-20T00:04:26Z",
+      "tingkat": "rendah",
+      "kerapuhan": "rendah",
+      "fase": "tutup_harian",
+      "harga": 69260.4,
+      "harga_sesudah": 73133.1,
+      "perubahan_pct": 5.59
+    },
+    {
+      "waktu_utc": "2026-08-20T08:42:36Z",
+      "tingkat": "rendah",
+      "kerapuhan": "sedang",
+      "fase": "tutup_harian",
+      "harga": 71205.6,
+      "harga_sesudah": null,
+      "perubahan_pct": null
+    },
+    {
+      "waktu_utc": "2026-08-20T23:46:11Z",
+      "tingkat": "rendah",
+      "kerapuhan": "rendah",
+      "fase": "tutup_harian",
+      "harga": 73133.1,
+      "harga_sesudah": null,
+      "perubahan_pct": null
+    },
+    {
+      "waktu_utc": "2026-08-21T00:09:46Z",
+      "tingkat": "rendah",
+      "kerapuhan": "rendah",
+      "fase": "tutup_harian",
+      "harga": 73131.6,
+      "harga_sesudah": null,
+      "perubahan_pct": null
+    }
+  ],
+  "siaga_vs_harga": [
+    {
+      "tingkat": "rendah",
+      "jumlah": 3,
+      "rata_perubahan_pct": 6.0467,
+      "turun_lebih_2_persen": 0
+    },
+    {
+      "tingkat": "sedang",
+      "jumlah": 2,
+      "rata_perubahan_pct": 0.455,
+      "turun_lebih_2_persen": 0
+    }
+  ]
+}

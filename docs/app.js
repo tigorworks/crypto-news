@@ -111,6 +111,9 @@ function briefApp() {
     arsipBanding: '',
     dataBanding: null,
     memuatBanding: false,
+    // Telemetri lintas hari (riwayat siaga, kesehatan run). Dimuat terpisah
+    // dari brief dan boleh absen.
+    telemetri: null,
     // Berita dan pernyataan tokoh berbagi satu bagian dengan dua tab.
     tabKonten: 'berita',
     halamanBerita: 1,
@@ -130,6 +133,7 @@ function briefApp() {
     async mulai() {
       await this.muat();
       await this.muatArsip();
+      await this.muatTelemetri();
       // Waktu relatif ("3 jam lalu") perlu dihitung ulang berkala.
       this._jam = setInterval(() => { this._detak++; }, 60000);
 
@@ -177,6 +181,27 @@ function briefApp() {
       }
     },
 
+    /* Telemetri lintas hari. Berkas TERPISAH dari brief karena umurnya
+       berbeda: brief menggambarkan satu hari, telemetri menyimpan riwayat
+       yang selamat dari pemangkasan arsip. Kegagalannya sengaja senyap —
+       halaman tetap utuh tanpa bagian riwayat kalau berkasnya belum ada. */
+    async muatTelemetri() {
+      try {
+        const resp = await fetch(`data/telemetri.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (!resp.ok) return;
+        this.telemetri = await resp.json();
+      } catch (e) {
+        this.telemetri = null;
+      }
+    },
+
+    /* Riwayat siaga, terbaru dulu, dibatasi supaya footernya tidak jadi
+       daftar sepanjang halaman. */
+    get riwayatSiaga() {
+      const r = this.telemetri?.riwayat_siaga || [];
+      return [...r].reverse().slice(0, 12);
+    },
+
     async muatArsip() {
       try {
         const resp = await fetch(`data/index.json?t=${Date.now()}`, { cache: 'no-store' });
@@ -218,7 +243,8 @@ function briefApp() {
       const daftar = [
         ['Harga', 'price.last', (v) => this.uang(v)],
         ['Perubahan 24j', 'price.change_24h_pct', (v) => this.persen(v, 2)],
-        ['Sentimen', 'aggregate.sentiment_score', (v) => this.angka(v, 1)],
+        ['Sentimen berita', 'aggregate.sentiment_score', (v) => this.angka(v, 1)],
+        ['Fear & Greed', 'market.fear_greed.value', (v) => this.angka(v, 0)],
         ['Funding rate', 'market.funding_rate', (v) => this.tekstFunding(v)],
         ['Open interest', 'market.open_interest', (v) => this.angka(v, 0) + ' BTC'],
         ['DVOL', 'options.dvol', (v) => this.angka(v, 1)],
@@ -581,6 +607,34 @@ function briefApp() {
       return `${Math.floor(jam / 24)} hari lalu`;
     },
 
+    /* Umur brief dalam jam. Dihitung ulang tiap menit lewat `_detak`, sama
+       seperti waktu relatif — halaman ini bisa dibiarkan terbuka berjam-jam,
+       dan brief yang masih segar saat dibuka bisa jadi basi sebelum ditutup. */
+    get umurBriefJam() {
+      this._detak;
+      if (!this.data?.generated_at) return null;
+      const dibuat = new Date(this.data.generated_at);
+      if (Number.isNaN(dibuat.getTime())) return null;
+      return (Date.now() - dibuat.getTime()) / 3600000;
+    },
+
+    /* Ambangnya 36 jam, bukan 24: brief terbit sekali sehari dan cron GitHub
+       kerap tertunda, jadi 26 jam masih normal. Lewat 36 jam berarti
+       setidaknya satu jadwal terbit benar-benar terlewat. */
+    get briefBasi() {
+      return (this.umurBriefJam ?? 0) > 36;
+    },
+
+    get kelasUmurBrief() {
+      if (!this.briefBasi) return 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300';
+      // Di atas tiga hari nadanya naik dari "perhatikan" jadi "jangan
+      // dipakai": harga sudah pasti bergerak jauh.
+      if ((this.umurBriefJam ?? 0) > 72) {
+        return 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 font-semibold';
+      }
+      return 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 font-semibold';
+    },
+
     /* Nama sumber gagal dalam bahasa manusia. Sebelumnya cuma tersembunyi di
        tooltip badge kualitas — tidak berguna di ponsel (tanpa hover) dan
        gampang terlewat bahkan di desktop. Sumber yang tidak masuk kamus
@@ -621,6 +675,52 @@ function briefApp() {
       if (c === 'baik') return 'bg-emerald-500';
       if (c === 'sedang') return 'bg-amber-500';
       return 'bg-rose-500';
+    },
+
+    /* Keterangan saat dua sumber arus ETF tidak sepakat. String kosong
+       berarti tidak ada yang perlu dikatakan — kecocokan adalah keadaan
+       normal, dan mengumumkannya tiap hari melatih pembaca mengabaikan baris
+       ini justru pada hari ia berarti. */
+    get etfBerbedaAntarSumber() {
+      const v = this.data?.market?.etf_flow_verifikasi;
+      if (!v || v.status !== 'berbeda') return '';
+      const beda = v.tanggal_sama
+        ? 'tanggalnya sama, jadi salah satunya kemungkinan keliru'
+        : `tanggalnya berbeda (${v.pembanding_tanggal || 'tidak diketahui'})`;
+      return `Sumber pembanding ${v.pembanding_sumber} menyebut `
+           + `${this.ringkasUang(v.pembanding_usd, true)} — ${beda}.`;
+    },
+
+    /* Porsi likuidasi posisi beli dalam persen, untuk batang dua warna.
+       Dibatasi 0..100 supaya data aneh tidak pernah menghasilkan batang yang
+       meluber keluar kartunya. */
+    get porsiLikuidasiLong() {
+      const m = this.data?.market || {};
+      const total = m.likuidasi_total_usd;
+      if (!total) return 0;
+      return Math.max(0, Math.min(100, (m.likuidasi_long_usd || 0) / total * 100));
+    },
+
+    /* Keterangan cakupan: bursa mana, dan berapa jam yang benar-benar
+       terekam. Jendela yang lebih pendek dari 24 jam disebut apa adanya —
+       riwayat bursa bisa saja tidak sampai sejauh itu. */
+    get keteranganLikuidasi() {
+      const m = this.data?.market || {};
+      const jam = m.likuidasi_cakupan_jam;
+      const cakupan = jam && jam < 23 ? `${this.angka(jam, 0)} jam terakhir` : '24 jam terakhir';
+      return `${m.likuidasi_sumber || 'satu bursa'} · ${cakupan} · bukan gabungan seluruh bursa`;
+    },
+
+    /* Perubahan Fear & Greed dibanding pembacaan sebelumnya. Sumbernya sudah
+       mengirim `previous`, jadi tidak ada yang dihitung ulang di sini — dan
+       kalau field itu absen barisnya cuma hilang, bukan menampilkan "0 poin"
+       yang terbaca seolah pasar tidak bergerak. */
+    get selisihFearGreed() {
+      const fg = this.data?.market?.fear_greed;
+      if (!fg || fg.previous === null || fg.previous === undefined) return '';
+      const selisih = fg.value - fg.previous;
+      if (!selisih) return 'sama seperti kemarin';
+      return `${selisih > 0 ? '+' : '−'}${Math.abs(selisih)} poin dari kemarin`;
     },
 
     get gayaBatangSentimen() {
@@ -758,6 +858,12 @@ function briefApp() {
       const s = this.siagaKebijakan;
       if (s) {
         const j = s.jendela || {};
+        // Urgensinya diambil dari RISIKO JENDELA, hitungan kode. Sebelumnya
+        // dari `s.siaga`, yaitu tingkat siaga milik langkah LLM agen
+        // kebijakan yang sudah dihapus — field itu tidak ada lagi di brief
+        // baru, dan membiarkannya berarti baris ini tidak akan pernah lagi
+        // tampil mendesak, sekalipun bursanya tutup di pasar yang rapuh.
+        const tinggi = (s.risiko_jendela || {}).tingkat === 'tinggi';
         const mundur = this.hitungMundurLive(j.buka_berikutnya_utc);
         // Tidak ada lagi cabang "sudah lewat" di sini: getter siagaKebijakan
         // memulangkan null begitu bursanya buka — untuk siaga yang memang
@@ -765,7 +871,7 @@ function briefApp() {
         const rawan = !!j.dalam_jendela_rawan;
         baris.push({
           jenis: 'siaga',
-          ikon: s.siaga === 'tinggi' ? 'siren' : 'landmark',
+          ikon: tinggi ? 'siren' : 'landmark',
           // Label dipendekkan supaya muat sebaris dengan hitung mundur, persis
           // seperti baris agenda. Versi panjang ("SIAGA KEBIJAKAN: SEDANG")
           // membungkus dan mendorong hitung mundur ke baris sendiri, sehingga
@@ -786,7 +892,7 @@ function briefApp() {
           // ini, siaga hari kerja terbit sebagai judul tanpa isi sama sekali.
           isi: this.kalimatJendelaRingkas,
           tautan: '#s-siaga',
-          mendesak: s.siaga === 'tinggi',
+          mendesak: tinggi,
           perhatian: true,
         });
       }
