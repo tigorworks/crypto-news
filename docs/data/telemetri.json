@@ -1,107 +1,112 @@
 {
-  "dibuat": "2026-08-21T22:24:07Z",
-  "jumlah_run": 10,
-  "total_run_tersimpan": 10,
+  "dibuat": "2026-08-21T23:49:43Z",
+  "jumlah_run": 11,
+  "total_run_tersimpan": 11,
   "sejak": "2026-08-17T11:28:02Z",
   "biaya": {
-    "rata_usd": 0.5279,
+    "rata_usd": 0.5252,
     "maks_usd": 0.75883,
-    "terakhir_usd": 0.42061,
+    "terakhir_usd": 0.49743,
     "run_di_atas_85_persen_budget": 5
   },
   "biaya_per_langkah": [
     {
       "langkah": "synthesis",
-      "rata_usd": 0.1334,
-      "run": 1,
-      "total_usd": 0.13336
+      "rata_usd": 0.1557,
+      "run": 2,
+      "total_usd": 0.31134
     },
     {
       "langkah": "outlook",
-      "rata_usd": 0.079,
-      "run": 1,
-      "total_usd": 0.07895
+      "rata_usd": 0.084,
+      "run": 2,
+      "total_usd": 0.16793
     },
     {
       "langkah": "technical",
-      "rata_usd": 0.044,
-      "run": 1,
-      "total_usd": 0.044
+      "rata_usd": 0.0554,
+      "run": 2,
+      "total_usd": 0.11078
     },
     {
       "langkah": "classify",
-      "rata_usd": 0.0348,
-      "run": 1,
-      "total_usd": 0.03484
-    },
-    {
-      "langkah": "critic",
-      "rata_usd": 0.0327,
-      "run": 1,
-      "total_usd": 0.03272
+      "rata_usd": 0.0349,
+      "run": 2,
+      "total_usd": 0.06977
     },
     {
       "langkah": "statements",
-      "rata_usd": 0.0314,
-      "run": 1,
-      "total_usd": 0.03143
+      "rata_usd": 0.0324,
+      "run": 2,
+      "total_usd": 0.0648
     },
     {
       "langkah": "whale",
-      "rata_usd": 0.0281,
-      "run": 1,
-      "total_usd": 0.02806
+      "rata_usd": 0.0303,
+      "run": 2,
+      "total_usd": 0.0605
+    },
+    {
+      "langkah": "critic",
+      "rata_usd": 0.0291,
+      "run": 2,
+      "total_usd": 0.05818
     },
     {
       "langkah": "filter",
-      "rata_usd": 0.0241,
-      "run": 1,
-      "total_usd": 0.02406
+      "rata_usd": 0.0245,
+      "run": 2,
+      "total_usd": 0.04907
     },
     {
       "langkah": "format",
-      "rata_usd": 0.0064,
-      "run": 1,
-      "total_usd": 0.0064
+      "rata_usd": 0.0065,
+      "run": 2,
+      "total_usd": 0.01291
     },
     {
       "langkah": "mechanism",
       "rata_usd": 0.0058,
-      "run": 1,
-      "total_usd": 0.00576
+      "run": 2,
+      "total_usd": 0.01165
     },
     {
       "langkah": "agenda_dampak",
-      "rata_usd": 0.0048,
-      "run": 1,
-      "total_usd": 0.00476
+      "rata_usd": 0.0044,
+      "run": 2,
+      "total_usd": 0.00873
     },
     {
       "langkah": "x_posts",
       "rata_usd": 0.0018,
-      "run": 1,
-      "total_usd": 0.00176
+      "run": 2,
+      "total_usd": 0.00353
     },
     {
       "langkah": "riset",
       "rata_usd": 0.0009,
-      "run": 1,
-      "total_usd": 0.0009
+      "run": 2,
+      "total_usd": 0.00176
     }
   ],
   "durasi": {
-    "rata_detik": 484.7,
+    "rata_detik": 491.3727,
     "maks_detik": 662.4
   },
   "critic": {
-    "dijalankan": 5,
+    "dijalankan": 6,
     "menahan": 1,
-    "persen_menahan": 20.0,
+    "persen_menahan": 16.7,
     "bagian_tersering": {
       "narasi": 1
     }
   },
-  "sumber_paling_sering_gagal": [],
+  "sumber_paling_sering_gagal": [
+    {
+      "sumber": "feed:theblock.co",
+      "run": 1
+    }
+  ],
   "riwayat_siaga": [
     {
       "waktu_utc": "2026-08-17T23:33:56Z",
@@ -181,6 +186,15 @@
       "kerapuhan": "rendah",
       "fase": "jeda_akhir_pekan",
       "harga": 78530.2,
+      "harga_sesudah": null,
+      "perubahan_pct": null
+    },
+    {
+      "waktu_utc": "2026-08-21T23:49:33Z",
+      "tingkat": "sedang",
+      "kerapuhan": "rendah",
+      "fase": "jeda_akhir_pekan",
+      "harga": 78275.7,
       "harga_sesudah": null,
       "perubahan_pct": null
     }
