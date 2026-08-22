@@ -569,13 +569,15 @@ function briefApp() {
       return { jenuh_beli: 'jenuh beli', jenuh_jual: 'jenuh jual', netral: 'netral' }[zona] || zona || '';
     },
 
-    /* Sebelumnya dirender apa adanya sebagai "priced in: ya" — mencampur
-       istilah Inggris dengan nilai enum Indonesia dalam satu chip. */
+    /* "priced in" sengaja TETAP Inggris — istilah pasar yang sudah lazim,
+       dan menerjemahkannya ("tercermin di harga") justru bikin bingung
+       pembaca yang sudah biasa dengan istilah aslinya. Yang diperbaiki
+       cuma tata bahasanya: dulu dirender mentah "priced in: ya". */
     labelPricedIn(nilai) {
       return {
-        ya: 'sudah tercermin di harga',
-        tidak: 'belum tercermin di harga',
-        sebagian: 'sebagian tercermin di harga',
+        ya: 'sudah priced in',
+        tidak: 'belum priced in',
+        sebagian: 'sebagian priced in',
       }[nilai] || '';
     },
 

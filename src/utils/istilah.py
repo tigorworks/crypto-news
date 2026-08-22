@@ -90,7 +90,7 @@ KAMUS: Dict[str, str] = {
     # Klasifikasi berita
     "status_kepastian": "status kepastian",
     "jalur_transmisi": "jalur transmisi",
-    "sudah_priced_in": "sudah tercermin di harga",
+    "sudah_priced_in": "sudah priced in",
     "belum_dikonfirmasi": "belum dikonfirmasi",
     "sudah_terjadi": "sudah terjadi",
     "dilaporkan_media": "dilaporkan media",
