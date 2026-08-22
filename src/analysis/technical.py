@@ -493,40 +493,58 @@ _AMBANG_BESARAN_PCT = ((1.0, "tipis"), (2.5, "wajar"), (5.0, "besar"))
 # harga naik karena uang baru masuk berbeda sifatnya dari harga naik karena
 # posisi jual ditutup paksa, walaupun persentasenya sama.
 #
-# Label pendeknya ditulis sebagai KALIMAT YANG MENJELASKAN DIRINYA, bukan
-# kontras teknis. Bentuk lama ("penutupan posisi jual, bukan permintaan
-# baru") tampil di puncak halaman sebagai "Sifatnya: ..." dan meninggalkan
-# pembaca menebak apa yang sebenarnya terjadi — potongan "bukan permintaan
-# baru" cuma bisa dipahami orang yang sudah paham mekanismenya, dan justru
-# merekalah yang paling tidak membutuhkan kalimat itu.
+# TIAP JENIS PUNYA DUA BENTUK, dan pembagiannya sengaja:
+#
+#   label  — 2-3 kata untuk chip. Chip tidak muat kalimat, dan kalimat yang
+#            dipaksa masuk ke chip selalu berakhir jadi frasa aneh.
+#   arti   — dua kalimat pendek: APA yang terjadi, lalu APA ARTINYA bagi
+#            pembaca. Inilah yang tampil di kartu Sorotan dan Telegram.
+#
+# Dua percobaan sebelumnya gagal dengan cara yang berbeda, dan keduanya
+# ditulis di sini supaya tidak diulang:
+#
+#   1. "penutupan posisi jual, bukan permintaan baru" — separuh keduanya
+#      benar, tapi berhenti pada KONTRAS. Pembaca tidak pernah diberi tahu
+#      apa bedanya dan kenapa itu penting, jadi kalimatnya menggantung.
+#   2. "pedagang yang bertaruh harga turun menutup posisinya dengan membeli"
+#      — mencoba menjelaskan mekanismenya di dalam label, dan hasilnya
+#      panjang, kaku, serta memperkenalkan kata yang tidak dipakai orang
+#      ("bertaruh", "taruhan turun"). Lebih buruk lagi: model ikut menyalin
+#      kosakata itu ke judul brief 22 Agustus ("ditopang penutupan taruhan
+#      turun yang rapuh").
+#
+# Aturannya sekarang: label memakai istilah pasar yang memang sudah lazim
+# dalam bahasa Indonesia (posisi beli, posisi jual), penjelasannya memakai
+# kata sehari-hari (masuk, keluar, menutup, membeli lagi), dan tidak ada
+# satu pun kalimat yang berhenti pada "bukan X" tanpa mengatakan akibatnya.
 _ARTI_JENIS = {
     "long_baru": (
-        "pembeli baru masuk dan menahan posisinya",
-        "Kenaikan disertai open interest bertambah — artinya ada posisi beli "
-        "BARU yang dibuka, bukan sekadar posisi lama yang ditutup. Kenaikan "
-        "jenis ini punya penopang yang lebih nyata.",
+        "pembelian baru",
+        "Harga naik karena ada pembeli baru yang masuk dan menahan posisinya, "
+        "bukan sekadar posisi lama yang ditutup. Kenaikan seperti ini punya "
+        "penopang yang lebih kuat.",
     ),
     "short_covering": (
-        "pedagang yang bertaruh harga turun menutup posisinya dengan membeli",
-        "Kenaikan disertai open interest berkurang. Yang mendorong harga naik "
-        "adalah pedagang yang sebelumnya bertaruh harga turun dan kini harus "
-        "membeli untuk menutup taruhannya — bukan pembeli yang datang karena "
-        "ingin memegang BTC. Kenaikan jenis ini cenderung kehilangan tenaga "
-        "begitu taruhan turun itu habis tertutup.",
+        "penutupan posisi jual",
+        "Harga naik bukan karena pembeli baru berdatangan, tapi karena mereka "
+        "yang sebelumnya menjual harus membeli lagi untuk menutup posisinya. "
+        "Dorongan seperti itu habis dengan sendirinya, jadi kenaikannya "
+        "gampang kehilangan tenaga.",
     ),
     "short_baru": (
-        "pedagang membuka taruhan baru bahwa harga akan turun",
-        "Penurunan disertai open interest bertambah — pelaku pasar membuka "
-        "posisi jual BARU, bukan sekadar keluar dari posisi beli. Tekanannya "
-        "cenderung bertahan selama taruhan itu belum ditutup.",
+        "posisi jual baru",
+        "Harga turun karena ada yang masuk menjual, bukan sekadar pemilik "
+        "posisi beli yang keluar. Tekanannya cenderung bertahan selama posisi "
+        "jual itu belum ditutup.",
     ),
     "long_ditutup": (
-        "pemegang posisi beli keluar, sebagian kena likuidasi paksa",
-        "Penurunan disertai open interest berkurang — posisi beli ditutup "
-        "atau kena likuidasi. Tekanannya cenderung mereda begitu posisi yang "
-        "rapuh selesai keluar.",
+        "posisi beli keluar",
+        "Harga turun karena pemilik posisi beli keluar — sebagian terpaksa, "
+        "karena posisinya ditutup otomatis saat harga jatuh. Tekanan seperti "
+        "ini biasanya mereda begitu posisi yang paling rapuh selesai keluar.",
     ),
 }
+
 
 _JENIS_DARI_SINYAL_OI = {
     "long_buildup": "long_baru",
@@ -645,7 +663,7 @@ def karakter_pergerakan_24j(
         "berita_pendukung": [j for j in pendukung if j][:3],
         "berita_berlawanan": [j for j in berlawanan if j][:3],
         "ringkas": _kalimat_pergerakan(
-            arah, perubahan, besaran, jenis_ringkas, volume_konfirmasi, pendukung
+            arah, perubahan, besaran, jenis_arti, volume_konfirmasi, pendukung
         ),
     }
 
@@ -654,15 +672,21 @@ def _kalimat_pergerakan(
     arah: str,
     perubahan: float,
     besaran: str,
-    jenis_ringkas: Optional[str],
+    jenis_arti: Optional[str],
     volume_konfirmasi: Optional[str],
     pendukung: List[Any],
 ) -> str:
-    """Satu kalimat Indonesia yang merangkum klasifikasi di atas.
+    """Beberapa kalimat Indonesia yang merangkum klasifikasi di atas.
 
     Dirakit kode supaya pembaca tetap mendapat jawaban "naik/turun karena apa
     dan kenaikan/penurunan jenis apa" bahkan pada run yang bagian AI-nya gagal
     atau ditahan critic.
+
+    Yang disisipkan di sini PENJELASANNYA, bukan label chip-nya. Bentuk lama
+    ("Sifatnya: penutupan posisi jual.") menyodorkan istilah tanpa
+    mengatakan apa akibatnya — dan "Sifatnya:" sendiri kata pembuka yang
+    abstrak. Label pendeknya tetap dipakai, tapi tempatnya di chip, di
+    sebelah angka yang sudah memberinya konteks.
     """
     besar_kata = {
         "tipis": "tipis", "wajar": "dalam kisaran wajar",
@@ -679,8 +703,8 @@ def _kalimat_pergerakan(
     kata_arah = "naik" if arah == "naik" else "turun"
     kalimat = f"Harga {kata_arah} {angka}% dalam 24 jam — pergerakan {besar_kata}."
 
-    if jenis_ringkas:
-        kalimat += f" Sifatnya: {jenis_ringkas}."
+    if jenis_arti:
+        kalimat += f" {jenis_arti}"
     if volume_konfirmasi == "dikonfirmasi":
         kalimat += " Volume di atas rata-rata, jadi pergerakannya terkonfirmasi."
     elif volume_konfirmasi == "tidak_dikonfirmasi":

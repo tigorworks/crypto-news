@@ -550,8 +550,10 @@ def _baris_pergerakan(brief: Dict[str, Any], penuh: bool) -> List[str]:
     if besaran:
         inti += f" · pergerakan {besaran}"
     hasil = [f"{panah} <b>{esc(inti)}</b>"]
-    if p.get("jenis_ringkas"):
-        hasil.append(f"   <i>{esc('sifatnya: ' + p['jenis_ringkas'])}</i>")
+    # Penjelasannya, bukan istilahnya: pembaca Telegram tidak punya chip
+    # maupun panel rinci untuk menebus label yang terlalu padat.
+    if p.get("jenis_arti"):
+        hasil.append(f"   <i>{esc(p['jenis_arti'])}</i>")
     hasil.append("")
     return hasil
 
