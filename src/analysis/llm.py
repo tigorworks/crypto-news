@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -441,6 +442,16 @@ class LLMClient:
         self._sudah_peringatkan_budget = False
         self.calls: List[Dict[str, Any]] = []
         self.models_used: List[str] = []
+        # Langkah seperti filter/klasifikasi/pernyataan memanggil client ini
+        # dari beberapa thread sekaligus (lihat _jalankan_batch_paralel di
+        # news_analysis.py) supaya batch yang saling independen tidak
+        # menunggu bergiliran. total_cost dan calls jadi state bersama antar
+        # thread, dan `+=` bukan operasi atomik — tanpa kunci ini, dua
+        # panggilan yang selesai bersamaan bisa saling menimpa penambahan
+        # biaya satu sama lain (lost update), membuat anggaran run terbaca
+        # lebih murah dari yang sebenarnya dan bisa menembus max_cost_usd
+        # tanpa ketahuan.
+        self._lock = threading.Lock()
         self._headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -456,10 +467,11 @@ class LLMClient:
         return self.total_cost >= self.max_cost_usd
 
     def _cek_budget(self) -> None:
-        if self.budget_habis:
-            raise BudgetExceeded(
-                f"Budget LLM habis: ${self.total_cost:.4f} >= ${self.max_cost_usd:.4f}"
-            )
+        with self._lock:
+            if self.budget_habis:
+                raise BudgetExceeded(
+                    f"Budget LLM habis: ${self.total_cost:.4f} >= ${self.max_cost_usd:.4f}"
+                )
 
     # -- biaya ---------------------------------------------------------
     def _catat_biaya(self, model: str, usage: Dict[str, Any], durasi: float, step: str) -> None:
@@ -472,21 +484,34 @@ class LLMClient:
         cost = float(usage.get("cost") or 0.0)
         tokens_in = int(usage.get("prompt_tokens") or 0)
         tokens_out = int(usage.get("completion_tokens") or 0)
-        self.total_cost += cost
-        entry = {
-            "step": step,
-            "model": model,
-            "tokens_in": tokens_in,
-            "tokens_out": tokens_out,
-            "cost_usd": round(cost, 6),
-            "durasi_detik": round(durasi, 2),
-        }
-        self.calls.append(entry)
-        if model not in self.models_used:
-            self.models_used.append(model)
+        with self._lock:
+            self.total_cost += cost
+            entry = {
+                "step": step,
+                "model": model,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
+                "cost_usd": round(cost, 6),
+                "durasi_detik": round(durasi, 2),
+            }
+            self.calls.append(entry)
+            if model not in self.models_used:
+                self.models_used.append(model)
+            total_cost = self.total_cost
+            # Peringatan dini dicek DI DALAM kunci yang sama: dua panggilan
+            # yang lolos ambang bersamaan dari thread berbeda cuma boleh
+            # membunyikannya sekali.
+            peringatkan = (
+                not self._sudah_peringatkan_budget
+                and self.max_cost_usd
+                and total_cost >= self.max_cost_usd * 0.85
+            )
+            if peringatkan:
+                self._sudah_peringatkan_budget = True
+
         log.info(
             "LLM %-9s | %-32s | in %5d out %5d | $%.5f | %.1fs | total $%.5f",
-            step, model, tokens_in, tokens_out, cost, durasi, self.total_cost,
+            step, model, tokens_in, tokens_out, cost, durasi, total_cost,
         )
 
         # Peringatan dini sebelum anggaran benar-benar habis. Tanpa ini,
@@ -494,17 +519,12 @@ class LLMClient:
         # ujung pipeline — dan yang berada di ujung justru revisi critic,
         # bagian yang paling mahal kalau hilang. Ambang 85% dipilih supaya
         # masih ada ruang untuk satu panggilan besar sesudahnya.
-        if (
-            not self._sudah_peringatkan_budget
-            and self.max_cost_usd
-            and self.total_cost >= self.max_cost_usd * 0.85
-        ):
-            self._sudah_peringatkan_budget = True
+        if peringatkan:
             log.warning(
                 "Anggaran LLM sudah terpakai %.0f%% ($%.4f dari $%.4f) setelah step '%s' "
                 "— langkah berikutnya berisiko terpotong",
-                self.total_cost / self.max_cost_usd * 100,
-                self.total_cost, self.max_cost_usd, step,
+                total_cost / self.max_cost_usd * 100,
+                total_cost, self.max_cost_usd, step,
             )
 
     # -- panggilan -----------------------------------------------------
