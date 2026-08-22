@@ -585,7 +585,17 @@ Yang sudah dikerjakan untuk menurunkannya:
 | `filter` hanya menulis artikel yang LOLOS ambang | Sebelumnya model menuliskan skor untuk **setiap** kandidat — ratusan baris keluaran yang langsung dibuang kode |
 | `critic` diberi `reasoning_effort: low` dan jatah token yang jauh lebih besar | Lihat di bawah |
 
-**Temuan yang paling mahal ada di `critic`.** Pada **5 dari 9** run terakhir di arsip, critic tercatat `dijalankan: false` — balasannya tidak pernah bisa dipakai, sementara tokennya sudah telanjur dibayar. Penjelasan yang paling masuk akal: `gpt-5.1` adalah model **penalar**, dan token penalarannya ikut memakan jatah `max_tokens` sebelum satu huruf jawaban ditulis; balasan yang mentok di batas ditolak oleh `llm.chat()`. Jatahnya dinaikkan 6.000 → 14.000 dan upaya penalarannya diturunkan lewat `llm.reasoning_effort`. Ini sekaligus soal kualitas: brief yang terbit tanpa critic adalah brief yang tidak pernah diperiksa.
+**Langkah termahal: `synthesis` ($0,156/run), dan sebagian besarnya token yang tidak pernah terlihat.** Diukur langsung: konteks masuknya ~11.400 token (prompt sistem 3.451 + data 7.922), dan keluaran yang benar-benar mendarat di brief ~1.350 token. Pada tarif Sonnet 5 itu semestinya ~$0,054 — sisanya, sekitar **$0,10 per run**, adalah token keluaran yang ditagih tapi tidak muncul di halaman mana pun.
+
+Sebabnya: **pada Sonnet 5 penalaran adaptif menyala secara bawaan**. Tidak mengirim parameter `thinking` bukan berarti mematikannya. Catatan lama di `config.yaml` menyatakan yang sebaliknya — bahwa `effort` pada model Anthropic justru menyalakan penalaran yang tadinya mati — dan itu keliru; sudah dibetulkan.
+
+`llm.reasoning_effort` sekarang memasang `medium` untuk `synthesis`, `outlook`, `technical`, dan `whale`. Keempatnya **menafsirkan** angka yang sudah dihitung kode, jadi tidak butuh penalaran sedalam bawaan. Kalau kualitas analisanya terasa turun, naikkan lagi ke `high` — satu baris di config.
+
+Bentuk parameter penalaran berbeda antar provider dan berubah seiring model baru, jadi tebakan yang salah tidak boleh menghanguskan narasi utama: kalau ditolak (400/422), `llm.chat()` mengulang panggilannya **tanpa** parameter itu dan mencatatnya di `effort_ditolak`. Paling banter langkahnya berjalan pada biaya penuh — bukan hilang.
+
+Konteks masuknya sendiri didominasi `berita` (3.239 token) dan `pernyataan_tokoh` (2.001 token). Memangkasnya menghemat sekitar $0,005/run — dua puluh kali lebih kecil dari penalaran, jadi belum dikerjakan sampai angka run berikutnya menunjukkan sebaliknya.
+
+**Temuan mahal berikutnya ada di `critic`.** Pada **5 dari 9** run terakhir di arsip, critic tercatat `dijalankan: false` — balasannya tidak pernah bisa dipakai, sementara tokennya sudah telanjur dibayar. Penjelasan yang paling masuk akal: `gpt-5.1` adalah model **penalar**, dan token penalarannya ikut memakan jatah `max_tokens` sebelum satu huruf jawaban ditulis; balasan yang mentok di batas ditolak oleh `llm.chat()`. Jatahnya dinaikkan 6.000 → 14.000 dan upaya penalarannya diturunkan lewat `llm.reasoning_effort`. Ini sekaligus soal kualitas: brief yang terbit tanpa critic adalah brief yang tidak pernah diperiksa.
 
 `reasoning_effort` **hanya boleh dipasang untuk langkah yang modelnya memang model penalar** (GPT-5.x, Gemini). Pada model Anthropic, `effort` justru *menyalakan* penalaran yang tadinya mati — hasilnya kebalikan dari hemat.
 
@@ -804,12 +814,12 @@ Dua berkas, umurnya berbeda dari brief:
 
 | Berkas | Isi | Nasib saat data direset |
 |---|---|---|
-| `state/telemetri.jsonl` | satu baris per run: biaya total **dan per langkah**, token, durasi, status critic, sumber & feed yang gagal, corong berita, tingkat siaga, harga | selamat — di luar `docs/` |
+| `state/telemetri.jsonl` | satu baris per run: biaya **dan token per langkah**, durasi, status critic, sumber & feed yang gagal, corong berita, tingkat siaga, harga | selamat — di luar `docs/` |
 | `docs/data/telemetri.json` | ringkasan siap baca dari 60 run terakhir, dipakai halaman | dibangkitkan ulang tiap run |
 
 Bentuknya JSONL supaya satu baris rusak (run yang mati di tengah tulis) dilewati tanpa menghanguskan sisanya.
 
-**Biaya per langkah adalah alasan utama berkas ini ada.** Sebelumnya hanya total per run yang tersimpan, jadi setiap usaha menghemat berjalan di atas dugaan tentang langkah mana yang boros.
+**Biaya dan token per langkah adalah alasan utama berkas ini ada.** Sebelumnya hanya total per run yang tersimpan, jadi setiap usaha menghemat berjalan di atas dugaan tentang langkah mana yang boros. Tokennya dicatat terpisah dari biayanya karena biaya saja tidak cukup untuk mendiagnosis: $0,156 bisa berarti konteks masuk yang kegemukan, keluaran yang kepanjangan, atau token penalaran yang tidak terlihat di brief sama sekali — dan ketiganya menuntut perbaikan yang sama sekali berbeda.
 
 **Riwayat siaga** menjawab apakah panel jendela risiko layak dipertahankan: tiap siaga dicatat bersama harga saat itu, lalu dibandingkan dengan run berikutnya yang berjarak **minimal 18 jam** (brief terbit sekali sehari, tapi run manual bisa menyelip beberapa jam setelahnya — selisih harga dua jam tidak menguji apa pun). Hasilnya tampil di footer halaman, disertai peringatan terbuka bahwa itu catatan pengamatan, bukan bukti sebab-akibat.
 
