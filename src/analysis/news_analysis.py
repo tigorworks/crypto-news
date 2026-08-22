@@ -39,7 +39,7 @@ ATURAN_DASAR = """ATURAN WAJIB:
 7. Tanda kutip ganda di dalam nilai string wajib di-escape (\\"). Kalau ragu,
    pakai tanda kutip tunggal ('begini') supaya tidak perlu di-escape."""
 
-KATEGORI = ["regulasi", "makro", "etf", "onchain", "hack", "adopsi", "teknologi", "geopolitik"]
+KATEGORI = ["regulasi", "makro", "etf", "onchain", "peretasan", "adopsi", "teknologi", "geopolitik"]
 SENTIMEN = ["bullish", "bearish", "netral"]
 HORIZON = ["langsung", "pendek", "struktural"]
 STATUS_KEPASTIAN = ["rumor", "belum_dikonfirmasi", "dikonfirmasi", "sudah_terjadi", "terjadwal"]

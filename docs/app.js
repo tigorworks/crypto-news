@@ -569,6 +569,16 @@ function briefApp() {
       return { jenuh_beli: 'jenuh beli', jenuh_jual: 'jenuh jual', netral: 'netral' }[zona] || zona || '';
     },
 
+    /* Sebelumnya dirender apa adanya sebagai "priced in: ya" — mencampur
+       istilah Inggris dengan nilai enum Indonesia dalam satu chip. */
+    labelPricedIn(nilai) {
+      return {
+        ya: 'sudah tercermin di harga',
+        tidak: 'belum tercermin di harga',
+        sebagian: 'sebagian tercermin di harga',
+      }[nilai] || '';
+    },
+
     tanggalSingkat(ms) {
       const d = keWIB(new Date(ms));
       return `${d.getDate()} ${BULAN_SINGKAT_ID[d.getMonth()]}`;
@@ -1100,7 +1110,7 @@ function briefApp() {
       const b = this.data?.ai?.bagian || {};
       const urutan = [
         ['posisi_harga', 'Posisi harga', 'teks'],
-        ['karakter_pergerakan', 'Naik atau turun, dan kenaikan/penurunan jenis apa', 'teks'],
+        ['karakter_pergerakan', 'Karakter pergerakan', 'teks'],
         ['penyebab', 'Penyebab', 'teks'],
         ['data_pendukung', 'Data pendukung', 'daftar'],
         ['peta_level', 'Peta level', 'teks'],
