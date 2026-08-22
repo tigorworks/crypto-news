@@ -21,17 +21,17 @@ llm:
   # kalau model pertama error / rate limit / kehabisan kapasitas.
   #
   # ISI SENDIRI setelah mengecek katalog https://openrouter.ai/models
-  # Aturan praktis — PENGAMBILAN/PENYIAPAN DATA memakai Ox Alpha (cadangan
-  # Haiku, lalu DeepSeek), PENULISAN ANALISA memakai model kuat:
-  #   filter    -> Ox Alpha (tugasnya cuma memberi skor 0-100)
-  #   classify  -> Ox Alpha (JSON terstruktur per artikel)
-  #   format    -> Ox Alpha, cuma menata pesan Telegram
-  #   agenda    -> Ox Alpha, ekstraksi teks-ke-JSON dari investing.com
-  #   riset     -> Ox Alpha, mengusulkan kueri pencarian berita hari ini
+  # Aturan praktis — PENGAMBILAN/PENYIAPAN DATA memakai DeepSeek (cadangan
+  # Haiku), PENULISAN ANALISA memakai GPT-5.1 (cadangan Sonnet 5):
+  #   filter    -> DeepSeek (tugasnya cuma memberi skor 0-100)
+  #   classify  -> DeepSeek (JSON terstruktur per artikel)
+  #   format    -> DeepSeek, cuma menata pesan Telegram
+  #   agenda    -> DeepSeek, ekstraksi teks-ke-JSON dari investing.com
+  #   riset     -> DeepSeek, mengusulkan kueri pencarian berita hari ini
   #   x_posts   -> GROK (wajib xAI: cuma Grok yang bisa mencari di X)
-  #   agenda_dampak -> Ox Alpha, menilai dampak agenda ke kripto
-  #   mechanism -> Ox Alpha, keterangan pendek per berita
-  #   statements-> Ox Alpha (menyaring pernyataan tokoh dari derau berita)
+  #   agenda_dampak -> DeepSeek, menilai dampak agenda ke kripto
+  #   mechanism -> DeepSeek, keterangan pendek per berita
+  #   statements-> DeepSeek (menyaring pernyataan tokoh dari derau berita)
   #   technical -> model menengah/kuat (MENAFSIRKAN indikator, bukan menghitung)
   #   whale     -> model menengah/kuat (membaca posisi whale vs ritel)
   #   synthesis -> model kuat (menulis analisa panjang bersebab-akibat)
@@ -46,39 +46,41 @@ llm:
   # menggagalkan brief.
 
   # ------------------------------------------------------------------
-  # LANGKAH PENGAMBILAN & PENYIAPAN DATA — sekarang Ox Alpha, cadangan
-  # Haiku lalu DeepSeek. Semua langkah di blok ini cuma mengubah data jadi
-  # data: memberi skor, mengklasifikasi, mengekstrak jadwal, mengusulkan
-  # kueri pencarian. Tidak ada satupun yang menulis prosa yang dibaca
-  # pengguna — pas untuk model gratis/belum teruji: kalau kualitasnya
-  # ternyata jelek, akibatnya paling banter satu berita salah skor, bukan
-  # narasi yang dibaca pembaca tiap hari.
+  # LANGKAH PENGAMBILAN & PENYIAPAN DATA — DeepSeek utama, Haiku cadangan.
+  # Semua langkah di blok ini cuma mengubah data jadi data: memberi skor,
+  # mengklasifikasi, mengekstrak jadwal, mengusulkan kueri pencarian. Tidak
+  # ada satupun yang menulis prosa yang dibaca pengguna, jadi model termurah
+  # yang masih cukup patuh format sudah memadai — beda dengan technical/
+  # whale/synthesis/outlook di bawah, tempat kualitas tulisan benar-benar
+  # dibaca orang.
   #
-  # `stealth/ox-alpha` model preview OpenRouter (gratis, konteks 1 juta
-  # token, identitas provider dirahasiakan) — lihat catatan di
-  # src/analysis/llm.py. KARENA statusnya masih preview: bisa ditarik atau
-  # berubah kapan saja tanpa pemberitahuan. Haiku dan DeepSeek tetap
-  # terpasang sebagai cadangan justru untuk hari itu terjadi, bukan hiasan.
-  # Pantau `state/telemetri.jsonl` (kolom model_dipakai per langkah) untuk
-  # tahu seberapa sering fallback-nya benar-benar terpakai.
+  # DeepSeek V3.2 ~$0,21/$0,31 per 1 juta token (in/out) vs Haiku 4.5
+  # ~$1/$5 — sekitar 5-16x lebih murah. Riwayatnya: DeepSeek sempat kurang
+  # patuh format (menulis skala 1-5 sebagai angka Romawi, "kekuatan": III,
+  # dan menggugurkan satu batch pernyataan utuh), makanya dulu ditaruh
+  # sebagai cadangan Haiku, bukan utama. Sekarang dibalik demi penghematan —
+  # Haiku tetap terpasang persis untuk hari kepatuhan formatnya meleset.
   #
-  # Riwayat sebelum Ox Alpha: sempat dipindah ke DeepSeek demi hemat, lalu
-  # dikembalikan ke Haiku karena kepatuhan formatnya lebih bisa
-  # diandalkan — DeepSeek pernah menulis skala 1-5 sebagai angka Romawi
-  # ("kekuatan": III) dan menggugurkan satu batch pernyataan utuh. Kedua
-  # model itu tetap terpasang sebagai cadangan berlapis.
+  # Riwayat lain: sempat dicoba `stealth/ox-alpha` (model preview gratis
+  # OpenRouter, konteks 1 juta token, identitas provider dirahasiakan) di
+  # sini, lalu DIBATALKAN setelah dua insiden produksi 22 Agustus dalam
+  # satu hari — batch `filter` kepotong karena jauh lebih verbose dari
+  # model lain untuk tugas sederhana ini, lalu satu run penuh (21 langkah)
+  # kena cancel oleh timeout 15 menit di brief.yml karena tiap panggilannya
+  # 5-10x lebih lambat dari Haiku (88-194 detik vs ~18 detik). Gratis tidak
+  # berguna kalau bikin brief gagal terbit.
   # ------------------------------------------------------------------
-  filter:     ["stealth/ox-alpha", "anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
-  classify:   ["stealth/ox-alpha", "anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  filter:     ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+  classify:   ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
 
   # Perapi pesan Telegram. Murni tata letak — tidak boleh menyentuh angka,
   # dan hasilnya diverifikasi kode sebelum dipakai. Model murah sudah cukup.
-  format:     ["stealth/ox-alpha", "anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  format:     ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
 
   # Mengusulkan kueri pencarian berita berdasarkan kondisi hari ini. Model
   # hanya menentukan ARAH pencarian; artikelnya diambil kode lewat Google
   # News RSS, jadi tidak ada peluang mengarang sumber. Tugas ringan.
-  riset:      ["stealth/ox-alpha", "anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  riset:      ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
 
   # Mengambil postingan X (Twitter) lewat Grok. HARUS keluarga Grok: hanya
   # xAI yang punya akses pencarian langsung ke X. Model lain akan menjawab
@@ -99,16 +101,16 @@ llm:
   # sekadar "baca teks berantakan, temukan baris jadwal event" — tidak
   # perlu penalaran, model murah cukup. Sumber ini opsional (lihat
   # src/collectors/investing.py); gagal di sini tidak menggagalkan brief.
-  agenda:     ["stealth/ox-alpha", "anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  agenda:     ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
 
   # Ketiganya menghasilkan keterangan pendek per item (mekanisme berita,
   # jalur dampak agenda, penyaringan pernyataan tokoh) — bukan prosa utama
   # laporan. Sebelumnya memakai Haiku; dipindah ke DeepSeek karena ini juga
   # bagian dari penyiapan data, dan biayanya di sini paling terasa (langkah
   # statements saja bisa 4 panggilan per run).
-  mechanism:  ["stealth/ox-alpha", "anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
-  agenda_dampak: ["stealth/ox-alpha", "anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
-  statements: ["stealth/ox-alpha", "anthropic/claude-haiku-4.5", "deepseek/deepseek-v3.2"]
+  mechanism:  ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+  agenda_dampak: ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
+  statements: ["deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5"]
   # Langkah `agen_kebijakan` DIHAPUS (tidak ada lagi entri di sini):
   # prosanya tidak pernah dirender setelah kebijakan AS pindah ke analisa AI,
   # sementara bagian yang benar-benar dipakai halaman — jendela jam bursa,
@@ -116,15 +118,20 @@ llm:
   # src/analysis/jendela_pasar.py dan tidak butuh model sama sekali.
 
   # Menafsirkan data dan menulis panjang: di sini kualitas model paling terasa.
-  technical:  ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
-  whale:      ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
-  synthesis:  ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
-  outlook:    ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
+  # GPT-5.1 utama, Sonnet 5 cadangan — GPT-5.1 sedikit lebih murah di kedua
+  # sisi ($1,25/$10 per 1 juta token vs $3/$15 punya Sonnet 5, promo Sonnet
+  # $2/$10 sampai 31 Agustus 2026), dan sekaligus membuat critic di bawah
+  # otomatis beda keluarga dari synthesis tanpa pengaturan tambahan.
+  technical:  ["openai/gpt-5.1", "anthropic/claude-sonnet-5"]
+  whale:      ["openai/gpt-5.1", "anthropic/claude-sonnet-5"]
+  synthesis:  ["openai/gpt-5.1", "anthropic/claude-sonnet-5"]
+  outlook:    ["openai/gpt-5.1", "anthropic/claude-sonnet-5"]
 
-  # PENTING: critic wajib beda keluarga dari synthesis. Synthesis memakai
-  # Anthropic, jadi critic memakai OpenAI. Model cenderung tidak menemukan
-  # kesalahannya sendiri — kalau keduanya sekeluarga, critic jadi percuma.
-  critic:     ["openai/gpt-5.1", "google/gemini-3.1-flash-lite-preview"]
+  # PENTING: critic wajib beda keluarga dari synthesis. Synthesis sekarang
+  # memakai OpenAI (GPT-5.1), jadi critic memakai Anthropic (Sonnet 5).
+  # Model cenderung tidak menemukan kesalahannya sendiri — kalau keduanya
+  # sekeluarga, critic jadi percuma.
+  critic:     ["anthropic/claude-sonnet-5", "google/gemini-3.1-flash-lite-preview"]
 
   # UPAYA PENALARAN PER LANGKAH.
   #
@@ -146,7 +153,7 @@ llm:
   # terasa turun, naikkan lagi ke `high` — satu baris, dan efeknya terukur
   # di `token_per_langkah` pada telemetri.
   #
-  # critic memakai gpt-5.1. Tugasnya memeriksa angka, bukan menulis esai,
+  # critic memakai Sonnet 5. Tugasnya memeriksa angka, bukan menulis esai,
   # jadi `low` memadai — dan itu sekaligus memperkecil peluang balasannya
   # terpotong, yang dulu membuatnya tidak pernah berhasil dijalankan.
   #
