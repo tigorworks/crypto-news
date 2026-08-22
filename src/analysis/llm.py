@@ -542,6 +542,23 @@ class LLMClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
             "usage": {"include": True},
+            # Model open-weight murah (DeepSeek dkk) dilayani belasan provider
+            # pihak ketiga di belakang satu slug OpenRouter, dan kecepatannya
+            # jomplang jauh antar provider — pada DeepSeek V3.2 terukur 4-57
+            # token/detik tergantung mana yang kebetulan dipilih. Tanpa ini,
+            # OpenRouter memilih sendiri (cenderung condong ke termurah) dan
+            # bisa jatuh ke provider paling lambat kapan saja: produksi 22
+            # Agustus dua panggilan berturut-turut untuk step yang sama
+            # terukur 4,9 tok/s dan 52,9 tok/s. Sort "throughput" memaksa
+            # pilih yang tercepat — bisa sedikit lebih mahal dari harga
+            # termurah yang tertera, tapi konsisten cepat lebih penting di
+            # sini: pipeline harian punya jatah waktu keras 15 menit
+            # (brief.yml), dan satu langkah yang lambat pernah membuat
+            # seluruh run kena timeout (lihat RENCANA.md, insiden Ox Alpha).
+            # Model satu-vendor (Anthropic/OpenAI/xAI/Google) tidak punya
+            # provider lain untuk dipilih, jadi field ini tidak berpengaruh
+            # apa-apa buat mereka.
+            "provider": {"sort": "throughput"},
         }
         # OpenRouter memakai `models` untuk fallback otomatis antar provider.
         if len(models) > 1:
