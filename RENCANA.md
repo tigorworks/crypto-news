@@ -428,16 +428,26 @@ cara membuat perubahan yang tidak bisa dievaluasi.
    perapi pesan Telegram menghapus penanda wajib `ULASAN LENGKAP` dan
    hasilnya dibuang — $0,0075 terbayar tanpa hasil. Belum diketahui apakah
    ini sesekali atau pola berulang; perlu dilihat beberapa run dulu.
-4. **Pantau stealth/ox-alpha di delapan langkah ringan** (PR #85, dipasang
-   22 Agustus). Bukti dari run produksi pertama (15:47 WIB): batch `filter`
-   1/2 kepotong tepat di `max_tokens=4000` lama dan hilang total — model
-   ini jauh lebih verbose dari Haiku untuk tugas skor sederhana, dan makan
-   108,9 detik untuk satu batch (fallback OpenRouter ke Haiku/DeepSeek
-   TIDAK ikut terpicu, karena responsnya "berhasil", cuma terpotong).
-   `max_tokens` untuk filter/mechanism/agenda_dampak/statements/agenda/riset
-   sudah dinaikkan sebagai tambalan langsung. Yang belum terjawab: apakah
-   kenaikan itu cukup, dan apakah latensinya (108,9 detik untuk satu langkah
-   saja) berisiko membuat total run 21 langkah melewati jatah 15 menit di
-   `brief.yml` — perlu dilihat `state/telemetri.jsonl` (durasi & model
-   terpakai per langkah) setelah beberapa run lagi sebelum menyimpulkan
-   aman atau perlu dibalik urutannya (Haiku utama, Ox Alpha cadangan).
+4. **stealth/ox-alpha DIBATALKAN** (dipasang PR #85 22 Agustus, dicabut hari
+   yang sama). Bukti dari dua insiden produksi berturut-turut:
+   - Run 15:47 WIB: batch `filter` 1/2 kepotong tepat di `max_tokens=4000`
+     lama dan hilang total — model ini jauh lebih verbose dari Haiku untuk
+     tugas skor sederhana, dan fallback OpenRouter ke Haiku/DeepSeek TIDAK
+     ikut terpicu (responsnya "berhasil", cuma terpotong). Sempat ditambal
+     menaikkan `max_tokens` (PR #86), tapi itu cuma menghilangkan gejala
+     kepotong, bukan akar masalahnya.
+   - Run #53 (15:44-15:59 UTC, id 32582590637): satu run PENUH (21 langkah)
+     kena `cancelled` oleh timeout 15 menit `brief.yml`. Baru sampai
+     langkah 10/21 saat waktu habis — panggilan Ox Alpha yang BERHASIL
+     (tidak kepotong) tetap makan 88-194 detik, 5-10x lebih lambat dari
+     Haiku yang cuma 18,1 detik untuk tugas sebanding. Menaikkan
+     `max_tokens` tidak menyentuh masalah kecepatan ini sama sekali.
+   Kesimpulan: gratis tidak berguna kalau bikin brief gagal terbit.
+   Konfigurasi delapan langkah ringan dikembalikan ke DeepSeek V3.2 utama
+   (bukan Haiku seperti semula — DeepSeek 5-16x lebih murah dari Haiku,
+   dan sudah dipasangkan sebagai cadangan berlapis sejak awal), Haiku 4.5
+   jadi cadangan. Empat langkah narasi (`technical`/`whale`/`synthesis`/
+   `outlook`) dibalik jadi GPT-5.1 utama, Sonnet 5 cadangan — sedikit lebih
+   murah di kedua sisi ($1,25/$10 vs $3/$15 per 1 juta token) dan sekaligus
+   membuat `critic` (sekarang Sonnet 5) otomatis beda keluarga dari
+   synthesis tanpa pengaturan tambahan.
