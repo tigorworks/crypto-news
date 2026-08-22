@@ -786,7 +786,8 @@ def _blok_jendela_risiko(brief: Dict[str, Any]) -> List[str]:
         jangkar = f" — buka {esc(wib)}" if wib else ""
         baris.append(
             f"Bursa AS &amp; ETF tutup{awal}, masih {_angka(jam, 0)} jam lagi"
-            f"{jangkar}. Kejutan kebijakan ditanggung pasar kripto sendirian."
+            f"{jangkar}. Kejutan kebijakan ditanggung pasar kripto sendiri, "
+            "tanpa penyangga bursa AS maupun ETF."
         )
     elif fase == "jelang_tutup_pekan":
         baris.append(
