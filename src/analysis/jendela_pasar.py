@@ -253,7 +253,7 @@ _ARTI_PENDARATAN = {
     "buka": "mendarat saat bursa AS buka — bisa langsung dicerna ETF dan meja institusi",
     "tutup_harian": "mendarat setelah bursa tutup — tertunda sampai pembukaan besok",
     "jelang_tutup_pekan": "mendarat menjelang penutupan Jumat — tak sempat dicerna sebelum jeda",
-    "jeda_akhir_pekan": "mendarat di dalam jeda akhir pekan — ditanggung pasar kripto sendiri, "
+    "jeda_akhir_pekan": "mendarat di dalam jeda akhir pekan — hanya harga kripto yang bereaksi, "
                         "belum diserap ETF atau institusi AS",
 }
 
