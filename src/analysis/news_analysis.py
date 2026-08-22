@@ -1167,7 +1167,8 @@ def outlook(
         "atau geopolitik yang ADA di data masuk ke `faktor_geopolitik` — jangan "
         "kosongkan array ini kalau datanya sebenarnya memuat isu semacam itu.\n"
         "  - Agenda dari `agenda_mendatang` yang berjarak dekat dan berdampak besar "
-        "(FOMC, rilis CPI/NFP) masuk ke `keputusan_besar`.\n\n"
+        "(FOMC, rilis CPI/NFP) cukup dirujuk singkat — kalendernya sudah "
+        "ditangani kode di bagian Agenda.\n\n"
         "JANGAN MENGARANG DETAIL DARI JUDUL BERITA: tiap berita hanya punya judul "
         "dan ringkasan singkat, bukan isi artikel lengkap. Kalau ringkasannya "
         "tidak menyebut angka atau nama pihak tertentu, jangan kamu isi sendiri. "
@@ -1197,8 +1198,17 @@ def outlook(
         "  faktor_geopolitik: array string PENDEK (maksimal 5), masing-masing "
         "satu isu — ini penopang butir dari narasi_geopolitik di atas, bukan "
         "pengulangannya. Jangan menyalin kalimat yang sama.\n"
-        "  keputusan_besar: array objek {\"apa\": \"...\", \"kapan\": \"...\", \"kenapa_penting\": \"...\"}\n"
-        "  risiko_utama: array string, hal yang paling bisa mengubah gambaran\n"
+        # `keputusan_besar` dan `risiko_utama` DIHAPUS dari sini, dengan
+        # alasan yang sama seperti `katalis_berikutnya` di sintesis:
+        #   keputusan_besar -> lima butir yang sama persis dengan agenda yang
+        #     dihitung kode, dan `kenapa_penting`-nya mengulang `jalur` yang
+        #     sudah ditulis langkah agenda_dampak dengan model jauh lebih
+        #     murah. Web merendernya di bagian Agenda; Telegram punya
+        #     _blok_agenda. Dari lima butir yang dibayar, paling banyak SATU
+        #     yang pernah tampil.
+        #   risiko_utama -> butir pertamanya selalu mengulang kalimat pembuka
+        #     `yang_diwaspadai`, sisanya sudah tercakup skenario_turun dan
+        #     panel jendela risiko. Tidak pernah dirender di web sama sekali.
         "  horizon: string, rentang waktu yang dibahas (contoh \"1-2 minggu ke depan\")\n\n"
         "Kalau data yang tersedia tidak mendukung suatu bagian, isi array kosong. "
         "JANGAN mengisi dengan pengetahuan umum dari masa pelatihanmu — pembaca "
@@ -1239,16 +1249,6 @@ def outlook(
             "kondisi": str(s.get("kondisi", ""))[:300],
         }
 
-    keputusan = []
-    for k in (hasil.get("keputusan_besar") or [])[:6]:
-        if not isinstance(k, dict):
-            continue
-        keputusan.append({
-            "apa": str(k.get("apa", ""))[:200],
-            "kapan": str(k.get("kapan", ""))[:100],
-            "kenapa_penting": str(k.get("kenapa_penting", ""))[:400],
-        })
-
     return {
         "ringkasan": str(hasil["ringkasan"]).strip(),
         "narasi_geopolitik": (
@@ -1260,8 +1260,6 @@ def outlook(
         "skenario_naik": skenario("skenario_naik"),
         "skenario_turun": skenario("skenario_turun"),
         "faktor_geopolitik": [str(x)[:300] for x in (hasil.get("faktor_geopolitik") or [])[:5]],
-        "keputusan_besar": keputusan,
-        "risiko_utama": [str(x)[:300] for x in (hasil.get("risiko_utama") or [])[:6]],
         "horizon": str(hasil.get("horizon", ""))[:100],
     }
 
@@ -1416,7 +1414,8 @@ def sintesis(
         "trade dolar-yen, yang menekan aset berisiko lewat jalur likuiditas — "
         "sebutkan ini kalau datanya mendukung. Dolar yang menguat (DXY naik) "
         "dan yield yang naik punya jalur yang sama. Agenda besar yang belum "
-        "terjadi (FOMC, CPI) masuk ke `katalis_berikutnya`, bukan `penyebab` — "
+        "terjadi (FOMC, CPI) BUKAN `penyebab` — kalendernya sudah ditangani "
+        "kode di bagian Agenda, jadi cukup dirujuk singkat kalau relevan — "
         "itu belum terjadi, jadi belum jadi penyebab.\n\n"
 
         "7. JANGAN mengarang detail dari judul berita — termasuk SUMBERNYA.\n"
@@ -1534,7 +1533,13 @@ def sintesis(
         "masing kalau ditembus (1-2 paragraf)\n"
         "  yang_diwaspadai: argumen penyeimbang dan risiko yang belum tercermin di "
         "harga (1-2 paragraf)\n"
-        "  katalis_berikutnya: array agenda dari data, sudah dalam WIB\n"
+        # `katalis_berikutnya` DIHAPUS dari sini. Diperiksa terhadap sembilan
+        # arsip produksi: SETIAP butirnya tanpa kecuali cuma menyalin ulang
+        # `agenda_mendatang` yang sudah disodorkan kode di konteks — dan
+        # halaman merender daftar yang sama di bagian Agenda 30 Hari, di sana
+        # lengkap dengan hitung mundur hidup, bobot dampak, dan jalur
+        # transmisinya. Model membayar token keluaran untuk menerjemahkan
+        # ulang daftar yang sudah dipegangnya.
         "  kesimpulan: 2-3 kalimat. Apa artinya. Seringkali kesimpulan terbaik "
         "adalah 'belum ada yang perlu dilakukan'.\n"
         "  penyebab_pergerakan: array objek {\"faktor\", \"arah\": naik|turun|netral, "
@@ -1608,7 +1613,6 @@ def sintesis(
         "data_pendukung": daftar("data_pendukung", 4),
         "peta_level": teks("peta_level"),
         "yang_diwaspadai": teks("yang_diwaspadai"),
-        "katalis_berikutnya": daftar("katalis_berikutnya", 5),
         "kesimpulan": teks("kesimpulan", 1000),
     }
 

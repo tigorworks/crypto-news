@@ -584,6 +584,29 @@ function briefApp() {
       return `${d.getDate()} ${BULAN_SINGKAT_ID[d.getMonth()]} ${jam}:${menit} WIB`;
     },
 
+    /* Agenda yang jatuh dalam waktu dekat perlu dibedakan dari yang masih
+       berhari-hari lagi. "7 hari lagi" dan "3 jam lagi" tampil dengan chip
+       kelabu yang sama persis — padahal cuma yang kedua yang menuntut
+       perhatian hari ini.
+
+       Ambangnya 12 jam, bukan 24: brief terbit pagi, dan acara yang jatuh
+       malam nanti masih di hari yang sama bagi pembaca. Lewat 12 jam,
+       sebagian besar acara sudah berada di "besok" — dan menyebutnya
+       berlangsung hari ini justru keliru. */
+    agendaHariIni(jamLagi) {
+      return typeof jamLagi === 'number' && jamLagi >= 0 && jamLagi <= 12;
+    },
+
+    /* Kelas chip hitung mundur: menyala hanya untuk yang benar-benar dekat. */
+    kelasHitungMundur(jamLagi) {
+      if (!this.agendaHariIni(jamLagi)) {
+        return 'bg-slate-100 dark:bg-slate-700';
+      }
+      return jamLagi <= 3
+        ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 font-semibold'
+        : 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 font-semibold';
+    },
+
     hitungMundur(jamLagi) {
       if (jamLagi === null || jamLagi === undefined) return '';
       if (jamLagi < 1) return `${Math.max(1, Math.round(jamLagi * 60))} menit lagi`;
@@ -1081,7 +1104,11 @@ function briefApp() {
         ['data_pendukung', 'Data pendukung', 'daftar'],
         ['peta_level', 'Peta level', 'teks'],
         ['yang_diwaspadai', 'Yang perlu diwaspadai', 'teks'],
-        ['katalis_berikutnya', 'Katalis berikutnya', 'daftar'],
+        // `katalis_berikutnya` dibuang: daftarnya identik dengan bagian
+        // Agenda 30 Hari di bawah — diperiksa terhadap sembilan arsip, tidak
+        // satu pun butirnya membawa peristiwa yang tidak ada di sana. Bedanya,
+        // Agenda punya hitung mundur hidup, bobot dampak, dan jalur
+        // transmisinya; di sini cuma teks statis hasil terjemahan model.
         ['kesimpulan', 'Kesimpulan', 'teks'],
       ];
       return urutan

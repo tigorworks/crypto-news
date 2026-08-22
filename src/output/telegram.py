@@ -686,18 +686,11 @@ def _blok_ai(
         if ol.get("faktor_geopolitik"):
             for g in ol["faktor_geopolitik"][: bat["faktor_jumlah"]]:
                 baris.append("• " + esc(_potong(g, bat["faktor"])))
-        if ol.get("keputusan_besar"):
-            for k in ol["keputusan_besar"][: bat["keputusan_jumlah"]]:
-                apa = k.get("apa", "")
-                # Sama seperti horizon: `kapan` dari model kerap sudah memuat
-                # kurung sendiri ("20 Agustus (01:00 WIB)"), jadi dibungkus
-                # lagi menghasilkan kurung bersarang.
-                teks_kapan = _bersihkan_kapan(k.get("kapan", "")).replace("(", "").replace(")", "").strip()
-                kapan = f" ({esc(teks_kapan)})" if teks_kapan else ""
-                baris.append(
-                    f"{EMOJI['agenda']} <b>{esc(apa)}{kapan}:</b> "
-                    + esc(_potong(k.get("kenapa_penting", ""), bat["keputusan"]))
-                )
+        # `keputusan_besar` tidak lagi dirender di sini — field-nya sudah
+        # dihapus dari skema outlook. Isinya kalender yang sama dengan
+        # `_blok_agenda`, yang dirakit KODE lengkap dengan jam WIB, penanda
+        # dampak, dan jalur transmisinya. Dari lima butir yang dibayar tiap
+        # run, paling banyak dua yang pernah muat di sini.
         for nama, kunci, panah in (("Menguat", "skenario_naik", "↑"), ("Melemah", "skenario_turun", "↓")):
             sk = ol.get(kunci) or {}
             pemicu = sk.get("pemicu") or []
@@ -708,8 +701,9 @@ def _blok_ai(
                 )
                 if sk.get("kondisi") and bat["syarat"]:
                     baris.append(f"   <i>syarat: {esc(_potong(sk['kondisi'], bat['syarat']))}</i>")
-        if ol.get("risiko_utama"):
-            baris.append("⚠ <b>Risiko:</b> " + esc(_potong(ol["risiko_utama"][0], bat["risiko"])))
+        # `risiko_utama` juga dihapus dari skema: butir pertamanya —
+        # satu-satunya yang pernah dirender — selalu mengulang kalimat
+        # pembuka `yang_diwaspadai` yang sudah ada di blok narasi.
 
     tek = ai.get("teknikal") or {}
     if teknikal_ai:
@@ -737,10 +731,9 @@ def _blok_ai(
     if bagian.get("kesimpulan") and not narasi_penuh:
         baris.append("")
         baris.append("<b>Kesimpulan:</b> " + esc(_potong(bagian["kesimpulan"], 400)))
-    if bagian.get("katalis_berikutnya") and bat["katalis"]:
-        baris.append("")
-        baris.append("<b>Katalis berikutnya:</b> " + esc(
-            _potong("; ".join(bagian["katalis_berikutnya"][:3]), bat["katalis"])))
+    # `katalis_berikutnya` dihapus dari skema sintesis: isinya salinan
+    # agenda yang sudah dirakit kode, dan `_blok_agenda` di bawah merender
+    # daftar yang sama dengan jam WIB serta jalur dampaknya.
 
     baris.append("")
     # Kalimat bernada anjuran TIDAK menahan analisa — cuma diberi keterangan,
