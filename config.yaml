@@ -117,19 +117,38 @@ llm:
 
   # UPAYA PENALARAN PER LANGKAH.
   #
-  # HANYA untuk langkah yang modelnya memang model penalar (GPT-5.x, Gemini).
-  # Jangan dipasang untuk langkah berbasis Anthropic: di sana `effort` justru
-  # MENYALAKAN penalaran yang tadinya mati, jadi hasilnya kebalikan dari
-  # hemat.
+  # KOREKSI atas catatan sebelumnya di baris ini. Sempat ditulis di sini
+  # bahwa `effort` pada model Anthropic justru MENYALAKAN penalaran yang
+  # tadinya mati, jadi tidak boleh dipasang. Itu keliru: pada Sonnet 5
+  # penalaran ADAPTIF menyala secara bawaan — menghilangkan parameternya
+  # bukan berarti mematikannya.
   #
-  # critic memakai gpt-5.1, dan token penalarannya ikut memakan jatah
-  # max_tokens. Itu penjelasan paling masuk akal untuk pola yang terlihat di
-  # arsip: pada 5 dari 9 run terakhir critic tercatat `dijalankan: false`,
-  # alias balasannya tidak pernah bisa dipakai — sementara tokennya sudah
-  # telanjur dibayar. Tugas critic memeriksa angka, bukan menulis esai, jadi
-  # upaya rendah sudah memadai dan sekaligus memperkecil peluang terpotong.
+  # Akibatnya terlihat di angka. Langkah `synthesis` menelan $0,156 per run,
+  # padahal konteks masuknya cuma ~11.400 token (~$0,034 pada tarif Sonnet 5)
+  # dan keluaran yang benar-benar mendarat di brief cuma ~1.350 token
+  # (~$0,020). Selisihnya, sekitar $0,10 per run, adalah token yang ditagih
+  # tapi tidak pernah muncul di halaman mana pun — tanda penalaran.
+  #
+  # Empat langkah di bawah dipasang `medium`, bukan dimatikan: semuanya
+  # MENAFSIRKAN angka yang sudah dihitung kode, jadi tidak butuh penalaran
+  # sedalam bawaan, tapi juga bukan tugas mekanis. Kalau kualitas analisanya
+  # terasa turun, naikkan lagi ke `high` — satu baris, dan efeknya terukur
+  # di `token_per_langkah` pada telemetri.
+  #
+  # critic memakai gpt-5.1. Tugasnya memeriksa angka, bukan menulis esai,
+  # jadi `low` memadai — dan itu sekaligus memperkecil peluang balasannya
+  # terpotong, yang dulu membuatnya tidak pernah berhasil dijalankan.
+  #
+  # Bentuk parameter ini berbeda antar provider dan berubah seiring model
+  # baru. Kalau ditolak, `llm.chat()` mengulang panggilannya tanpa parameter
+  # itu dan mencatatnya di `effort_ditolak` — salah tebak paling banter
+  # membuat langkahnya berjalan pada biaya penuh, bukan hilang.
   reasoning_effort:
     critic: low
+    synthesis: medium
+    outlook: medium
+    technical: medium
+    whale: medium
 
   # Dengan Sonnet, run terukur di produksi ~$0,26 saat catatan ini ditulis.
   # Telemetri 9 run pertama (state/telemetri.jsonl) memberi angka yang jauh

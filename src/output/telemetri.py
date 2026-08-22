@@ -101,11 +101,25 @@ def rekam(
     # Sebelum ini hanya total per run yang tersimpan, jadi setiap usaha
     # menghemat berjalan di atas tebakan.
     per_langkah: Dict[str, float] = {}
+    # TOKEN per langkah, bukan cuma biaya. Tanpa ini pertanyaan "kenapa
+    # sintesis mahal" cuma bisa dijawab dengan tebakan: biaya $0,156 bisa
+    # berarti konteks masuk yang kegemukan, keluaran yang kepanjangan, atau
+    # token penalaran yang tidak terlihat di brief sama sekali — dan
+    # ketiganya menuntut perbaikan yang sama sekali berbeda.
+    #
+    # `keluar_tak_terlihat` adalah selisih antara token keluaran yang
+    # DITAGIH dan yang benar-benar mendarat di brief. Pada model penalar,
+    # selisih itulah token penalarannya.
+    token_langkah: Dict[str, Dict[str, int]] = {}
     for panggilan in panggilan_llm or []:
         langkah = str(panggilan.get("step") or "?")
         per_langkah[langkah] = round(
             per_langkah.get(langkah, 0.0) + float(panggilan.get("cost_usd") or 0.0), 6
         )
+        t = token_langkah.setdefault(langkah, {"masuk": 0, "keluar": 0, "panggilan": 0})
+        t["masuk"] += int(panggilan.get("tokens_in") or 0)
+        t["keluar"] += int(panggilan.get("tokens_out") or 0)
+        t["panggilan"] += 1
 
     biaya = float(kualitas.get("llm_cost_usd") or 0.0)
     catatan = {
@@ -114,6 +128,7 @@ def rekam(
         "harga": (brief.get("price") or {}).get("last"),
         "biaya_usd": round(biaya, 5),
         "biaya_per_langkah": per_langkah,
+        "token_per_langkah": token_langkah,
         "budget_maks_usd": round(float(budget_maks_usd or 0.0), 4),
         "budget_terpakai_pct": (
             round(biaya / budget_maks_usd * 100, 1) if budget_maks_usd else None
@@ -231,9 +246,14 @@ def ringkas(path: Path = CATATAN_PATH, keluaran: Path = RINGKASAN_PATH) -> Dict[
             bagian_ditahan[bagian] = bagian_ditahan.get(bagian, 0) + 1
 
     langkah: Dict[str, List[float]] = {}
+    token: Dict[str, Dict[str, List[int]]] = {}
     for c in catatan:
         for nama, nilai in (c.get("biaya_per_langkah") or {}).items():
             langkah.setdefault(nama, []).append(float(nilai))
+        for nama, t in (c.get("token_per_langkah") or {}).items():
+            simpul = token.setdefault(nama, {"masuk": [], "keluar": []})
+            simpul["masuk"].append(int(t.get("masuk") or 0))
+            simpul["keluar"].append(int(t.get("keluar") or 0))
 
     gagal: Dict[str, int] = {}
     for c in catatan:
@@ -273,6 +293,8 @@ def ringkas(path: Path = CATATAN_PATH, keluaran: Path = RINGKASAN_PATH) -> Dict[
                     "rata_usd": _rata(nilai),
                     "run": len(nilai),
                     "total_usd": round(sum(nilai), 5),
+                    "rata_token_masuk": _rata(token.get(nama, {}).get("masuk", [])),
+                    "rata_token_keluar": _rata(token.get(nama, {}).get("keluar", [])),
                 }
                 for nama, nilai in langkah.items()
             ),

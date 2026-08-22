@@ -430,6 +430,10 @@ class LLMClient:
         # terdaftar — lihat catatan panjang di config.yaml soal kenapa ini
         # TIDAK boleh dipasang sembarangan pada model non-penalar.
         self.reasoning_effort = dict(reasoning_effort or {})
+        # Step yang parameter penalarannya ditolak provider dan terpaksa
+        # dijalankan tanpa itu. Dicatat supaya kelihatan di ringkasan run,
+        # bukan cuma lewat di log.
+        self.langkah_tanpa_effort: set = set()
         self.total_cost = 0.0
         # Peringatan anggaran hanya dibunyikan sekali per run; kalau tiap
         # panggilan ikut berteriak, log-nya jadi tidak terbaca justru saat
@@ -569,7 +573,35 @@ class LLMClient:
                 retries=RETRIES,
             )
         except HttpError as exc:
-            raise LLMError(f"Panggilan LLM step '{step}' gagal: {exc}") from exc
+            # Sekali coba lagi TANPA parameter penalaran kalau itu yang
+            # ditolak. Bentuk parameter ini berbeda-beda antar provider dan
+            # berubah seiring model baru — dan kalau sebuah tebakan yang salah
+            # bisa menghanguskan narasi utama brief, tebakan itu tidak layak
+            # dipasang. Dengan cadangan ini, salah tebak paling banter
+            # membuat langkahnya berjalan pada biaya penuh, bukan hilang.
+            if effort and (exc.status_code or 0) in (400, 422):
+                log.warning(
+                    "Step '%s' ditolak dengan reasoning effort '%s' (%s); "
+                    "dicoba ulang tanpa parameter itu",
+                    step, effort, exc,
+                )
+                payload.pop("reasoning", None)
+                self.langkah_tanpa_effort.add(step)
+                try:
+                    resp = request(
+                        "POST",
+                        f"{self.base_url}/chat/completions",
+                        json_body=payload,
+                        headers=self._headers,
+                        timeout=TIMEOUT,
+                        retries=RETRIES,
+                    )
+                except HttpError as exc2:
+                    raise LLMError(
+                        f"Panggilan LLM step '{step}' gagal: {exc2}"
+                    ) from exc2
+            else:
+                raise LLMError(f"Panggilan LLM step '{step}' gagal: {exc}") from exc
 
         durasi = time.time() - mulai
         try:
@@ -633,4 +665,5 @@ class LLMClient:
             "token_keluar": self.total_token_keluar,
             "models_used": self.models_used,
             "budget_habis": self.budget_habis,
+            "effort_ditolak": sorted(self.langkah_tanpa_effort),
         }
