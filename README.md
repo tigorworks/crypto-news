@@ -198,14 +198,21 @@ Pertanyaan pertama pembaca setiap pagi selalu sama: 24 jam ini naik atau turun, 
 
 Empat jenis pergerakan, dan kenapa bedanya penting:
 
-| Jenis | Artinya | Kenapa berbeda |
-|---|---|---|
-| `long_baru` | naik, open interest bertambah | **Pembeli baru masuk dan menahan posisinya** |
-| `short_covering` | naik, open interest berkurang | Naik karena **pedagang yang bertaruh harga turun menutup posisinya dengan membeli** — cenderung kehilangan tenaga begitu taruhan itu habis tertutup |
-| `short_baru` | turun, open interest bertambah | **Pedagang membuka taruhan baru bahwa harga akan turun** |
-| `long_ditutup` | turun, open interest berkurang | **Pemegang posisi beli keluar, sebagian kena likuidasi paksa** — tekanan mereda begitu posisi rapuh selesai keluar |
+| Jenis | Kondisi | Chip | Yang dibaca pengguna |
+|---|---|---|---|
+| `long_baru` | naik, OI bertambah | pembelian baru | "Harga naik karena ada pembeli baru yang masuk dan menahan posisinya… Kenaikan seperti ini punya penopang yang lebih kuat." |
+| `short_covering` | naik, OI berkurang | penutupan posisi jual | "Harga naik bukan karena pembeli baru berdatangan, tapi karena mereka yang sebelumnya menjual harus membeli lagi untuk menutup posisinya. Dorongan seperti itu habis dengan sendirinya…" |
+| `short_baru` | turun, OI bertambah | posisi jual baru | "Harga turun karena ada yang masuk menjual… Tekanannya cenderung bertahan selama posisi jual itu belum ditutup." |
+| `long_ditutup` | turun, OI berkurang | posisi beli keluar | "Harga turun karena pemilik posisi beli keluar — sebagian terpaksa… Tekanan seperti ini biasanya mereda begitu posisi yang paling rapuh selesai keluar." |
 
-Label pendeknya ditulis sebagai kalimat yang menjelaskan dirinya sendiri, bukan kontras teknis. Bentuk lama (`"penutupan posisi jual, bukan permintaan baru"`) tampil di puncak halaman sebagai "Sifatnya: …" dan meninggalkan pembaca menebak: potongan "bukan permintaan baru" hanya bisa dipahami orang yang sudah paham mekanismenya — dan justru merekalah yang paling tidak membutuhkan kalimat itu. Aturan yang sama berlaku untuk judul yang ditulis model (lihat prompt `judul` di `news_analysis.sintesis`).
+**Dua bentuk, dan pembagiannya disengaja.** Chip memuat istilah pasar yang memang sudah lazim dalam bahasa Indonesia (2–3 kata, di sebelah angka yang memberinya konteks). Penjelasannya — yang tampil di kartu Sorotan dan Telegram — memakai kata sehari-hari dan selalu dua kalimat: **apa yang terjadi**, lalu **apa artinya**.
+
+Dua percobaan sebelumnya gagal dengan cara yang berbeda, dan keduanya dicatat di kode supaya tidak diulang:
+
+1. `"penutupan posisi jual, bukan permintaan baru"` — berhenti pada **kontras**. Separuhnya benar, tapi pembaca tidak pernah diberi tahu apa bedanya dan kenapa itu penting.
+2. `"pedagang yang bertaruh harga turun menutup posisinya dengan membeli"` — mencoba menjelaskan mekanismenya **di dalam label**: panjang, kaku, dan memperkenalkan kosakata yang tidak dipakai orang. Lebih buruk lagi, model ikut menyalinnya ke judul brief 22 Agustus: *"ditopang penutupan taruhan turun yang rapuh"*.
+
+Kegagalan kedua itu yang menegaskan pola lama repo ini: **larangan lewat prompt saja tidak cukup.** Prompt `judul` sekarang punya daftar kosakata (pakai yang kiri, jangan yang kanan) dan melarang kata "taruhan"/"bertaruh"/"pedagang", tapi jaring pengamannya ada di kode — `istilah.FRASA_KAKU` mengganti frasa itu secara deterministik setelah model selesai menulis, sama seperti perlakuan terhadap nama field yang bocor. `tests/test_bahasa_pergerakan.py` menjaga keduanya.
 
 Naik 3% karena uang baru masuk tidak sama artinya dengan naik 3% karena short tertutup, walaupun angkanya sama persis. Itu yang membuat klasifikasi ini layak dihitung sendiri, bukan disimpulkan ulang tiap hari oleh model.
 

@@ -487,9 +487,23 @@
                         <span class="text-xs px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
                               x-text="'pergerakan ' + labelBesaran24j"></span>
                       </div>
-                      <template x-if="pergerakan24j.jenis_ringkas">
-                        <p class="mt-1 text-sm text-slate-700 dark:text-slate-200"
-                           x-text="'Sifatnya: ' + pergerakan24j.jenis_ringkas + '.'"></p>
+                      <!-- Penjelasan, bukan istilah. Baris ini sempat berbunyi
+                           "Sifatnya: penutupan posisi jual, bukan permintaan
+                           baru" — separuhnya benar tapi berhenti pada kontras,
+                           jadi pembaca tidak pernah tahu apa akibatnya. Versi
+                           berikutnya mencoba menjelaskan mekanisme di dalam
+                           frasa yang sama dan malah jadi kalimat kaku penuh
+                           kata yang tidak dipakai orang ("bertaruh harga
+                           turun").
+
+                           Sekarang yang tampil `jenis_arti`: dua kalimat
+                           pendek — apa yang terjadi, lalu apa artinya. Istilah
+                           pasarnya tetap ada, tapi sebagai chip di bagian
+                           Pergerakan 24 Jam, tempat angkanya sudah memberi
+                           konteks. -->
+                      <template x-if="pergerakan24j.jenis_arti">
+                        <p class="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200"
+                           x-text="pergerakan24j.jenis_arti"></p>
                       </template>
                       <template x-if="!pergerakan24j.jenis && pergerakan24j.arah !== 'datar'">
                         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -1308,12 +1322,12 @@
                             x-text="pergerakan24j.jenis_ringkas"></span>
                     </template>
                   </div>
+                  <!-- `ringkas` sekarang SUDAH memuat penjelasan jenisnya
+                       (lihat _kalimat_pergerakan), jadi `jenis_arti` tidak
+                       lagi dirender terpisah di sini — dulu keduanya tampil
+                       beruntun dan mengatakan hal yang sama dua kali. -->
                   <p class="mt-1.5 text-sm leading-relaxed text-slate-700 dark:text-slate-200"
                      x-text="pergerakan24j.ringkas"></p>
-                  <template x-if="pergerakan24j.jenis_arti">
-                    <p class="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-300"
-                       x-text="pergerakan24j.jenis_arti"></p>
-                  </template>
                   <template x-if="!pergerakan24j.jenis && pergerakan24j.arah !== 'datar'">
                     <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
                       Data open interest belum masuk kali ini, jadi sifat pergerakannya

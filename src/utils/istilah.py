@@ -123,6 +123,55 @@ KAMUS: Dict[str, str] = {
     "posisi_whale": "posisi whale",
 }
 
+# --------------------------------------------------------------------------
+# Frasa kaku yang ditulis MODEL (bukan nama field)
+# --------------------------------------------------------------------------
+# Beda dari KAMUS di atas: yang ini bukan istilah internal yang bocor,
+# melainkan bahasa Indonesia yang sah secara tata bahasa tapi tidak dipakai
+# siapa pun untuk bicara soal pasar.
+#
+# Bukan kekhawatiran teoretis. Prompt `judul` sempat memberi contoh
+# "pedagang yang bertaruh harga turun menutup posisinya" sebagai cara
+# menghindari istilah 'short', dan model menyalin kosakata itu ke judul
+# brief 22 Agustus: "ditopang penutupan taruhan turun yang rapuh". Contoh di
+# prompt sudah dibetulkan, tapi pelajarannya sama dengan nama field —
+# LARANGAN LEWAT PROMPT SAJA TIDAK CUKUP, karena gagalnya baru ketahuan
+# setelah terkirim ke pembaca.
+#
+# Daftarnya sengaja PENDEK dan harfiah: hanya frasa yang benar-benar pernah
+# muncul beserta variasi terdekatnya. Penggantian yang terlalu longgar akan
+# merusak kalimat yang sudah benar, dan itu lebih buruk daripada satu frasa
+# kaku yang lolos.
+FRASA_KAKU = {
+    "penutupan taruhan turun": "penutupan posisi jual",
+    "penutupan taruhan naik": "penutupan posisi beli",
+    "taruhan turun": "posisi jual",
+    "taruhan naik": "posisi beli",
+    "pedagang yang bertaruh harga turun": "pihak yang tadinya menjual",
+    "pedagang yang bertaruh harga naik": "pihak yang tadinya membeli",
+    "bertaruh harga turun": "membuka posisi jual",
+    "bertaruh harga naik": "membuka posisi beli",
+    "short covering": "penutupan posisi jual",
+    "short seller": "pemilik posisi jual",
+    "short-seller": "pemilik posisi jual",
+}
+
+_POLA_FRASA = re.compile(
+    r"(" + "|".join(sorted(map(re.escape, FRASA_KAKU), key=len, reverse=True)) + r")",
+    re.IGNORECASE,
+)
+
+
+def _ganti_frasa(teks: str) -> str:
+    """Ganti frasa kaku, dengan huruf besar awal kalimat dipertahankan."""
+    def _ganti(m: "re.Match") -> str:
+        asli = m.group(0)
+        pengganti = FRASA_KAKU[asli.lower()]
+        return pengganti[0].upper() + pengganti[1:] if asli[0].isupper() else pengganti
+
+    return _POLA_FRASA.sub(_ganti, teks)
+
+
 # Kata bergaris bawah apa pun yang tersisa. Ditangani generik: garis bawah
 # jadi spasi. Lebih baik "sinyal terdeteksi" daripada "sinyal_terdeteksi",
 # dan ini menangkap field baru yang belum sempat masuk kamus.
@@ -141,9 +190,16 @@ def manusiakan(teks: Any) -> Any:
     Nilai non-string dikembalikan apa adanya supaya fungsi ini aman dipanggil
     pada struktur campuran tanpa perlu pengecekan tipe di sisi pemanggil.
     """
-    if not isinstance(teks, str) or "_" not in teks:
+    if not isinstance(teks, str):
         return teks
-    hasil = _POLA_KAMUS.sub(lambda m: KAMUS[m.group(1)], teks)
+    # Frasa kaku diperiksa SELALU. Pemeriksaan nama field di bawah masih
+    # dibatasi ada-tidaknya garis bawah (itu memang penandanya), tapi frasa
+    # seperti "taruhan turun" tidak punya penanda apa pun — membatasinya
+    # dengan syarat yang sama berarti ia tidak akan pernah tertangkap.
+    hasil = _ganti_frasa(teks)
+    if "_" not in hasil:
+        return hasil
+    hasil = _POLA_KAMUS.sub(lambda m: KAMUS[m.group(1)], hasil)
     return _POLA_SISA.sub(lambda m: m.group(0).replace("_", " "), hasil)
 
 
