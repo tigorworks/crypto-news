@@ -786,7 +786,7 @@ function briefApp() {
        berikutnya pagi.
 
        Yang lebih berbahaya ada di bawahnya: seluruh prosa bagian #s-siaga —
-       pemicu, skenario, "ditanggung pasar kripto sendiri" — ditulis saat
+       pemicu, skenario, kalimat soal harga kripto bergerak sendirian — ditulis saat
        jendelanya masih terbuka. Membiarkan barisnya berarti mengundang
        pembaca ke uraian yang premisnya sudah gugur.
 
@@ -1011,8 +1011,8 @@ function briefApp() {
         const awal = j.jeda_mulai ? ` sejak ${j.jeda_mulai}` : '';
         const buka = j.buka_berikutnya_wib ? ` dan dibuka kembali ${j.buka_berikutnya_wib}` : '';
         return `Bursa AS & ETF tutup${awal}${buka}. `
-             + 'Kejutan kebijakan yang muncul sekarang ditanggung pasar kripto sendiri, '
-             + 'tanpa penyangga dari bursa AS maupun ETF.';
+             + 'Kalau ada kejutan kebijakan sekarang, hanya harga kripto yang bereaksi — '
+             + 'tidak ada transaksi ETF atau institusi AS yang bisa meredamnya.';
       }
       if (j.fase === 'jelang_tutup_pekan') {
         return 'Menjelang penutupan Jumat — berita yang mendarat sekarang tidak sempat '
@@ -1034,7 +1034,8 @@ function briefApp() {
     get kalimatJendelaRingkas() {
       const f = this.siagaKebijakan?.jendela?.fase;
       if (f === 'jeda_akhir_pekan') {
-        return 'Bursa AS & ETF tutup — kejutan kebijakan kini ditanggung pasar kripto sendiri.';
+        return 'Bursa AS & ETF tutup — kejutan kebijakan sekarang hanya akan terasa di harga '
+             + 'kripto, tanpa peredam dari ETF atau bursa AS.';
       }
       if (f === 'jelang_tutup_pekan') {
         return 'Menjelang penutupan Jumat — berita sekarang tidak sempat dicerna pasar AS.';
