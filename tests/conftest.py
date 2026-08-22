@@ -24,9 +24,21 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 ASET = Path(__file__).resolve().parent / "aset"
 
-#: Chromium bawaan lingkungan. Bisa ditimpa lewat env kalau Playwright
-#: memasang browsernya sendiri di tempat lain.
+#: Chromium yang sudah tersedia di lingkungan pengembangan, dipakai apa
+#: adanya supaya uji tidak perlu mengunduh browser sendiri.
+#:
+#: Nilai ini TIDAK boleh dipaksakan: di runner CI, Playwright memasang
+#: browsernya sendiri di tempat lain, dan menunjuk ke jalur yang tidak ada
+#: membuat seluruh uji halaman gagal dengan "Executable doesn't exist" —
+#: kegagalan yang sama sekali tidak berhubungan dengan yang sedang diuji.
+#: `_jalur_chromium()` di bawah karena itu memulangkan None kalau berkasnya
+#: memang tidak ada, dan Playwright mencari sendiri.
 CHROMIUM = os.environ.get("CHROMIUM_PATH", "/opt/pw-browsers/chromium-1194/chrome-linux/chrome")
+
+
+def _jalur_chromium():
+    """Jalur chromium kalau memang ada di sana; None supaya Playwright memilih."""
+    return CHROMIUM if CHROMIUM and Path(CHROMIUM).exists() else None
 
 _PETUNJUK_ASET = (
     "Aset uji belum dibangun. Jalankan: python -m scripts.bangun_aset_uji"
@@ -131,6 +143,6 @@ def brief_asli() -> dict:
 def peramban():
     playwright = pytest.importorskip("playwright.sync_api")
     with playwright.sync_playwright() as p:
-        browser = p.chromium.launch(executable_path=CHROMIUM)
+        browser = p.chromium.launch(executable_path=_jalur_chromium())
         yield browser
         browser.close()

@@ -868,7 +868,13 @@ Uji halamannya dijalankan lewat server HTTP lokal, bukan `file://` — `app.js` 
 
 Yang paling berguna di antaranya: **uji sehari penuh** untuk hitung mundur. Panel jendela risiko harus menyala dan **padam** pada saat yang tepat, dan itu bergantung pada waktu nyata — satu-satunya cara mengujinya tanpa jam palsu adalah menunggu hari berganti, yang berarti tidak pernah diuji sama sekali. `tests/test_hitung_mundur_seharian.py` memajukan jam palsu dari pagi ke malam dan memastikan panelnya hidup sepanjang jendela, lalu benar-benar padam sesudah bursa buka — tanpa ikut mematikan baris agenda yang berbagi kartu dan penjagaan yang sama.
 
-Belum ada workflow CI yang menjalankannya otomatis pada setiap pull request; menjalankannya masih manual.
+**Di CI** — `.github/workflows/uji.yml` menjalankan rangkaian yang sama pada tiap `pull_request`, pada `push` ke `main`, dan lewat `workflow_dispatch`.
+
+Pemicu `push` ke `main` bukan kelebihan: brief harian menulis ke `docs/data` dan `docs/index.html` **langsung di main tanpa melewati PR**, sementara uji halaman membaca kedua berkas itu. Tanpa pemicu itu, kerusakan yang masuk lewat jalur cron tidak akan pernah terlihat.
+
+Chromium dipasang Playwright sendiri di runner. `tests/conftest.py` memakai chromium lingkungan hanya kalau berkasnya memang ada — memaksakan jalur yang tidak ada membuat seluruh uji halaman gagal dengan "Executable doesn't exist", kegagalan yang sama sekali tidak berhubungan dengan yang sedang diuji.
+
+Tanpa aset yang dibangkitkan, uji halaman **dilewati** dengan pesan petunjuk (46 lolos, 16 dilewati) — bukan gagal berantakan.
 
 ---
 

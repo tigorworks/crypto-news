@@ -36,14 +36,25 @@ sebenarnya diuji, jadi hijau tanpa memeriksa apa pun.
 > `pull_request` yang menjalankannya. Ini prasyarat bagi hampir semua butir
 > lain di dokumen ini.
 
-**Status 21 Agu: separuh jalan, sengaja.** `tests/` sekarang ada di repo
-(28 uji: hitung mundur sehari penuh, kartu suasana pasar, brief basi,
-likuidasi, verifikasi ETF, corong berita, telemetri, candle parsial),
-lengkap dengan perkakas menjalankan halaman offline. **Workflow
-`pull_request`-nya belum dibuat** — butir ini tidak termasuk yang diminta
-dikerjakan pada putaran ini, dan menambah workflow tanpa diminta berarti
-memutuskan sendiri hal yang menyangkut jatah Actions dan kebijakan repo.
-Yang tersisa tinggal berkas workflow-nya.
+**Status 22 Agu: SELESAI.** `tests/` ada di repo dengan **62 uji**, dan
+`.github/workflows/uji.yml` menjalankannya pada tiap `pull_request`.
+
+Workflow-nya juga dipicu `push` ke `main`, bukan cuma PR: brief harian
+menulis ke `docs/data` dan `docs/index.html` langsung di main tanpa melewati
+PR, sementara uji halaman membaca kedua berkas itu. Tanpa pemicu itu,
+kerusakan yang masuk lewat jalur cron tidak akan pernah terlihat.
+
+Satu bug ikut ketahuan saat menyiapkannya: `tests/conftest.py` memaksakan
+jalur Chromium milik lingkungan pengembangan. Di runner CI jalur itu tidak
+ada, dan seluruh uji halaman akan gagal dengan "Executable doesn't exist" —
+kegagalan yang sama sekali tidak berhubungan dengan yang sedang diuji.
+Sekarang jalurnya dipakai hanya kalau berkasnya memang ada; selain itu
+Playwright mencari sendiri.
+
+Diverifikasi dengan menjalankan urutan langkah workflow dari nol (aset
+dihapus lebih dulu): 62 lolos. Tanpa aset yang dibangkitkan, uji halaman
+DILEWATI dengan pesan petunjuk — 46 lolos, 16 dilewati — bukan gagal
+berantakan.
 
 ### 1.2 Stylesheet uji tidak sama dengan produksi — **selesai**
 
@@ -292,13 +303,17 @@ sebagai satu baris, keduanya **menyebut nama bursanya**: angkanya satu
 bursa, bukan gabungan seluruh pasar, dan situs agregator akan menampilkan
 angka jauh lebih besar.
 
-*Belum terverifikasi terhadap endpoint sungguhan* — lingkungan tempat kode
-ini ditulis memblokir akses keluar ke OKX, jadi yang teruji baru parsing,
-arah sisi (`sell` = long yang dilikuidasi), pemotongan jendela, dan
-penelusuran halaman, semuanya lewat respons tiruan. Kalau endpointnya
-ternyata sudah berganti bentuk, sumbernya gagal dengan tenang: brief terbit
-tanpa blok likuidasi, dan `likuidasi` muncul di `failed_sources`. Ia sengaja
-**tidak** ikut menentukan skor kualitas data.
+**Terverifikasi di produksi 22 Agustus 08.06 UTC.** Endpoint OKX menjawab:
+7.420 order likuidasi dalam 24 jam penuh — long $46,4 juta, short $45,8
+juta, total $92,2 juta, sisi dominan "seimbang", order terbesar $5,9 juta.
+`likuidasi` tidak muncul di `failed_sources`.
+
+Sebelum run itu, yang teruji baru parsing, arah sisi (`sell` = long yang
+dilikuidasi), pemotongan jendela, dan penelusuran halaman — semuanya lewat
+respons tiruan, karena lingkungan tempat kode ini ditulis memblokir akses
+keluar ke OKX. Ia tetap sengaja **tidak** ikut menentukan skor kualitas
+data: endpoint publiknya pernah berganti bentuk, dan kegagalannya tidak
+boleh menyeret label keyakinan seluruh brief.
 
 ### 4.2 Uji "sehari penuh" untuk hitung mundur hidup — **selesai**
 
@@ -359,12 +374,57 @@ ini catatan pengamatan, bukan bukti sebab-akibat.
 
 ---
 
+## Pembacaan telemetri, 22 Agustus
+
+Butir ketiga dari daftar sebelumnya: memeriksa apakah penghematannya
+benar-benar terlihat, bukan cuma diharapkan.
+
+| | 21 Agu 22.23 | 21 Agu 23.49 | **22 Agu 08.06** |
+|---|---|---|---|
+| `synthesis` | $0,133 | $0,178 | **$0,112** |
+| `outlook` | $0,079 | $0,089 | **$0,051** |
+| total run | $0,421 | $0,497 | **$0,348** |
+
+Total per run turun **36% dari rata-rata lama** ($0,540). `outlook` turun
+paling tajam — masuk akal, karena dua field keluarannya dibuang seluruhnya
+dan itu perubahan deterministik.
+
+**Yang belum bisa disimpulkan:** seberapa besar andil `reasoning_effort`.
+Ukuran konteks masuk berbeda-beda tiap run, jadi selisih biaya di atas tidak
+bisa dipisahkan antara "penalaran lebih pendek" dan "harinya memang lebih
+sepi". Baru run 22 Agustus yang menyimpan token per langkah; run berikutnya
+yang akan membuat perbandingannya sah.
+
+**Yang sudah pasti terlihat:** `synthesis` tetap langkah termahal, dan
+sebagian besar keluarannya tidak pernah sampai ke pembaca —
+
+```
+ditagih   7.071 token keluaran
+mendarat  ~1.500 token di brief  (bagian + penyebab_pergerakan)
+selisih   ~5.570 token, 79%
+```
+
+`reasoning_effort: medium` DITERIMA provider (tidak ada `effort_ditolak` di
+log run itu), tapi jelas tidak menghapus penalarannya. Menurunkannya lagi ke
+`low` adalah langkah berikutnya yang paling jelas — sengaja belum dilakukan:
+menyetel dua kali berturut-turut tanpa data pembanding di antaranya persis
+cara membuat perubahan yang tidak bisa dievaluasi.
+
+---
+
 ## Yang tersisa
 
-1. **1.1 workflow `pull_request`** — `tests/` sudah ada dan hijau, tinggal
-   berkas workflow-nya. Ini satu-satunya butir yang benar-benar belum tuntas.
-2. **Verifikasi endpoint likuidasi** (4.1) pada run produksi pertama —
-   parsingnya teruji, jangkauan jaringannya belum.
-3. **Baca ulang telemetri setelah beberapa run** untuk melihat apakah
-   penghematan di 3.1/3.3 dan perbaikan critic di 2.2 benar-benar terlihat
-   pada biaya per langkah.
+1. **Turunkan `reasoning_effort` synthesis ke `low`** — setelah beberapa run
+   menyimpan token per langkah, supaya efeknya bisa dibandingkan. 79% token
+   keluaran yang tidak pernah dibaca adalah sasaran penghematan terbesar
+   yang tersisa.
+2. **Ukur pengulangan dalam prosa model.** Arus ETF $606,29 juta diceritakan
+   di empat tempat pada brief 22 Agustus, padahal prompt sudah melarangnya
+   (aturan "SATU PERISTIWA DIBAHAS SATU KALI SAJA"). Menambah aturan prompt
+   lagi sudah dua kali terbukti tidak menempel di repo ini — yang dibutuhkan
+   pengukuran lebih dulu, baru memilih apakah perbaikannya di prompt atau di
+   struktur field.
+3. **Langkah `format` yang hasilnya ditolak.** Pada run 22 Agustus 08.06,
+   perapi pesan Telegram menghapus penanda wajib `ULASAN LENGKAP` dan
+   hasilnya dibuang — $0,0075 terbayar tanpa hasil. Belum diketahui apakah
+   ini sesekali atau pola berulang; perlu dilihat beberapa run dulu.

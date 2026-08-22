@@ -1,0 +1,77 @@
+name: uji
+
+# Butir 1.1 di RENCANA.md, dan prasyarat bagi hampir semua butir lain di
+# sana: sebelum workflow ini ada, satu-satunya workflow di repo adalah
+# `brief.yml` yang jalan lewat cron. Tidak ada satu pun yang terpicu
+# `pull_request`, jadi seluruh uji hidup di scratchpad sesi dan ikut hilang
+# saat sesi berakhir — fixture jadi usang tanpa ketahuan, dan beberapa uji
+# sempat lulus karena alasan yang salah.
+on:
+  pull_request:
+  # Ikut dijalankan pada push ke main: brief harian menulis ke docs/data dan
+  # docs/index.html langsung di main tanpa melewati PR, dan uji halaman
+  # membaca kedua berkas itu. Tanpa ini, kerusakan yang masuk lewat jalur
+  # cron tidak akan pernah terlihat.
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# PR yang di-push berkali-kali tidak perlu menumpuk antrean runner.
+concurrency:
+  group: uji-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    # Terukur ~2 menit di sandbox pengembangan (bangun aset ~40 detik, uji
+    # ~25 detik). 15 menit memberi ruang lebar untuk pemasangan browser dan
+    # runner yang sedang lambat, tanpa membiarkan job menggantung berjam-jam.
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # Node dipakai `scripts.bangun_aset_uji` untuk menjalankan Tailwind CLI
+      # dan mengambil Alpine/Chart.js/Lucide dari registry npm.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: pip install -r requirements-dev.txt
+
+      # Browsernya dipasang Playwright sendiri; `tests/conftest.py` memakai
+      # jalur bawaan itu selama CHROMIUM_PATH tidak menunjuk ke berkas yang
+      # benar-benar ada.
+      - name: Pasang Chromium
+        run: python -m playwright install --with-deps chromium
+
+      # CSS uji DIBANGKITKAN, tidak di-commit. Alasannya butir 1.2: salinan
+      # yang dibuat sekali lalu dibiarkan akan tertinggal begitu halamannya
+      # berkembang, dan kegagalannya senyap — tidak ada error, cuma tata
+      # letak yang salah. Skripnya gagal keras kalau utility penting hilang.
+      - name: Bangun aset uji
+        run: python -m scripts.bangun_aset_uji
+
+      - name: Jalankan uji
+        run: python -m pytest tests/ -q
+
+      # Uji halaman yang gagal jauh lebih mudah didiagnosis dari gambar
+      # daripada dari pesan assert. Hanya diunggah saat ada yang gagal.
+      - name: Simpan bukti kegagalan
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bukti-uji-gagal
+          path: |
+            tests/aset/tw.css
+          retention-days: 7
+          if-no-files-found: ignore
