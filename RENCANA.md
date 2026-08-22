@@ -428,3 +428,16 @@ cara membuat perubahan yang tidak bisa dievaluasi.
    perapi pesan Telegram menghapus penanda wajib `ULASAN LENGKAP` dan
    hasilnya dibuang — $0,0075 terbayar tanpa hasil. Belum diketahui apakah
    ini sesekali atau pola berulang; perlu dilihat beberapa run dulu.
+4. **Pantau stealth/ox-alpha di delapan langkah ringan** (PR #85, dipasang
+   22 Agustus). Bukti dari run produksi pertama (15:47 WIB): batch `filter`
+   1/2 kepotong tepat di `max_tokens=4000` lama dan hilang total — model
+   ini jauh lebih verbose dari Haiku untuk tugas skor sederhana, dan makan
+   108,9 detik untuk satu batch (fallback OpenRouter ke Haiku/DeepSeek
+   TIDAK ikut terpicu, karena responsnya "berhasil", cuma terpotong).
+   `max_tokens` untuk filter/mechanism/agenda_dampak/statements/agenda/riset
+   sudah dinaikkan sebagai tambalan langsung. Yang belum terjawab: apakah
+   kenaikan itu cukup, dan apakah latensinya (108,9 detik untuk satu langkah
+   saja) berisiko membuat total run 21 langkah melewati jatah 15 menit di
+   `brief.yml` — perlu dilihat `state/telemetri.jsonl` (durasi & model
+   terpakai per langkah) setelah beberapa run lagi sebelum menyimpulkan
+   aman atau perlu dibalik urutannya (Haiku utama, Ox Alpha cadangan).

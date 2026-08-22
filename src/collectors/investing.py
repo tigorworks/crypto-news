@@ -122,7 +122,11 @@ def collect(
             f"Hari ini {hari_ini_wib}. Cuplikan teks halaman kalender ekonomi:\n\n{teks}",
             step="agenda",
             temperature=0.0,
-            max_tokens=2000,
+            # Dinaikkan dari 2000: stealth/ox-alpha (PR #85) jauh lebih
+            # verbose dari Haiku untuk tugas ekstraksi sederhana ini, dan
+            # langkah ini tidak dibatch — lihat catatan serupa di
+            # news_analysis.py step "filter".
+            max_tokens=4000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.info("Ekstraksi agenda investing.com gagal: %s", exc)
