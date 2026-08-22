@@ -806,6 +806,26 @@ state/                      # di luar docs/, tidak terbit ke Pages
 
 ---
 
+## Duplikasi yang dibuang (audit 22 Agustus)
+
+Halaman diaudit dengan menghitung berapa kali tiap fakta muncul di teks yang benar-benar terlihat pembaca. Tiga field ternyata daftar kembar, dan ketiganya sudah dihapus dari skema keluaran LLM:
+
+| Field | Duplikat dari | Bukti |
+|---|---|---|
+| `ai.bagian.katalis_berikutnya` | bagian **Agenda 30 Hari** | Diperiksa terhadap sembilan arsip: **tidak satu pun** butirnya membawa peristiwa yang tidak ada di agenda. Model menerjemahkan ulang daftar yang sudah disodorkan kode kepadanya |
+| `ai.outlook.keputusan_besar` | agenda yang sama; `kenapa_penting` mengulang `jalur` | Lima butir dibayar tiap run, **paling banyak dua** yang pernah muat di Telegram, **nol** di web |
+| `ai.outlook.risiko_utama` | `yang_diwaspadai` + `skenario_turun` + panel jendela risiko | Butir pertama — satu-satunya yang pernah dirender — selalu mengulang kalimat pembuka `yang_diwaspadai` |
+
+Pola yang sama dengan `skenario` di RENCANA 1.3: dihasilkan tiap run, ditagih, tidak pernah dibaca siapa pun. Bedanya kali ini bukan cuma tidak dirender — yang dirender pun mengatakan hal yang sudah ada di tempat lain, sering dengan versi yang lebih miskin (tanpa hitung mundur, tanpa bobot dampak).
+
+Agenda yang dihitung kode selalu menang atas versi model: ia punya hitung mundur hidup, `relevansi_kripto`, arah dampak, dan `jalur` transmisinya — dan langkah yang menghasilkannya (`agenda_dampak`) memakai model jauh lebih murah daripada `synthesis` dan `outlook`.
+
+**Yang BUKAN duplikasi**, dan sengaja dipertahankan: baris AGENDA BESAR di kartu Sorotan menyebut satu agenda yang juga ada di bagian Agenda. Itu hubungan ringkasan-ke-rincian dengan tautan di antaranya, bukan dua daftar sejajar.
+
+**Yang masih tersisa** — pengulangan di dalam prosa model, bukan struktur halaman. Pada brief 22 Agustus, arus masuk ETF $606,29 juta diceritakan di empat tempat: `narasi_geopolitik`, `penyebab`, `data_pendukung`, dan `penyebab_pergerakan`. Prompt sintesis sudah punya aturan "SATU PERISTIWA DIBAHAS SATU KALI SAJA" dan tiga dari empat kemunculan itu melanggarnya; yang keempat (`narasi_geopolitik`) berasal dari panggilan `outlook` yang memang tidak pernah melihat tulisan sintesis. Belum diperbaiki: menambah aturan prompt di repo ini sudah dua kali terbukti tidak menempel, dan pengukurannya perlu lebih dulu.
+
+---
+
 ## Telemetri lintas hari
 
 Arsip brief dipangkas retensi dan ikut terhapus setiap kali data direset. Bersamanya hilang kemampuan melihat **tren**, dan justru tren yang menjawab pertanyaan paling penting tentang kesehatan pipeline ini: seberapa sering critic menahan narasi, berapa biaya rata-rata per run, sumber mana yang paling sering gagal, dan apakah siaga jendela benar-benar mendahului pergerakan harga. Selama ini semuanya dijawab dengan tebakan.

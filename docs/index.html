@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=91b9af01"></script>
+<script src="app.js?v=02dc164d"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -1828,8 +1828,17 @@
                       </div>
                     </template>
                   </div>
-                  <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 whitespace-nowrap shrink-0"
-                        x-text="hitungMundur(a.jam_lagi)"></span>
+                  <!-- Chip hitung mundur berubah warna untuk acara yang jatuh
+                       hari ini. Sebelumnya "3 jam lagi" dan "7 hari lagi"
+                       tampil identik, jadi yang mendesak tidak pernah
+                       menonjol dari yang masih seminggu lagi. -->
+                  <span class="text-xs px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 text-center"
+                        :class="kelasHitungMundur(a.jam_lagi)">
+                    <span x-text="hitungMundur(a.jam_lagi)"></span>
+                    <template x-if="agendaHariIni(a.jam_lagi)">
+                      <span class="block text-[10px] font-normal opacity-80">berlangsung hari ini</span>
+                    </template>
+                  </span>
                 </li>
               </template>
             </ul>
