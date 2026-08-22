@@ -122,7 +122,13 @@ def filter_relevansi(
                 "Nilai relevansi setiap artikel berikut:\n\n"
                 + json.dumps(daftar, ensure_ascii=False),
                 step="filter",
-                max_tokens=4000,
+                # Dinaikkan dari 4000: stealth/ox-alpha (dipasang PR #85) jauh
+                # lebih verbose dari Haiku untuk tugas skor sederhana ini —
+                # produksi 22 Agustus kepotong tepat di 4000 token untuk satu
+                # batch 60 artikel, dan batch itu hilang total (lihat
+                # penanganan LLMError di bawah, tidak ada fallback model kalau
+                # responsnya "berhasil" tapi terpotong).
+                max_tokens=8000,
             )
         except BudgetExceeded as exc:
             log.warning("Filter relevansi berhenti di batch %d/%d: %s",
@@ -410,7 +416,9 @@ def analisa_agenda(
 
     try:
         hasil = client.chat_json(
-            models, system, user, step="agenda_dampak", temperature=0.2, max_tokens=4000
+            # Dinaikkan dari 4000, alasan sama seperti `filter`/`mechanism`:
+            # langkah ini juga tidak dibatch.
+            models, system, user, step="agenda_dampak", temperature=0.2, max_tokens=6000
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Analisa dampak agenda gagal: %s", exc)
@@ -492,7 +500,11 @@ def analisa_mekanisme(
             system,
             "Jelaskan mekanisme untuk artikel berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
             step="mechanism",
-            max_tokens=4000,
+            # Dinaikkan dari 4000 sebagai langkah pencegahan yang sama seperti
+            # `filter` (lihat catatan di sana): langkah ini tidak dibatch,
+            # jadi satu batch yang terpotong berarti SELURUH langkah gugur
+            # untuk hari itu, bukan cuma sebagian.
+            max_tokens=6000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Analisa mekanisme gagal: %s", exc)
@@ -788,7 +800,11 @@ def analisa_pernyataan(
                 system,
                 "Analisa item berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
                 step="statements",
-                max_tokens=5000,
+                # Dinaikkan dari 5000, alasan sama seperti `filter`: skema
+                # per-item di sini (ringkasan, kutipan, dampak, mekanisme,
+                # dst) sama kaya dengan `classify`, yang sudah lama dipasang
+                # 9000 untuk beban serupa.
+                max_tokens=8000,
             )
         except BudgetExceeded as exc:
             log.warning("Analisa pernyataan berhenti di batch %d: %s", i // batch_size + 1, exc)

@@ -81,7 +81,10 @@ def usulkan_query(
             "Kondisi hari ini:\n\n" + json.dumps(konteks, ensure_ascii=False, default=str),
             step="riset",
             temperature=0.5,
-            max_tokens=800,
+            # Dinaikkan dari 800: stealth/ox-alpha (PR #85) jauh lebih verbose
+            # dari Haiku, dan 800 nyaris tidak beri ruang sama sekali kalau
+            # ada token penalaran ikut terhitung sebelum isi jawabannya.
+            max_tokens=2000,
         )
     except (LLMError, BudgetExceeded) as exc:
         log.warning("Riset kueri berita gagal: %s", exc)
