@@ -14,8 +14,9 @@ from __future__ import annotations
 import json
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from dateutil import parser as date_parser
 
@@ -24,6 +25,58 @@ from ..utils.timezone import now_utc, to_utc
 from .llm import BudgetExceeded, LLMClient, LLMError
 
 log = logging.getLogger(__name__)
+
+#: Batch per langkah filter/klasifikasi/pernyataan jarang lebih dari
+#: segelintir — cukup sejajarkan semuanya tanpa perlu batas ketat seperti
+#: pengambilan RSS (yang bisa puluhan feed sekaligus).
+_BATCH_PARALEL = 6
+
+
+def _jalankan_batch_paralel(
+    batches: List[Any],
+    panggil: Callable[[Any], Any],
+    label_langkah: str,
+) -> List[Any]:
+    """Panggil `panggil(batch)` untuk tiap batch SEKALIGUS, bukan bergantian.
+
+    Batch-batch ini saling independen — skor/klasifikasi satu batch tidak
+    bergantung batch lain — tapi sebelumnya dikirim satu per satu, jadi
+    waktu tunggunya menumpuk. Terlihat nyata di produksi 22 Agustus: langkah
+    `filter` (2 batch) makan 3m41s, `classify` (5 batch) 2m55s, `statements`
+    (5 batch) 1m50s — bertiga saja 76% dari total 12m21s run, padahal
+    langkah narasi yang tokennya jauh lebih besar (synthesis, outlook)
+    beres dalam hitungan puluhan detik.
+
+    Akar masalahnya OpenRouter, bukan tugasnya: model murah (DeepSeek dkk)
+    dilayani belasan provider pihak ketiga dengan kecepatan yang jomplang
+    jauh, dan dua batch dari langkah yang SAMA bisa jatuh ke provider
+    berbeda — satu 162,2 detik, satunya 58,3 detik. Menjalankan tiap batch
+    berbarengan tidak menghapus variasi itu, tapi mengubahnya dari
+    PENJUMLAHAN jadi MAKSIMUM: total waktu jadi sebesar batch paling
+    lambat, bukan jumlah semuanya.
+
+    Return list SEPANJANG `batches`, urutan dipertahankan (bukan urutan
+    selesai) supaya nomor batch di pesan log tetap berarti; None untuk
+    batch yang gagal (BudgetExceeded atau LLMError) — pemanggil memperlakukan
+    None sama seperti sebelumnya menangani `continue`/`break`.
+    """
+    hasil: List[Any] = [None] * len(batches)
+    with ThreadPoolExecutor(max_workers=min(_BATCH_PARALEL, len(batches))) as pool:
+        tugas = {pool.submit(panggil, b): i for i, b in enumerate(batches)}
+        for selesai in as_completed(tugas):
+            i = tugas[selesai]
+            try:
+                hasil[i] = selesai.result()
+            except BudgetExceeded as exc:
+                log.warning(
+                    "%s: batch %d/%d berhenti (anggaran habis): %s",
+                    label_langkah, i + 1, len(batches), exc,
+                )
+            except LLMError as exc:
+                log.warning(
+                    "%s: batch %d/%d gagal: %s", label_langkah, i + 1, len(batches), exc,
+                )
+    return hasil
 
 # Aturan yang WAJIB ada di setiap system prompt.
 ATURAN_DASAR = """ATURAN WAJIB:
@@ -101,6 +154,35 @@ def filter_relevansi(
     # yang lebih panjang, sekali terpotong berarti seluruh penilaian hilang dan
     # brief jatuh ke fallback kata kunci. Batch juga membuat satu batch yang
     # gagal tidak menjatuhkan yang lain.
+    #
+    # Batch-batchnya dikirim BERBARENGAN (_jalankan_batch_paralel), bukan
+    # bergantian — keduanya saling independen, dan menunggu satu per satu
+    # cuma menumpuk waktu tunggu provider OpenRouter yang memang lambat
+    # untuk model murah (lihat catatan panjang di _jalankan_batch_paralel).
+    batches = [articles[i : i + batch_size] for i in range(0, len(articles), batch_size)]
+
+    def _panggil(batch: List[Dict[str, Any]]):
+        daftar = [
+            {"id": a["id"], "judul": a["judul"], "ringkasan": a["ringkasan"][:250]}
+            for a in batch
+        ]
+        return client.chat_json(
+            models,
+            system,
+            "Nilai relevansi setiap artikel berikut:\n\n"
+            + json.dumps(daftar, ensure_ascii=False),
+            step="filter",
+            # Dinaikkan dari 4000: stealth/ox-alpha (dipasang PR #85) jauh
+            # lebih verbose dari Haiku untuk tugas skor sederhana ini —
+            # produksi 22 Agustus kepotong tepat di 4000 token untuk satu
+            # batch 60 artikel, dan batch itu hilang total (lihat
+            # penanganan LLMError di bawah, tidak ada fallback model kalau
+            # responsnya "berhasil" tapi terpotong).
+            max_tokens=8000,
+        )
+
+    hasil_per_batch = _jalankan_batch_paralel(batches, _panggil, "Filter relevansi")
+
     skor: Dict[str, int] = {}
     # Model kini hanya menuliskan artikel yang LOLOS ambang, jadi batch yang
     # sah bisa saja mengembalikan array kosong. Tanpa penanda ini, hari yang
@@ -108,36 +190,7 @@ def filter_relevansi(
     # gagal total, dan brief jatuh ke fallback kata kunci — memasukkan 25
     # artikel yang baru saja dinilai tidak relevan oleh model.
     ada_batch_berhasil = False
-    total_batch = (len(articles) + batch_size - 1) // batch_size
-    for i in range(0, len(articles), batch_size):
-        batch = articles[i : i + batch_size]
-        daftar = [
-            {"id": a["id"], "judul": a["judul"], "ringkasan": a["ringkasan"][:250]}
-            for a in batch
-        ]
-        try:
-            hasil = client.chat_json(
-                models,
-                system,
-                "Nilai relevansi setiap artikel berikut:\n\n"
-                + json.dumps(daftar, ensure_ascii=False),
-                step="filter",
-                # Dinaikkan dari 4000: stealth/ox-alpha (dipasang PR #85) jauh
-                # lebih verbose dari Haiku untuk tugas skor sederhana ini —
-                # produksi 22 Agustus kepotong tepat di 4000 token untuk satu
-                # batch 60 artikel, dan batch itu hilang total (lihat
-                # penanganan LLMError di bawah, tidak ada fallback model kalau
-                # responsnya "berhasil" tapi terpotong).
-                max_tokens=8000,
-            )
-        except BudgetExceeded as exc:
-            log.warning("Filter relevansi berhenti di batch %d/%d: %s",
-                        i // batch_size + 1, total_batch, exc)
-            break
-        except LLMError as exc:
-            log.warning("Batch filter %d/%d gagal: %s", i // batch_size + 1, total_batch, exc)
-            continue
-
+    for hasil in hasil_per_batch:
         if isinstance(hasil, list):
             ada_batch_berhasil = True
         for item in hasil if isinstance(hasil, list) else []:
@@ -287,8 +340,12 @@ def klasifikasi(
     system = _prompt_klasifikasi()
     hasil_per_id: Dict[str, Dict[str, Any]] = {}
 
-    for i in range(0, len(articles), batch_size):
-        batch = articles[i : i + batch_size]
+    # Lihat catatan di _jalankan_batch_paralel: batch-batch ini independen,
+    # jadi dikirim berbarengan supaya total waktunya sebesar batch paling
+    # lambat, bukan jumlah semuanya.
+    batches = [articles[i : i + batch_size] for i in range(0, len(articles), batch_size)]
+
+    def _panggil(batch: List[Dict[str, Any]]):
         payload = [
             {
                 "id": a["id"],
@@ -299,24 +356,18 @@ def klasifikasi(
             }
             for a in batch
         ]
-        try:
-            hasil = client.chat_json(
-                models,
-                system,
-                "Klasifikasikan artikel berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
-                step="classify",
-                # Naik dari 4000: langkah ini sekarang juga menerjemahkan judul
-                # dan ringkasan tiap artikel, jadi keluarannya jauh lebih panjang.
-                # Terpotong di tengah berarti seluruh batch hilang.
-                max_tokens=9000,
-            )
-        except BudgetExceeded as exc:
-            log.warning("Klasifikasi berhenti di batch %d: %s", i // batch_size + 1, exc)
-            break
-        except LLMError as exc:
-            log.warning("Batch klasifikasi %d gagal: %s", i // batch_size + 1, exc)
-            continue
+        return client.chat_json(
+            models,
+            system,
+            "Klasifikasikan artikel berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
+            step="classify",
+            # Naik dari 4000: langkah ini sekarang juga menerjemahkan judul
+            # dan ringkasan tiap artikel, jadi keluarannya jauh lebih panjang.
+            # Terpotong di tengah berarti seluruh batch hilang.
+            max_tokens=9000,
+        )
 
+    for hasil in _jalankan_batch_paralel(batches, _panggil, "Klasifikasi"):
         for item in hasil if isinstance(hasil, list) else []:
             if isinstance(item, dict) and item.get("id"):
                 hasil_per_id[str(item["id"])] = _validasi_klasifikasi(item)
@@ -782,8 +833,13 @@ def analisa_pernyataan(
     )
 
     hasil_per_id: Dict[str, Dict[str, Any]] = {}
-    for i in range(0, len(kandidat), batch_size):
-        batch = kandidat[i : i + batch_size]
+
+    # Lihat catatan di _jalankan_batch_paralel: batch-batch ini independen,
+    # jadi dikirim berbarengan supaya total waktunya sebesar batch paling
+    # lambat, bukan jumlah semuanya.
+    batches = [kandidat[i : i + batch_size] for i in range(0, len(kandidat), batch_size)]
+
+    def _panggil(batch: List[Dict[str, Any]]):
         payload = [
             {
                 "id": k["id"],
@@ -794,25 +850,19 @@ def analisa_pernyataan(
             }
             for k in batch
         ]
-        try:
-            hasil = client.chat_json(
-                models,
-                system,
-                "Analisa item berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
-                step="statements",
-                # Dinaikkan dari 5000, alasan sama seperti `filter`: skema
-                # per-item di sini (ringkasan, kutipan, dampak, mekanisme,
-                # dst) sama kaya dengan `classify`, yang sudah lama dipasang
-                # 9000 untuk beban serupa.
-                max_tokens=8000,
-            )
-        except BudgetExceeded as exc:
-            log.warning("Analisa pernyataan berhenti di batch %d: %s", i // batch_size + 1, exc)
-            break
-        except LLMError as exc:
-            log.warning("Batch pernyataan %d gagal: %s", i // batch_size + 1, exc)
-            continue
+        return client.chat_json(
+            models,
+            system,
+            "Analisa item berikut:\n\n" + json.dumps(payload, ensure_ascii=False),
+            step="statements",
+            # Dinaikkan dari 5000, alasan sama seperti `filter`: skema
+            # per-item di sini (ringkasan, kutipan, dampak, mekanisme,
+            # dst) sama kaya dengan `classify`, yang sudah lama dipasang
+            # 9000 untuk beban serupa.
+            max_tokens=8000,
+        )
 
+    for hasil in _jalankan_batch_paralel(batches, _panggil, "Analisa pernyataan"):
         for item in hasil if isinstance(hasil, list) else []:
             if isinstance(item, dict) and item.get("id"):
                 hasil_per_id[str(item["id"])] = item
