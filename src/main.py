@@ -944,6 +944,27 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
             # saja tidak cukup untuk mencegahnya, jadi penggantian dilakukan
             # kode di sini — deterministik dan tidak menyentuh angka.
             ai = istilah.manusiakan_dalam(ai)
+
+            # BUKAN CUMA BLOK `ai`. Selama ini pembersihan berhenti di sini,
+            # padahal tulisan model juga mendarat di tempat lain — dan
+            # ketiganya tampil di halaman:
+            #
+            #   aggregate.dominant_themes  tema dari sintesis; brief 22
+            #                              Agustus memuat "short covering/
+            #                              likuidasi paksa" apa adanya
+            #   news[].judul_id/ringkasan_id  terjemahan dari langkah
+            #                              klasifikasi
+            #   aggregate.narrative_shift  kalimat pergeseran narasi
+            #
+            # Diperiksa pada data produksi 22 Agustus: keempatnya lolos
+            # dengan istilah mentah karena tidak pernah melewati penyaring
+            # ini. Sengaja tidak menyentuh `judul` asli berbahasa Inggris —
+            # itu kutipan sumber, bukan tulisan model.
+            agregat = istilah.manusiakan_dalam(agregat)
+            for _artikel in artikel:
+                for _kunci in ("judul_id", "ringkasan_id", "mekanisme"):
+                    if _artikel.get(_kunci):
+                        _artikel[_kunci] = istilah.manusiakan(_artikel[_kunci])
         else:
             catatan.append("Analisa AI tidak tersedia pada run ini.")
 

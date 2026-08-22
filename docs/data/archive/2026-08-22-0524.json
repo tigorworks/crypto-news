@@ -377,8 +377,8 @@
       "besaran": "ekstrem",
       "atr_harian_pct": 2.71,
       "jenis": "long_baru",
-      "jenis_ringkas": "pembeli baru masuk dan menahan posisinya",
-      "jenis_arti": "Kenaikan disertai open interest bertambah — artinya ada posisi beli BARU yang dibuka, bukan sekadar posisi lama yang ditutup. Kenaikan jenis ini punya penopang yang lebih nyata.",
+      "jenis_ringkas": "pembelian baru",
+      "jenis_arti": "Harga naik karena ada pembeli baru yang masuk dan menahan posisinya, bukan sekadar posisi lama yang ditutup. Kenaikan seperti ini punya penopang yang lebih kuat.",
       "perubahan_oi_pct": 1.2,
       "volume_rasio_vs_rata": 3.79,
       "volume_konfirmasi": "dikonfirmasi",
@@ -389,7 +389,7 @@
         "Reli Bitcoin Tembus $72.000 Didukung Permintaan Spot dan ETF"
       ],
       "berita_berlawanan": [],
-      "ringkas": "Harga naik 8,12% dalam 24 jam — pergerakan sangat besar. Sifatnya: pembeli baru masuk dan menahan posisinya. Volume di atas rata-rata, jadi pergerakannya terkonfirmasi. Ada 5 berita berdampak kuat yang searah."
+      "ringkas": "Harga naik 8,12% dalam 24 jam — pergerakan sangat besar. Harga naik karena ada pembeli baru yang masuk dan menahan posisinya, bukan sekadar posisi lama yang ditutup. Kenaikan seperti ini punya penopang yang lebih kuat. Volume di atas rata-rata, jadi pergerakannya terkonfirmasi. Ada 3 berita berdampak kuat yang searah."
     }
   },
   "market": {
@@ -1525,7 +1525,7 @@
       "konfluensi": [
         "MACD menguat bersamaan dengan volume candle harian jauh di atas rata-rata, saling mengonfirmasi kekuatan kenaikan",
         "Harga berada di atas VWAP harian, mendukung dominasi pembeli sepanjang sesi",
-        "Sinyal open interest 'long buildup' sejalan dengan volume tinggi, menandakan posisi baru dibuka bukan sekadar short covering",
+        "Sinyal open interest 'long buildup' sejalan dengan volume tinggi, menandakan posisi baru dibuka bukan sekadar penutupan posisi jual",
         "Harga di atas seluruh EMA (20/50/100/200) memperkuat gambaran tren naik jangka pendek"
       ],
       "kontradiksi": [
@@ -1537,7 +1537,7 @@
       "pembatalan": "Pembacaan bullish ini akan terbantahkan jika harga turun kembali ke bawah level batas pembatalan skenario naik di $74.949 atau menembus ke bawah zona support $76.011, terutama bila disertai penurunan volume candle harian yang menunjukkan minat beli mulai pudar, atau bila RSI turun tajam dari zona jenuh beli sambil harga gagal bertahan di atas VWAP harian."
     },
     "whale": {
-      "ringkasan": "Posisi whale hampir netral (49.49% long vs 50.51% short) dengan tren long yang sedikit menurun (-1.65 poin), sementara ritel net long (55.11%) namun tren long ritel turun cukup tajam (-7.33 poin) di tengah harga naik 8.12%. Divergensi whale-ritel hanya -5.62 poin persen dan oleh sistem dikategorikan 'selaras', bukan pola distribusi atau akumulasi yang tegas. Open interest menunjukkan penumpukan posisi beli (long) (+1.2%) dan taker buy/sell ratio 1.083 (tren seimbang), yang secara kasar mengindikasikan kenaikan harga diikuti pembukaan posisi baru, bukan sekadar short covering atau kekosongan partisipasi.",
+      "ringkasan": "Posisi whale hampir netral (49.49% long vs 50.51% short) dengan tren long yang sedikit menurun (-1.65 poin), sementara ritel net long (55.11%) namun tren long ritel turun cukup tajam (-7.33 poin) di tengah harga naik 8.12%. Divergensi whale-ritel hanya -5.62 poin persen dan oleh sistem dikategorikan 'selaras', bukan pola distribusi atau akumulasi yang tegas. Open interest menunjukkan penumpukan posisi beli (long) (+1.2%) dan taker buy/sell ratio 1.083 (tren seimbang), yang secara kasar mengindikasikan kenaikan harga diikuti pembukaan posisi baru, bukan sekadar penutupan posisi jual atau kekosongan partisipasi.",
       "sinyal_palsu": [],
       "posisi_whale_vs_ritel": "Whale berada di posisi mendekati netral sementara ritel net long, tetapi selisihnya kecil dan tergolong selaras sehingga tidak mengindikasikan pola distribusi atau akumulasi yang jelas.",
       "tingkat_kewaspadaan": "rendah",
@@ -1549,7 +1549,7 @@
       "skenario_naik": {
         "pemicu": [
           "Aliran ETF spot Bitcoin AS yang kembali kuat dengan dominasi BlackRock",
-          "Open interest bertambah bersamaan kenaikan harga (long buildup), menandakan posisi baru bukan short covering",
+          "Open interest bertambah bersamaan kenaikan harga (long buildup), menandakan posisi baru bukan penutupan posisi jual",
           "Dukungan politik terhadap kejelasan regulasi kripto (CLARITY Act) dan komitmen buyback Treasury yang menambah ekspektasi likuiditas",
           "Likuidasi short yang dominan (66,4 juta dolar) turut mendorong momentum naik"
         ],

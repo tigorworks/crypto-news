@@ -147,6 +147,9 @@ FRASA_KAKU = {
     "penutupan taruhan naik": "penutupan posisi beli",
     "taruhan turun": "posisi jual",
     "taruhan naik": "posisi beli",
+    # Varian yang muncul di terjemahan berita: "$1,21 miliar taruhan bearish".
+    "taruhan bearish": "posisi jual",
+    "taruhan bullish": "posisi beli",
     "pedagang yang bertaruh harga turun": "pihak yang tadinya menjual",
     "pedagang yang bertaruh harga naik": "pihak yang tadinya membeli",
     "bertaruh harga turun": "membuka posisi jual",
@@ -160,6 +163,44 @@ _POLA_FRASA = re.compile(
     r"(" + "|".join(sorted(map(re.escape, FRASA_KAKU), key=len, reverse=True)) + r")",
     re.IGNORECASE,
 )
+
+
+#: Nilai hasil penggantian — dipakai mengenali kurung yang jadi mubazir
+#: SETELAH penggantian, bukan sebelumnya.
+_NILAI_PENGGANTI = {v.lower() for v in FRASA_KAKU.values()} | {
+    v.lower() for v in KAMUS.values()
+}
+
+_POLA_KURUNG_ISI = re.compile(r"\s*\(([^()]{1,60})\)")
+
+
+def _buang_kurung_mubazir(teks: str) -> str:
+    """Buang kurung yang mengulang frasa tepat di depannya.
+
+    Dua penggantian bisa menembak kalimat yang sama. Contoh nyata dari brief
+    22 Agustus:
+
+        "Penutupan taruhan turun secara massal (short covering) memaksa..."
+         -> taruhan turun  -> posisi jual
+         -> short covering -> penutupan posisi jual
+        = "Penutupan posisi jual secara massal (penutupan posisi jual) ..."
+
+    Kurungnya semula berguna — ia memberi padanan istilah asing. Begitu isi
+    kurung jadi sama dengan teks di depannya, ia tinggal pengulangan.
+
+    Sengaja SEMPIT: hanya kurung yang isinya persis salah satu NILAI hasil
+    penggantian, dan hanya kalau nilai itu memang sudah muncul tepat
+    sebelumnya. Kurung yang menerangkan hal lain — "(short)", "(ATR 2,3%)" —
+    tidak tersentuh.
+    """
+    def _ganti(m: "re.Match") -> str:
+        isi = m.group(1).strip().lower()
+        if isi not in _NILAI_PENGGANTI:
+            return m.group(0)
+        sebelum = teks[max(0, m.start() - 80): m.start()].lower()
+        return "" if isi in sebelum else m.group(0)
+
+    return _POLA_KURUNG_ISI.sub(_ganti, teks)
 
 
 def _ganti_frasa(teks: str) -> str:
@@ -197,10 +238,12 @@ def manusiakan(teks: Any) -> Any:
     # seperti "taruhan turun" tidak punya penanda apa pun — membatasinya
     # dengan syarat yang sama berarti ia tidak akan pernah tertangkap.
     hasil = _ganti_frasa(teks)
-    if "_" not in hasil:
-        return hasil
-    hasil = _POLA_KAMUS.sub(lambda m: KAMUS[m.group(1)], hasil)
-    return _POLA_SISA.sub(lambda m: m.group(0).replace("_", " "), hasil)
+    if "_" in hasil:
+        hasil = _POLA_KAMUS.sub(lambda m: KAMUS[m.group(1)], hasil)
+        hasil = _POLA_SISA.sub(lambda m: m.group(0).replace("_", " "), hasil)
+    # Dijalankan paling akhir: pengulangannya baru terbentuk setelah semua
+    # penggantian di atas selesai.
+    return _buang_kurung_mubazir(hasil)
 
 
 def manusiakan_dalam(obj: Any) -> Any:
