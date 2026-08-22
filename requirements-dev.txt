@@ -1,0 +1,10 @@
+# Kebutuhan PENGUJIAN saja — tidak dipasang oleh workflow brief harian.
+#
+# Dipisah dari requirements.txt dengan sengaja: pipeline produksi berjalan
+# tiap hari dengan timeout 15 menit, dan memasang Playwright beserta
+# browsernya di sana berarti menambah menit ke setiap run untuk sesuatu yang
+# tidak pernah dipakainya.
+-r requirements.txt
+
+pytest
+playwright
