@@ -84,7 +84,12 @@ def _jalankan(perintah: list, cwd: Path) -> None:
 
 
 def bangun_css(kerja: Path) -> Path:
-    konten = [str(DOCS_DIR / "index.html"), str(DOCS_DIR / "app.js")]
+    # SELURUH halaman di docs/ ikut dipindai, bukan cuma index.html. Kelas
+    # yang tidak ter-generate gagal DIAM: halamannya tetap render, cuma
+    # tanpa tata letaknya — dan uji yang memeriksa posisi elemen lalu jatuh
+    # karena sebab yang tidak ada hubungannya dengan yang sedang diuji.
+    konten = [str(p) for p in sorted(DOCS_DIR.glob("*.html"))]
+    konten.append(str(DOCS_DIR / "app.js"))
     (kerja / "tailwind.config.js").write_text(
         KONFIG_TAILWIND % json.dumps(konten), encoding="utf-8"
     )

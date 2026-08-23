@@ -80,23 +80,39 @@ def situs(tmp_path: Path, aset_tersedia: bool) -> Path:
     shutil.copytree(DOCS, tujuan)
     shutil.copytree(ASET, tujuan / "aset")
 
-    html = (tujuan / "index.html").read_text(encoding="utf-8")
-    for pola, ganti in _GANTI:
-        html, jumlah = re.subn(pola, ganti, html)
-        assert jumlah == 1, f"tag CDN tidak ditemukan untuk pola: {pola}"
-    html = _POLA_KONFIG_TW.sub("", html)
-    (tujuan / "index.html").write_text(html, encoding="utf-8")
+    # SEMUA halaman disiapkan, bukan cuma index.html: satu halaman yang
+    # tag CDN-nya lolos akan diam-diam mengambil dari jaringan saat diuji,
+    # dan uji yang bergantung jaringan gagal karena sebab yang tidak ada
+    # hubungannya dengan yang sedang diperiksa.
+    halaman = sorted(tujuan.glob("*.html"))
+    assert halaman, "tidak ada halaman HTML di docs/"
+    for berkas in halaman:
+        html = berkas.read_text(encoding="utf-8")
+        for pola, ganti in _GANTI:
+            # Tidak semua halaman memuat semua pustaka — cost.html tidak
+            # memakai Chart.js. Yang dijaga: setiap tag CDN yang MEMANG ADA
+            # tertukar, bukan bahwa setiap pustaka hadir di tiap halaman.
+            html, jumlah = re.subn(pola, ganti, html)
+            assert jumlah <= 1, f"tag CDN ganda di {berkas.name}: {pola}"
+        assert "https://cdn." not in html and "https://unpkg." not in html, (
+            f"masih ada tag CDN yang belum ditukar di {berkas.name}"
+        )
+        html = _POLA_KONFIG_TW.sub("", html)
+        berkas.write_text(html, encoding="utf-8")
     return tujuan
 
 
 @pytest.fixture
-def alamat(situs: Path):
+def asal(situs: Path):
     """Sajikan salinan situs lewat HTTP lokal, bukan `file://`.
 
     `app.js` mengambil datanya dengan fetch(), dan fetch dari halaman
     `file://` ditolak browser sebagai pelanggaran CORS (origin "null") —
     halamannya lalu berhenti di layar "Data belum bisa dimuat", jauh sebelum
     hal yang sebenarnya diuji sempat dirender.
+
+    Memulangkan asal (origin)-nya saja; tiap halaman menyusun alamatnya
+    sendiri di atas ini.
     """
     import functools
     import http.server
@@ -111,11 +127,33 @@ def alamat(situs: Path):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        yield f"http://127.0.0.1:{server.server_port}/index.html"
+        yield f"http://127.0.0.1:{server.server_port}"
     finally:
         server.shutdown()
         server.server_close()
         http.server.SimpleHTTPRequestHandler.log_message = handler_log
+
+
+@pytest.fixture
+def alamat(asal: str) -> str:
+    """Halaman brief."""
+    return f"{asal}/index.html"
+
+
+@pytest.fixture
+def alamat_biaya(asal: str) -> str:
+    """Halaman biaya per run."""
+    return f"{asal}/cost.html"
+
+
+@pytest.fixture
+def tulis_telemetri(situs: Path):
+    """Ganti isi data/telemetri.json dengan ringkasan yang sudah dimodifikasi."""
+    def _tulis(ringkasan: dict) -> None:
+        (situs / "data" / "telemetri.json").write_text(
+            json.dumps(ringkasan, ensure_ascii=False), encoding="utf-8"
+        )
+    return _tulis
 
 
 @pytest.fixture

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nawala — Biaya per Run</title>
+<meta name="description" content="Biaya LLM tiap run pipeline Nawala: token masuk, token keluar, dan ongkos USD, dengan rincian per langkah.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext x='16' y='25' font-size='26' font-family='system-ui,sans-serif' font-weight='700' fill='%23f59e0b' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E">
+
+<!-- Terapkan tema SEBELUM render supaya tidak ada kedipan (flash). Sama
+     persis dengan index.html: kunci localStorage yang sama, jadi pilihan
+     tema pembaca ikut berpindah antar halaman. -->
+<script>
+  (function () {
+    try {
+      var simpan = localStorage.getItem('theme');
+      var gelap = simpan ? simpan === 'dark'
+                         : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (gelap) document.documentElement.classList.add('dark');
+    } catch (e) { /* localStorage diblokir: pakai tema terang */ }
+  })();
+</script>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } }
+  };
+</script>
+<script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+
+<style>
+  [x-cloak] { display: none !important; }
+  /* Angka dalam tabel harus rata secara vertikal supaya besarannya bisa
+     dibandingkan sekilas tanpa membaca tiap digit. */
+  .angka { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 antialiased transition-colors">
+
+<div x-data="biaya()" x-init="muat()" x-cloak>
+
+  <header class="sticky top-0 z-30 backdrop-blur bg-white/85 dark:bg-slate-900/85 border-b border-slate-200 dark:border-slate-700">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-start justify-between gap-3">
+      <div class="min-w-0">
+        <h1 class="text-lg sm:text-xl font-bold flex items-baseline flex-wrap gap-x-2 gap-y-0.5 min-w-0">
+          <i data-lucide="receipt" class="w-5 h-5 text-amber-500 shrink-0 self-center"></i>
+          <span class="shrink-0">Biaya per Run</span>
+          <span class="text-xs sm:text-sm font-normal text-slate-500 dark:text-slate-400">Nawala</span>
+        </h1>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Ongkos LLM tiap kali pipeline berjalan. Klik satu baris untuk melihat rinciannya per langkah.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <a href="index.html"
+           class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-medium inline-flex items-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Brief</span>
+        </a>
+        <button type="button" @click="gantiTema()" :aria-label="gelap ? 'Ganti ke tema terang' : 'Ganti ke tema gelap'"
+                class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+          <i :data-lucide="gelap ? 'sun' : 'moon'" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-5 space-y-5">
+
+    <!-- Gagal memuat: dinyatakan terus terang, bukan tabel kosong yang
+         terlihat seperti "belum ada run". -->
+    <template x-if="galat">
+      <div class="flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-700
+                  bg-amber-50 dark:bg-amber-900/30 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+        <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 mt-0.5"></i>
+        <span x-text="galat"></span>
+      </div>
+    </template>
+
+    <template x-if="!galat && !data">
+      <p class="text-sm text-slate-500 dark:text-slate-400">Memuat telemetri…</p>
+    </template>
+
+    <template x-if="data">
+      <div class="space-y-5">
+
+        <!-- Ringkasan. Proyeksi bulanan ikut ditampilkan karena anggaran
+             yang dijaga proyek ini memang bulanan, bukan per run — dan
+             "$0,24 per run" tidak berarti apa-apa sampai dikalikan 30. -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+            <div class="text-xs text-slate-500 dark:text-slate-400">Rata-rata per run</div>
+            <div class="mt-1 text-xl font-bold angka" x-text="usd(data.biaya?.rata_usd)"></div>
+            <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400"
+                 x-text="data.jumlah_run + ' run terakhir'"></div>
+          </div>
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+            <div class="text-xs text-slate-500 dark:text-slate-400">Proyeksi sebulan</div>
+            <div class="mt-1 text-xl font-bold angka" x-text="usd(proyeksiBulanan)"></div>
+            <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">1&times;/hari &middot; 30,4 hari</div>
+          </div>
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+            <div class="text-xs text-slate-500 dark:text-slate-400">Run termahal</div>
+            <div class="mt-1 text-xl font-bold angka" x-text="usd(data.biaya?.maks_usd)"></div>
+            <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400"
+                 x-text="(data.biaya?.run_di_atas_85_persen_budget ?? 0) + ' run pakai ≥85% plafon'"></div>
+          </div>
+          <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+            <div class="text-xs text-slate-500 dark:text-slate-400">Run terakhir</div>
+            <div class="mt-1 text-xl font-bold angka" x-text="usd(data.biaya?.terakhir_usd)"></div>
+            <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400" x-text="waktuSingkat(run[0]?.waktu_utc)"></div>
+          </div>
+        </section>
+
+        <!-- Tabel run. Dibungkus overflow-x-auto: di ponsel kolomnya
+             digeser, bukan diperas sampai angkanya membungkus. -->
+        <section class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400
+                            bg-slate-50 dark:bg-slate-700/40 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <!-- Kolom sekunder menyusut bertahap di layar sempit.
+                       Yang dipertahankan sampai 390px: kapan run-nya, jenisnya,
+                       dan BIAYANYA — pertanyaan yang membuat orang membuka
+                       halaman ini. Sisanya satu ketukan jauhnya di rincian,
+                       jadi menyembunyikannya tidak menghilangkan apa pun;
+                       membiarkannya justru mendorong kolom biaya keluar layar. -->
+                  <th scope="col" class="text-left font-medium px-4 py-2.5 whitespace-nowrap">Waktu (WIB)</th>
+                  <th scope="col" class="text-left font-medium px-3 py-2.5 whitespace-nowrap">Jenis</th>
+                  <th scope="col" class="hidden md:table-cell text-right font-medium px-3 py-2.5 whitespace-nowrap">Panggilan</th>
+                  <th scope="col" class="hidden sm:table-cell text-right font-medium px-3 py-2.5 whitespace-nowrap">Token masuk</th>
+                  <th scope="col" class="hidden sm:table-cell text-right font-medium px-3 py-2.5 whitespace-nowrap">Token keluar</th>
+                  <th scope="col" class="hidden lg:table-cell text-right font-medium px-3 py-2.5 whitespace-nowrap">Durasi</th>
+                  <th scope="col" class="hidden md:table-cell text-right font-medium px-3 py-2.5 whitespace-nowrap">Plafon</th>
+                  <th scope="col" class="text-right font-medium px-4 py-2.5 whitespace-nowrap">Biaya</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60">
+                <template x-for="(r, i) in run" :key="r.waktu_utc + '-' + i">
+                  <!-- Barisnya sendiri yang bisa difokus dan ditekan: pembaca
+                       keyboard tidak boleh kehilangan rinciannya hanya karena
+                       pemicunya sebuah <tr>. -->
+                  <tr tabindex="0" role="button"
+                      :aria-label="'Rincian biaya run ' + waktuPanjang(r.waktu_utc)"
+                      @click="buka(r)" @keydown.enter.prevent="buka(r)" @keydown.space.prevent="buka(r)"
+                      class="cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-700/40
+                             focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-inset">
+                    <td class="px-4 py-2.5 whitespace-nowrap">
+                      <span class="font-medium" x-text="waktuSingkat(r.waktu_utc)"></span>
+                    </td>
+                    <td class="px-3 py-2.5 whitespace-nowrap">
+                      <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700"
+                            x-text="r.run_type || '—'"></span>
+                      <!-- Critic yang menahan narasi memicu putaran revisi,
+                           dan revisi itulah sebab run mahal yang paling
+                           sering. Ditandai di baris supaya sebabnya terlihat
+                           tanpa perlu membuka rinciannya lebih dulu. -->
+                      <template x-if="r.critic?.dijalankan && !r.critic?.lolos">
+                        <span class="ml-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800
+                                     dark:bg-amber-900/50 dark:text-amber-300"
+                              title="Critic menahan sebagian analisa; putaran revisi ikut ditagih">revisi</span>
+                      </template>
+                    </td>
+                    <!-- Run yang diisi ulang dari arsip (scripts/telemetri_dari_arsip.py)
+                         tidak pernah punya jumlah panggilan — arsip brief tidak
+                         menyimpannya. Ditampilkan sebagai "—", bukan "0": sebuah run
+                         yang menghasilkan brief mustahil memanggil LLM nol kali, dan
+                         angka nol di sini terbaca sebagai fakta, bukan sebagai
+                         ketiadaan catatan. -->
+                    <td class="hidden md:table-cell px-3 py-2.5 text-right angka text-slate-600 dark:text-slate-300"
+                        x-text="r.panggilan_llm ? num(r.panggilan_llm) : '—'"></td>
+                    <td class="hidden sm:table-cell px-3 py-2.5 text-right angka text-slate-600 dark:text-slate-300"
+                        x-text="num(r.token_masuk)"></td>
+                    <td class="hidden sm:table-cell px-3 py-2.5 text-right angka text-slate-600 dark:text-slate-300"
+                        x-text="num(r.token_keluar)"></td>
+                    <td class="hidden lg:table-cell px-3 py-2.5 text-right angka text-slate-600 dark:text-slate-300"
+                        x-text="durasi(r.durasi_detik)"></td>
+                    <td class="hidden md:table-cell px-3 py-2.5 text-right angka" :class="kelasPlafon(r.budget_terpakai_pct)"
+                        x-text="r.budget_terpakai_pct == null ? '—' : num(r.budget_terpakai_pct, 1) + '%'"></td>
+                    <td class="px-4 py-2.5 text-right angka font-semibold" x-text="usd(r.biaya_usd)"></td>
+                  </tr>
+                </template>
+              </tbody>
+              <tfoot class="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40">
+                <!-- Colspan 2, bukan 3: dua kolom pertama satu-satunya yang
+                     tampil di setiap lebar layar. Sel sisanya memakai kelas
+                     sembunyi yang sama persis dengan kolomnya di atas, jadi
+                     kaki tabel tidak pernah bergeser dari kepalanya. -->
+                <tr class="text-sm font-semibold">
+                  <td class="px-4 py-2.5" colspan="2">Total <span class="font-normal text-slate-500 dark:text-slate-400" x-text="'(' + run.length + ' run)'"></span></td>
+                  <td class="hidden md:table-cell px-3 py-2.5"></td>
+                  <td class="hidden sm:table-cell px-3 py-2.5 text-right angka" x-text="num(total.masuk)"></td>
+                  <td class="hidden sm:table-cell px-3 py-2.5 text-right angka" x-text="num(total.keluar)"></td>
+                  <td class="hidden lg:table-cell px-3 py-2.5"></td>
+                  <td class="hidden md:table-cell px-3 py-2.5"></td>
+                  <td class="px-4 py-2.5 text-right angka" x-text="usd(total.biaya)"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          Sumber: <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-700/60">state/telemetri.jsonl</code>,
+          diringkas ke <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-700/60">docs/data/telemetri.json</code>
+          tiap run. Biayanya angka yang <strong>ditagih OpenRouter</strong> (<code>usage.cost</code>), bukan tarif yang
+          dihitung ulang di sisi kita. Run lama dari sebelum rincian per langkah dicatat tetap ditampilkan,
+          tapi rinciannya kosong.
+        </p>
+      </div>
+    </template>
+  </main>
+
+  <!-- ------------------------------------------------------------------
+       Popup rincian per langkah.
+       ------------------------------------------------------------------ -->
+  <template x-if="pilih">
+    <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+         role="dialog" aria-modal="true" aria-labelledby="judul-rincian"
+         @keydown.escape.window="tutup()">
+      <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="tutup()"></div>
+
+      <div class="relative w-full sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col
+                  bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                  rounded-t-2xl sm:rounded-2xl shadow-xl">
+
+        <div class="flex items-start justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
+          <div class="min-w-0">
+            <h2 id="judul-rincian" class="text-base font-bold" x-text="'Run ' + waktuPanjang(pilih.waktu_utc)"></h2>
+            <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+              <span>Total <strong class="text-slate-800 dark:text-slate-100 angka" x-text="usd(pilih.biaya_usd)"></strong></span>
+              <span x-text="durasi(pilih.durasi_detik)"></span>
+              <template x-if="pilih.panggilan_llm">
+                <span x-text="num(pilih.panggilan_llm) + ' panggilan'"></span>
+              </template>
+              <template x-if="pilih.budget_maks_usd">
+                <span x-text="'plafon ' + usd(pilih.budget_maks_usd)"></span>
+              </template>
+            </div>
+          </div>
+          <button type="button" @click="tutup()" aria-label="Tutup rincian"
+                  class="shrink-0 p-1.5 rounded-lg border border-slate-200 dark:border-slate-600
+                         hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="overflow-auto">
+          <!-- Run lama: rinciannya memang tidak pernah tercatat. Dikatakan
+               apa adanya, bukan ditampilkan sebagai tabel kosong. -->
+          <template x-if="!pilih.langkah?.length">
+            <p class="px-4 sm:px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+              Run ini berjalan sebelum biaya per langkah mulai dicatat, jadi rinciannya tidak tersedia.
+              Yang tersimpan hanya totalnya.
+            </p>
+          </template>
+
+          <template x-if="pilih.langkah?.length">
+            <table class="w-full text-sm">
+              <thead class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400
+                            bg-slate-50 dark:bg-slate-700/40 sticky top-0">
+                <tr>
+                  <th scope="col" class="text-left font-medium px-4 sm:px-5 py-2.5">Langkah</th>
+                  <th scope="col" class="text-right font-medium px-3 py-2.5 whitespace-nowrap">Panggilan</th>
+                  <th scope="col" class="text-right font-medium px-3 py-2.5 whitespace-nowrap">Masuk</th>
+                  <th scope="col" class="text-right font-medium px-3 py-2.5 whitespace-nowrap">Keluar</th>
+                  <th scope="col" class="text-right font-medium px-3 py-2.5 whitespace-nowrap">Biaya</th>
+                  <th scope="col" class="text-right font-medium px-4 sm:px-5 py-2.5 whitespace-nowrap">% run</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60">
+                <template x-for="s in pilih.langkah" :key="s.langkah">
+                  <tr>
+                    <td class="px-4 sm:px-5 py-2.5">
+                      <div class="font-medium" x-text="s.langkah"></div>
+                      <!-- Model per langkah baru tercatat sejak telemetri
+                           diperluas; run lama menampilkan baris ini kosong,
+                           dan itu memang keadaannya. -->
+                      <template x-if="s.model?.length">
+                        <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400 break-all"
+                             x-text="s.model.join(', ')"></div>
+                      </template>
+                    </td>
+                    <td class="px-3 py-2.5 text-right angka text-slate-600 dark:text-slate-300" x-text="num(s.panggilan)"></td>
+                    <td class="px-3 py-2.5 text-right angka text-slate-600 dark:text-slate-300" x-text="num(s.masuk)"></td>
+                    <td class="px-3 py-2.5 text-right angka text-slate-600 dark:text-slate-300" x-text="num(s.keluar)"></td>
+                    <td class="px-3 py-2.5 text-right angka font-medium" x-text="usd(s.biaya_usd)"></td>
+                    <td class="px-4 sm:px-5 py-2.5 text-right angka text-slate-500 dark:text-slate-400"
+                        x-text="persenRun(s.biaya_usd)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>
+
+<script>
+function biaya() {
+  return {
+    data: null,
+    galat: '',
+    pilih: null,
+    gelap: document.documentElement.classList.contains('dark'),
+
+    get run() { return this.data?.run || []; },
+
+    // Proyeksi bulanan pada satu run per hari. 30,4 = 365/12, bukan 30:
+    // selisihnya kecil per bulan tapi konsisten meleset ke bawah kalau
+    // dibulatkan, dan angka ini dipakai untuk menjaga anggaran.
+    get proyeksiBulanan() {
+      const rata = this.data?.biaya?.rata_usd;
+      return rata == null ? null : rata * 30.4;
+    },
+
+    get total() {
+      return this.run.reduce((a, r) => ({
+        masuk: a.masuk + (r.token_masuk || 0),
+        keluar: a.keluar + (r.token_keluar || 0),
+        biaya: a.biaya + (r.biaya_usd || 0),
+      }), { masuk: 0, keluar: 0, biaya: 0 });
+    },
+
+    async muat() {
+      try {
+        // Penanda waktu memaksa lewat cache: halaman ini dibaca justru
+        // sesaat setelah sebuah run selesai, dan telemetri yang basi
+        // membuatnya tampak seperti run itu tidak pernah jalan.
+        const resp = await fetch('data/telemetri.json?t=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        this.data = await resp.json();
+        if (!this.data?.run?.length) {
+          this.galat = 'Telemetri terbaca, tapi belum ada satu pun run yang tercatat.';
+        }
+      } catch (e) {
+        this.galat = 'Gagal memuat data/telemetri.json (' + e.message + '). '
+                   + 'Berkas itu ditulis tiap kali pipeline selesai berjalan.';
+      } finally {
+        this.$nextTick(() => window.lucide?.createIcons());
+      }
+    },
+
+    buka(r) {
+      this.pilih = r;
+      this.$nextTick(() => window.lucide?.createIcons());
+    },
+    tutup() { this.pilih = null; },
+
+    gantiTema() {
+      this.gelap = !this.gelap;
+      document.documentElement.classList.toggle('dark', this.gelap);
+      try { localStorage.setItem('theme', this.gelap ? 'dark' : 'light'); } catch (e) { /* diblokir */ }
+      this.$nextTick(() => window.lucide?.createIcons());
+    },
+
+    // -- format --------------------------------------------------------
+    num(n, desimal = 0) {
+      if (n == null) return '—';
+      return Number(n).toLocaleString('id-ID', {
+        minimumFractionDigits: desimal, maximumFractionDigits: desimal,
+      });
+    },
+
+    // Biaya per langkah turun sampai $0,0002. Dibulatkan ke sen, seluruh
+    // kolom rincian jadi "$0,00" dan tabelnya kehilangan gunanya — jadi
+    // presisinya mengikuti besaran angkanya.
+    usd(n) {
+      if (n == null) return '—';
+      const v = Number(n);
+      const desimal = Math.abs(v) >= 1 ? 2 : (Math.abs(v) >= 0.01 ? 4 : 5);
+      return '$' + v.toLocaleString('id-ID', {
+        minimumFractionDigits: desimal, maximumFractionDigits: desimal,
+      });
+    },
+
+    persenRun(n) {
+      const total = this.pilih?.biaya_usd;
+      if (!total || n == null) return '—';
+      return (Number(n) / Number(total) * 100).toFixed(1) + '%';
+    },
+
+    durasi(detik) {
+      if (detik == null) return '—';
+      const d = Math.round(Number(detik));
+      return Math.floor(d / 60) + 'm ' + String(d % 60).padStart(2, '0') + 's';
+    },
+
+    // Plafon disorot hanya saat sudah dekat: warna yang selalu menyala
+    // berhenti berarti apa-apa. Ambang 85% sama dengan ambang peringatan
+    // dini di src/analysis/llm.py, supaya halaman dan log sepakat.
+    kelasPlafon(pct) {
+      if (pct == null) return 'text-slate-600 dark:text-slate-300';
+      if (pct >= 100) return 'text-rose-600 dark:text-rose-400 font-semibold';
+      if (pct >= 85) return 'text-amber-600 dark:text-amber-400 font-semibold';
+      return 'text-slate-600 dark:text-slate-300';
+    },
+
+    _wib(iso, opsi) {
+      if (!iso) return '—';
+      const t = new Date(iso);
+      if (isNaN(t)) return '—';
+      return new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', ...opsi }).format(t);
+    },
+    waktuSingkat(iso) {
+      return this._wib(iso, {
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+      });
+    },
+    waktuPanjang(iso) {
+      return this._wib(iso, {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      }) + ' WIB';
+    },
+  };
+}
+
+document.addEventListener('DOMContentLoaded', () => window.lucide?.createIcons());
+document.addEventListener('alpine:initialized', () => window.lucide?.createIcons());
+</script>
+</body>
+</html>
