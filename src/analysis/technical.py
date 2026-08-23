@@ -533,9 +533,10 @@ _ARTI_JENIS = {
     ),
     "short_baru": (
         "posisi jual baru",
-        "Harga turun karena ada yang masuk menjual, bukan sekadar pemilik "
-        "posisi beli yang keluar. Tekanannya cenderung bertahan selama posisi "
-        "jual itu belum ditutup.",
+        "Harga turun karena ada penjual baru yang masuk dan menahan "
+        "posisinya, bukan sekadar pemilik posisi beli yang menutup "
+        "posisinya. Tekanannya cenderung bertahan selama posisi jual baru "
+        "itu belum ditutup.",
     ),
     "long_ditutup": (
         "posisi beli keluar",
