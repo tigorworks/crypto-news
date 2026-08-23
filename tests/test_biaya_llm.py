@@ -133,19 +133,79 @@ def test_telemetri_mencatat_token_per_langkah(tmp_path):
     telemetri.rekam(
         brief=brief,
         panggilan_llm=[
-            {"step": "synthesis", "cost_usd": 0.15, "tokens_in": 11400, "tokens_out": 8100},
-            {"step": "filter", "cost_usd": 0.02, "tokens_in": 9000, "tokens_out": 400},
-            {"step": "filter", "cost_usd": 0.02, "tokens_in": 9000, "tokens_out": 400},
+            {
+                "step": "synthesis", "cost_usd": 0.15,
+                "tokens_in": 11400, "tokens_out": 8100,
+                "prompt_chars": 41000, "model": "openai/gpt-5.1",
+            },
+            {
+                "step": "filter", "cost_usd": 0.02,
+                "tokens_in": 9000, "tokens_out": 400,
+                "prompt_chars": 32000, "model": "deepseek/deepseek-v3.2",
+            },
+            {
+                "step": "filter", "cost_usd": 0.02,
+                "tokens_in": 9000, "tokens_out": 400,
+                "prompt_chars": 32000, "model": "anthropic/claude-haiku-4.5",
+            },
         ],
         path=path,
     )
     baris = json.loads(path.read_text().splitlines()[0])
     assert baris["token_per_langkah"]["synthesis"] == {
-        "masuk": 11400, "keluar": 8100, "panggilan": 1,
+        "masuk": 11400, "keluar": 8100, "panggilan": 1, "prompt_char": 41000,
     }
     assert baris["token_per_langkah"]["filter"]["panggilan"] == 2
+    assert baris["token_per_langkah"]["filter"]["prompt_char"] == 64000
 
     ringkas = telemetri.ringkas(path=path, keluaran=tmp_path / "ringkas.json")
     sintesis = next(x for x in ringkas["biaya_per_langkah"] if x["langkah"] == "synthesis")
     assert sintesis["rata_token_keluar"] == 8100
     assert sintesis["rata_token_masuk"] == 11400
+
+
+def test_telemetri_mencatat_model_per_langkah(tmp_path):
+    """Jatuhnya sebuah langkah ke model cadangan harus terlihat.
+
+    Tanpa catatan ini, `filter` yang diam-diam pindah dari DeepSeek ke Haiku
+    menaikkan biayanya delapan kali lipat tanpa satu pun pertanda sampai
+    tagihan bulanan datang.
+    """
+    brief = {
+        "generated_at": datetime(2026, 8, 22, tzinfo=timezone.utc).isoformat(),
+        "price": {"last": 78000},
+        "data_quality": {"llm_cost_usd": 0.5},
+        "ai": {"critic": {}},
+        "agen_kebijakan": {},
+    }
+    path = tmp_path / "telemetri.jsonl"
+    telemetri.rekam(
+        brief=brief,
+        panggilan_llm=[
+            {"step": "synthesis", "model": "openai/gpt-5.1"},
+            # Satu langkah yang dibatch boleh dilayani dua model berbeda:
+            # batch pertama lolos ke model utama, batch kedua jatuh ke
+            # cadangan. Keduanya harus tercatat, bukan cuma yang terakhir.
+            {"step": "filter", "model": "deepseek/deepseek-v3.2"},
+            {"step": "filter", "model": "anthropic/claude-haiku-4.5"},
+            {"step": "filter", "model": "deepseek/deepseek-v3.2"},
+        ],
+        path=path,
+    )
+    baris = json.loads(path.read_text().splitlines()[0])
+    assert baris["model_per_langkah"]["synthesis"] == ["openai/gpt-5.1"]
+    assert baris["model_per_langkah"]["filter"] == [
+        "deepseek/deepseek-v3.2", "anthropic/claude-haiku-4.5",
+    ]
+
+
+def test_panggilan_mencatat_panjang_prompt(monkeypatch):
+    """`tokens_in` yang ditagih tidak bisa ditafsirkan tanpa pembanding.
+
+    Rasio karakter-per-token adalah satu-satunya cara membedakan prompt yang
+    memang gemuk dari penagihan di atas apa yang dikirim.
+    """
+    monkeypatch.setattr(modul_llm, "request", lambda *a, **k: _balasan_ok())
+    klien = _klien()
+    klien.chat(["m"], "sistem" * 10, "data" * 20, step="synthesis")
+    assert klien.calls[0]["prompt_chars"] == len("sistem" * 10) + len("data" * 20)
