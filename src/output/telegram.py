@@ -248,12 +248,39 @@ def _blok_pasar(brief: Dict[str, Any]) -> List[str]:
     potongan = []
     if market.get("etf_flow_usd") is not None:
         juta = market["etf_flow_usd"] / 1_000_000
-        potongan.append("ETF flow " + _uang_bertanda(juta, 1, " jt"))
+        # Angka ETF terbit sekali sehari dan sesekali gagal diambil, lalu
+        # dipakai ulang dari brief sebelumnya — sama seperti keterangan
+        # "per {tanggal}" di web (data.market.etf_flow_kedaluwarsa).
+        tanggal = ""
+        if market.get("etf_flow_kedaluwarsa") and market.get("etf_flow_date"):
+            tanggal = f" (per {esc(market['etf_flow_date'])})"
+        potongan.append("ETF flow " + _uang_bertanda(juta, 1, " jt") + tanggal)
     fg = market.get("fear_greed") or {}
     if fg.get("value") is not None:
-        potongan.append(f"Fear &amp; Greed {fg['value']} ({esc(fg.get('label'))})")
+        # Perubahan vs pembacaan kemarin, sama seperti selisihFearGreed di
+        # web — datang langsung dari `previous`, tidak dihitung ulang.
+        selisih = ""
+        if fg.get("previous") is not None:
+            d = fg["value"] - fg["previous"]
+            if d:
+                selisih = f" ({'+' if d > 0 else '−'}{abs(d)} poin dari kemarin)"
+        potongan.append(f"Fear &amp; Greed {fg['value']} ({esc(fg.get('label'))}){selisih}")
     if potongan:
         baris.append(" · ".join(potongan))
+
+    # Pemeriksaan silang dua sumber ETF. Hanya disebut kalau BEDA JAUH —
+    # sama seperti etfBerbedaAntarSumber di web: kecocokan adalah keadaan
+    # normal dan tidak perlu diumumkan, sedangkan perbedaan berarti salah
+    # satu angkanya keliru dan pembaca berhak ragu sebelum mengutipnya.
+    verifikasi = market.get("etf_flow_verifikasi") or {}
+    if verifikasi.get("status") == "berbeda":
+        beda = "tanggal sama" if verifikasi.get("tanggal_sama") else "tanggal berbeda"
+        pembanding_jt = (verifikasi.get("pembanding_usd") or 0) / 1_000_000
+        baris.append(
+            f"⚠️ {esc(verifikasi.get('pembanding_sumber', 'Sumber lain'))} sebut "
+            f"{_uang_bertanda(pembanding_jt, 1, ' jt')} ({beda}) — salah satu "
+            "sumber kemungkinan keliru"
+        )
 
     # Likuidasi 24 jam. Sisinya diterjemahkan ("posisi beli/jual"), dan
     # bursanya disebut — angka satu bursa tidak boleh terbaca seperti

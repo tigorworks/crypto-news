@@ -600,6 +600,11 @@ def _reaksi_harga(waktu_utc: str, klines_1h: List[Dict[str, Any]]) -> Optional[f
     return None
 
 
+# Skala "kekuatan" 1-5 hanya bermakna bagi kita yang membaca prompt-nya.
+# Pembaca brief butuh kata, bukan angka — samakan dengan DAMPAK di telegram.py.
+_DAMPAK_KATA = {1: "kecil", 2: "terbatas", 3: "sedang", 4: "besar", 5: "sangat besar"}
+
+
 def cross_check(
     articles: List[Dict[str, Any]],
     klines_1h: List[Dict[str, Any]],
@@ -630,7 +635,7 @@ def cross_check(
                 {
                     "tipe": "anomali_reaksi",
                     "keterangan": (
-                        f"Berita {a['sentimen']} berkekuatan {a['kekuatan']} "
+                        f"Berita {a['sentimen']} berdampak {_DAMPAK_KATA.get(a['kekuatan'], 'besar')} "
                         f"(\"{a['judul'][:80]}\") diikuti pergerakan harga {persen_id(reaksi, 2, pakai_tanda=True)} "
                         "pada jam berikutnya — berlawanan arah."
                     ),
