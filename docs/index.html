@@ -2228,7 +2228,10 @@
         </div>
       </template>
 
-      <!-- Statistik run: berapa token dihabiskan dan berapa lama prosesnya. -->
+      <!-- Statistik run: berapa token dihabiskan dan berapa lama prosesnya.
+           Tautan ke halaman biaya ditempel di ujung baris yang sama: itu
+           baris tempat pembaca sudah melihat angka token run ini, jadi di
+           sinilah pertanyaan "berapa ongkosnya?" muncul. -->
       <template x-if="statistikRun.length">
         <p class="text-xs flex flex-wrap items-center gap-x-3 gap-y-1">
           <i data-lucide="activity" class="w-3.5 h-3.5 shrink-0"></i>
@@ -2238,6 +2241,11 @@
               <span class="font-medium text-slate-600 dark:text-slate-300" x-text="s.nilai"></span>
             </span>
           </template>
+          <a href="cost.html"
+             class="inline-flex items-center gap-1 font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+            <i data-lucide="receipt" class="w-3.5 h-3.5 shrink-0"></i>
+            Biaya per run
+          </a>
         </p>
       </template>
 

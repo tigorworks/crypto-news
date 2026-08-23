@@ -251,6 +251,63 @@ def _rata(nilai: List[float]) -> Optional[float]:
     return round(sum(bersih) / len(bersih), 4) if bersih else None
 
 
+def _rincian_per_run(catatan: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Satu baris per run, lengkap dengan rincian langkahnya.
+
+    Ringkasan yang sudah ada menjawab "berapa rata-rata biaya sebuah run" —
+    tapi bukan "kenapa run HARI ITU mahal". Dua run dengan total yang sama
+    bisa lahir dari sebab yang sama sekali berbeda: `critic` yang menahan
+    narasi lalu memicu putaran revisi, atau sebuah langkah yang jatuh ke
+    model cadangan yang delapan kali lebih mahal. Rata-rata menghapus
+    keduanya.
+
+    Run terbaru lebih dulu: itu urutan yang dipakai halaman, dan yang
+    ditanya orang pertama kali selalu run yang barusan jalan.
+
+    Run lama dari sebelum `biaya_per_langkah` ada tetap disertakan dengan
+    `langkah` kosong. Menyembunyikannya akan membuat riwayat biaya bolong
+    tanpa keterangan; halaman menampilkannya apa adanya sebagai run yang
+    rinciannya memang tidak pernah tercatat.
+    """
+    hasil: List[Dict[str, Any]] = []
+    for c in reversed(catatan):
+        token = c.get("token_per_langkah") or {}
+        model = c.get("model_per_langkah") or {}
+        langkah = [
+            {
+                "langkah": nama,
+                "biaya_usd": round(float(nilai), 6),
+                "masuk": int((token.get(nama) or {}).get("masuk") or 0),
+                "keluar": int((token.get(nama) or {}).get("keluar") or 0),
+                "prompt_char": int((token.get(nama) or {}).get("prompt_char") or 0),
+                "panggilan": int((token.get(nama) or {}).get("panggilan") or 0),
+                "model": list(model.get(nama) or []),
+            }
+            for nama, nilai in (c.get("biaya_per_langkah") or {}).items()
+        ]
+        langkah.sort(key=lambda x: x["biaya_usd"], reverse=True)
+
+        critic = c.get("critic") or {}
+        hasil.append({
+            "waktu_utc": c.get("waktu_utc"),
+            "run_type": c.get("run_type"),
+            "harga": c.get("harga"),
+            "biaya_usd": c.get("biaya_usd"),
+            "budget_maks_usd": c.get("budget_maks_usd"),
+            "budget_terpakai_pct": c.get("budget_terpakai_pct"),
+            "token_masuk": c.get("token_masuk"),
+            "token_keluar": c.get("token_keluar"),
+            "panggilan_llm": c.get("panggilan_llm"),
+            "durasi_detik": c.get("durasi_detik"),
+            "critic": {
+                "dijalankan": bool(critic.get("dijalankan", False)),
+                "lolos": bool(critic.get("lolos", True)),
+            },
+            "langkah": langkah,
+        })
+    return hasil
+
+
 def ringkas(path: Path = CATATAN_PATH, keluaran: Path = RINGKASAN_PATH) -> Dict[str, Any]:
     """Rangkum catatan mentah jadi berkas ringkas untuk web dan operator."""
     semua = _baca_baris(path)
@@ -331,6 +388,10 @@ def ringkas(path: Path = CATATAN_PATH, keluaran: Path = RINGKASAN_PATH) -> Dict[
             "rata_detik": _rata(durasi),
             "maks_detik": max(durasi) if durasi else None,
         },
+        # Rincian per run — sumber tabel di docs/cost.html. Dibatasi jendela
+        # yang sama dengan ringkasan lain (60 run), jadi berkasnya tidak
+        # tumbuh tanpa batas meski riwayat mentahnya menyimpan 400 baris.
+        "run": _rincian_per_run(catatan),
         "critic": {
             "dijalankan": len(diperiksa),
             "menahan": len(menahan),

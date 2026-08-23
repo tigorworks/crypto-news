@@ -847,6 +847,7 @@ tests/                      # uji halaman (Playwright) + uji unit
 
 docs/                       # GitHub Pages
 ├── index.html
+├── cost.html               # biaya per run + rincian per langkah
 ├── app.js
 └── data/
     ├── latest.json         # brief terbaru
@@ -890,9 +891,19 @@ Dua berkas, umurnya berbeda dari brief:
 | Berkas | Isi | Nasib saat data direset |
 |---|---|---|
 | `state/telemetri.jsonl` | satu baris per run: biaya **dan token per langkah**, durasi, status critic, sumber & feed yang gagal, corong berita, tingkat siaga, harga | selamat — di luar `docs/` |
-| `docs/data/telemetri.json` | ringkasan siap baca dari 60 run terakhir, dipakai halaman | dibangkitkan ulang tiap run |
+| `docs/data/telemetri.json` | ringkasan siap baca dari 60 run terakhir **plus rincian per run**, dipakai halaman | dibangkitkan ulang tiap run |
 
 Bentuknya JSONL supaya satu baris rusak (run yang mati di tengah tulis) dilewati tanpa menghanguskan sisanya.
+
+#### Halaman biaya (`docs/cost.html`)
+
+Satu tabel, satu baris per run: waktu, jumlah panggilan, token masuk, token keluar, durasi, pemakaian plafon, dan ongkos USD. **Klik satu baris** untuk membuka rincian per langkah — biaya, token, dan model yang benar-benar melayani tiap langkah, diurutkan dari yang termahal beserta porsinya terhadap total run.
+
+Kenapa per run dan bukan rata-rata: dua run dengan total yang sama bisa lahir dari sebab yang sama sekali berbeda — `critic` yang menahan narasi lalu memicu putaran revisi, atau sebuah langkah yang jatuh ke model cadangan yang delapan kali lebih mahal. Rata-rata menghapus keduanya. Run yang memicu revisi ditandai di barisnya, jadi sebab paling umum sebuah run mahal terlihat tanpa perlu membukanya dulu.
+
+Angkanya adalah biaya yang **ditagih OpenRouter** (`usage.cost`), bukan tarif yang dihitung ulang di sisi kita — jadi perubahan harga model tidak pernah membuat halaman ini berbohong. Run lama dari sebelum rincian per langkah dicatat tetap ditampilkan dengan keterangan bahwa rinciannya memang tidak pernah ada; menyembunyikannya akan membuat riwayat biaya bolong tanpa penjelasan.
+
+Tautannya ada di footer brief, di baris yang sama dengan statistik token run — di situlah pertanyaan "berapa ongkosnya?" muncul.
 
 **Biaya dan token per langkah adalah alasan utama berkas ini ada.** Sebelumnya hanya total per run yang tersimpan, jadi setiap usaha menghemat berjalan di atas dugaan tentang langkah mana yang boros. Tokennya dicatat terpisah dari biayanya karena biaya saja tidak cukup untuk mendiagnosis: $0,156 bisa berarti konteks masuk yang kegemukan, keluaran yang kepanjangan, atau token penalaran yang tidak terlihat di brief sama sekali — dan ketiganya menuntut perbaikan yang sama sekali berbeda.
 
