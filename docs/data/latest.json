@@ -376,8 +376,8 @@
       "besaran": "wajar",
       "atr_harian_pct": 2.78,
       "jenis": "short_baru",
-      "jenis_ringkas": "posisi jual baru",
-      "jenis_arti": "Harga turun karena ada penjual baru yang masuk dan menahan posisinya, bukan sekadar pemilik posisi beli yang menutup posisinya. Tekanannya cenderung bertahan selama posisi jual baru itu belum ditutup.",
+      "jenis_ringkas": "short baru",
+      "jenis_arti": "Harga turun karena ada posisi short baru yang masuk dan bertahan, bukan sekadar long yang ditutup. Tekanannya cenderung bertahan selama short baru itu belum ditutup.",
       "perubahan_oi_pct": 0.01,
       "volume_rasio_vs_rata": 1.35,
       "volume_konfirmasi": "dikonfirmasi",
@@ -391,7 +391,7 @@
         "ETF Bitcoin dan ether catat arus masuk $2,6 miliar di minggu terkuat sejak Oktober, volume tiga kali lipat",
         "Mengapa pengumuman dari Departemen Keuangan picu rally emas dan bitcoin minggu ini"
       ],
-      "ringkas": "Harga turun 1,85% dalam 24 jam — pergerakan dalam kisaran wajar. Harga turun karena ada penjual baru yang masuk dan menahan posisinya, bukan sekadar pemilik posisi beli yang menutup posisinya. Tekanannya cenderung bertahan selama posisi jual baru itu belum ditutup. Volume di atas rata-rata, jadi pergerakannya terkonfirmasi. Ada 2 berita berdampak kuat yang searah."
+      "ringkas": "Harga turun 1,85% dalam 24 jam — pergerakan dalam kisaran wajar. Harga turun karena ada posisi short baru yang masuk dan bertahan, bukan sekadar long yang ditutup. Tekanannya cenderung bertahan selama short baru itu belum ditutup. Volume di atas rata-rata, jadi pergerakannya terkonfirmasi. Ada 2 berita berdampak kuat yang searah."
     }
   },
   "market": {

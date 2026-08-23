@@ -500,7 +500,7 @@ _AMBANG_BESARAN_PCT = ((1.0, "tipis"), (2.5, "wajar"), (5.0, "besar"))
 #   arti   — dua kalimat pendek: APA yang terjadi, lalu APA ARTINYA bagi
 #            pembaca. Inilah yang tampil di kartu Sorotan dan Telegram.
 #
-# Dua percobaan sebelumnya gagal dengan cara yang berbeda, dan keduanya
+# Tiga percobaan sebelumnya gagal dengan cara yang berbeda, dan ketiganya
 # ditulis di sini supaya tidak diulang:
 #
 #   1. "penutupan posisi jual, bukan permintaan baru" — separuh keduanya
@@ -512,37 +512,42 @@ _AMBANG_BESARAN_PCT = ((1.0, "tipis"), (2.5, "wajar"), (5.0, "besar"))
 #      ("bertaruh", "taruhan turun"). Lebih buruk lagi: model ikut menyalin
 #      kosakata itu ke judul brief 22 Agustus ("ditopang penutupan taruhan
 #      turun yang rapuh").
+#   3. "ada yang masuk menjual, bukan sekadar pemilik posisi beli yang
+#      keluar" — menerjemahkan long/short jadi "posisi beli"/"posisi jual"
+#      justru bikin kontrasnya semu: menutup posisi beli JUGA berarti
+#      menjual, jadi dua sisi kontras itu kedengarannya sama saja.
 #
-# Aturannya sekarang: label memakai istilah pasar yang memang sudah lazim
-# dalam bahasa Indonesia (posisi beli, posisi jual), penjelasannya memakai
-# kata sehari-hari (masuk, keluar, menutup, membeli lagi), dan tidak ada
-# satu pun kalimat yang berhenti pada "bukan X" tanpa mengatakan akibatnya.
+# Aturannya sekarang: label dan penjelasan memakai "long"/"short" apa
+# adanya (istilah pasar yang memang sudah lazim dalam bahasa Inggris,
+# menerjemahkannya justru membingungkan — sama seperti "priced in"),
+# kata sehari-hari untuk sisanya (masuk, keluar, menutup, membeli lagi),
+# dan tidak ada satu pun kalimat yang berhenti pada "bukan X" tanpa
+# mengatakan akibatnya.
 _ARTI_JENIS = {
     "long_baru": (
-        "pembelian baru",
-        "Harga naik karena ada pembeli baru yang masuk dan menahan posisinya, "
-        "bukan sekadar posisi lama yang ditutup. Kenaikan seperti ini punya "
+        "long baru",
+        "Harga naik karena ada posisi long baru yang masuk dan bertahan, "
+        "bukan sekadar short yang ditutup. Kenaikan seperti ini punya "
         "penopang yang lebih kuat.",
     ),
     "short_covering": (
-        "penutupan posisi jual",
-        "Harga naik bukan karena pembeli baru berdatangan, tapi karena mereka "
-        "yang sebelumnya menjual harus membeli lagi untuk menutup posisinya. "
-        "Dorongan seperti itu habis dengan sendirinya, jadi kenaikannya "
-        "gampang kehilangan tenaga.",
+        "penutupan short",
+        "Harga naik bukan karena posisi long baru berdatangan, tapi karena "
+        "short sebelumnya ditutup dengan membeli lagi. Dorongan seperti itu "
+        "habis dengan sendirinya, jadi kenaikannya gampang kehilangan "
+        "tenaga.",
     ),
     "short_baru": (
-        "posisi jual baru",
-        "Harga turun karena ada penjual baru yang masuk dan menahan "
-        "posisinya, bukan sekadar pemilik posisi beli yang menutup "
-        "posisinya. Tekanannya cenderung bertahan selama posisi jual baru "
-        "itu belum ditutup.",
+        "short baru",
+        "Harga turun karena ada posisi short baru yang masuk dan bertahan, "
+        "bukan sekadar long yang ditutup. Tekanannya cenderung bertahan "
+        "selama short baru itu belum ditutup.",
     ),
     "long_ditutup": (
-        "posisi beli keluar",
-        "Harga turun karena pemilik posisi beli keluar — sebagian terpaksa, "
-        "karena posisinya ditutup otomatis saat harga jatuh. Tekanan seperti "
-        "ini biasanya mereda begitu posisi yang paling rapuh selesai keluar.",
+        "long ditutup",
+        "Harga turun karena posisi long ditutup — sebagian terpaksa "
+        "dilikuidasi otomatis saat harga jatuh. Tekanan seperti ini "
+        "biasanya mereda begitu posisi yang paling rapuh selesai ditutup.",
     ),
 }
 

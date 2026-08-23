@@ -1,7 +1,7 @@
 """Bahasa jenis pergerakan: harus bisa dibaca orang yang tidak ikut pasar.
 
-Baris ini sudah dua kali gagal dengan cara yang berbeda, dan berkas ini ada
-supaya tidak ada kali ketiga:
+Baris ini sudah tiga kali gagal dengan cara yang berbeda, dan berkas ini ada
+supaya tidak ada kali keempat:
 
   1. "penutupan posisi jual, bukan permintaan baru" — berhenti pada KONTRAS.
      Separuhnya benar, tapi pembaca tidak pernah diberi tahu apa bedanya dan
@@ -11,6 +11,10 @@ supaya tidak ada kali ketiga:
      DAN memperkenalkan kosakata yang tidak dipakai orang. Model lalu
      menyalinnya ke judul brief 22 Agustus: "ditopang penutupan taruhan turun
      yang rapuh".
+  3. "ada yang masuk menjual, bukan sekadar pemilik posisi beli yang keluar"
+     — menerjemahkan long/short jadi "posisi beli"/"posisi jual" membuat
+     kontrasnya semu, karena menutup posisi beli JUGA berarti menjual.
+     Sekarang "long"/"short" dipakai apa adanya, seperti "priced in".
 """
 
 from __future__ import annotations
@@ -108,7 +112,7 @@ def test_kartu_sorotan_menampilkan_penjelasan_bukan_istilah(
     teks = page.inner_text("body")
 
     # Penjelasannya tampil…
-    assert "harus membeli lagi untuk menutup posisinya" in teks
+    assert "ditutup dengan membeli lagi" in teks
     # …dan pembuka abstrak "Sifatnya:" tidak dipakai lagi.
     assert "Sifatnya:" not in teks
     page.close()
