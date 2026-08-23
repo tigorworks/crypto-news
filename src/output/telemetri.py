@@ -111,15 +111,40 @@ def rekam(
     # DITAGIH dan yang benar-benar mendarat di brief. Pada model penalar,
     # selisih itulah token penalarannya.
     token_langkah: Dict[str, Dict[str, int]] = {}
+    # MODEL per langkah. Sebelum ini tidak ada satu berkas pun yang menyimpan
+    # model apa yang BENAR-BENAR melayani tiap langkah: `models_used` hanya
+    # hidup di memori (LLMClient.ringkasan()) dan tidak pernah ikut ke
+    # latest.json maupun ke sini. Akibatnya jatuhnya sebuah langkah ke model
+    # cadangan tidak terlihat di mana pun.
+    #
+    # Itu bukan risiko teoretis. Perpindahan langkah penyiapan data ke
+    # DeepSeek menurunkan harga campurannya dari ~$2,40 jadi ~$0,30 per juta
+    # token — delapan kali lipat. Kalau suatu hari DeepSeek menolak dan
+    # semuanya diam-diam jatuh ke cadangan Haiku, biayanya naik sebesar itu
+    # juga, dan satu-satunya pertanda adalah tagihan di akhir bulan.
+    #
+    # Disimpan sebagai daftar, bukan satu nilai: satu langkah bisa dibatch
+    # (classify 5 panggilan, statements ~5) dan sebagian batch bisa jatuh ke
+    # cadangan sementara sisanya tidak.
+    model_langkah: Dict[str, list] = {}
     for panggilan in panggilan_llm or []:
         langkah = str(panggilan.get("step") or "?")
         per_langkah[langkah] = round(
             per_langkah.get(langkah, 0.0) + float(panggilan.get("cost_usd") or 0.0), 6
         )
-        t = token_langkah.setdefault(langkah, {"masuk": 0, "keluar": 0, "panggilan": 0})
+        t = token_langkah.setdefault(
+            langkah, {"masuk": 0, "keluar": 0, "panggilan": 0, "prompt_char": 0}
+        )
         t["masuk"] += int(panggilan.get("tokens_in") or 0)
         t["keluar"] += int(panggilan.get("tokens_out") or 0)
+        # Panjang prompt yang dikirim, pendamping `masuk` yang ditagih.
+        # Rasio prompt_char/masuk yang wajar untuk teks Indonesia ~3,5-4;
+        # jauh di bawah itu berarti selisihnya bukan dari payload kita.
+        t["prompt_char"] += int(panggilan.get("prompt_chars") or 0)
         t["panggilan"] += 1
+        model = panggilan.get("model")
+        if model and model not in model_langkah.setdefault(langkah, []):
+            model_langkah[langkah].append(str(model))
 
     biaya = float(kualitas.get("llm_cost_usd") or 0.0)
     catatan = {
@@ -129,6 +154,7 @@ def rekam(
         "biaya_usd": round(biaya, 5),
         "biaya_per_langkah": per_langkah,
         "token_per_langkah": token_langkah,
+        "model_per_langkah": model_langkah,
         "budget_maks_usd": round(float(budget_maks_usd or 0.0), 4),
         "budget_terpakai_pct": (
             round(biaya / budget_maks_usd * 100, 1) if budget_maks_usd else None

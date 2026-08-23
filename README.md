@@ -537,7 +537,7 @@ Untuk mengirim ke grup: tambahkan bot ke grup, kirim satu pesan di grup, lalu ul
 ### 3. Ambil API key OpenRouter
 
 1. Daftar di [openrouter.ai](https://openrouter.ai), buka **Keys**, buat key baru.
-2. Isi saldo secukupnya. `max_cost_usd_per_run: 0.75` adalah **plafon**, bukan tarif tetap. Langkah yang kena batas dilewati dan brief tetap terbit. Angka biaya sesungguhnya ada di bagian **Biaya per run** di bawah.
+2. Isi saldo secukupnya. `max_cost_usd_per_run: 0.40` adalah **plafon**, bukan tarif tetap. Langkah yang kena batas dilewati dan brief tetap terbit. Angka biaya sesungguhnya ada di bagian **Biaya per run** di bawah.
 
 ### 4. Model LLM di `config.yaml`
 
@@ -566,15 +566,31 @@ Blok ini sempat dipindah ke DeepSeek demi hemat, lalu dikembalikan ke Haiku kare
 
 #### Biaya per run
 
-Catatan lama di berkas ini menyebut ~$0,26 per run. Telemetri sembilan run pertama (`state/telemetri.jsonl`, diisi dari arsip) memberi angka yang jauh berbeda:
+Angka di bagian ini **hanya boleh diambil dari `state/telemetri.jsonl`**, bukan dari ingatan atau dari catatan lama di berkas ini — keduanya sudah terbukti meleset dua kali.
 
-| | Nilai |
-|---|---|
-| Rata-rata | **$0,540** |
-| Tertinggi | **$0,759** |
-| Run yang memakai ≥85% plafon | **5 dari 9** |
+Sasarannya sekarang **$10 per bulan**. Pada satu run per hari itu $0,33/run.
 
-Run tertinggi bahkan **melampaui plafon $0,60** — pemeriksaan anggaran terjadi *sebelum* sebuah panggilan, jadi satu panggilan besar bisa menyeberanginya di tengah jalan.
+Perpindahan langkah penyiapan data ke DeepSeek membelah biaya run jadi dua era yang tidak boleh dicampur:
+
+| | Sebelum DeepSeek | **Sesudah (3 run terakhir)** |
+|---|---|---|
+| Rata-rata per run | $0,540 | **$0,243** |
+| Per bulan (1×/hari) | ~$16,4 | **~$7,40** |
+
+Harga campuran delapan langkah penyiapan data turun dari ~$2,40 jadi ~$0,30 per juta token — delapan kali lipat. Kedelapan langkah itu sekarang tinggal **7%** dari biaya run, jadi tidak ada lagi yang bisa diperas di sana.
+
+**Ke mana perginya biaya sekarang** (rata-rata tiga run terakhir):
+
+| Langkah | $/run | % | token masuk | token keluar |
+|---|---:|---:|---:|---:|
+| `synthesis` | 0,0733 | 30% | 11.865 | 5.978 |
+| `critic` | 0,0574 | 24% | 22.227 | 1.297 |
+| `outlook` | 0,0508 | 21% | 9.269 | 3.963 |
+| `technical` | 0,0338 | 14% | 2.013 | 3.129 |
+| `whale` | 0,0126 | 5% | 872 | 1.155 |
+| 8 langkah DeepSeek + Grok | 0,0162 | 7% | — | — |
+
+Polanya jelas: **empat langkah GPT-5.1 menghabiskan 14.225 token keluaran per run, dan pada tarif $10 per juta token itu $0,142 — 58% dari seluruh biaya run.** Sisi masuknya ($1,25/juta) hampir tidak berarti: seluruh 24.019 token masuk keempatnya cuma $0,030. Karena itu memangkas konteks masuk bukan penghematan yang layak dikejar — memotong `berita` dan `pernyataan_tokoh` separuh menghemat $0,008/run sambil memiskinkan analisanya.
 
 Yang sudah dikerjakan untuk menurunkannya:
 
@@ -589,7 +605,9 @@ Yang sudah dikerjakan untuk menurunkannya:
 
 Sebabnya: **pada Sonnet 5 penalaran adaptif menyala secara bawaan**. Tidak mengirim parameter `thinking` bukan berarti mematikannya. Catatan lama di `config.yaml` menyatakan yang sebaliknya — bahwa `effort` pada model Anthropic justru menyalakan penalaran yang tadinya mati — dan itu keliru; sudah dibetulkan.
 
-`llm.reasoning_effort` sekarang memasang `medium` untuk `synthesis`, `outlook`, `technical`, dan `whale`. Keempatnya **menafsirkan** angka yang sudah dihitung kode, jadi tidak butuh penalaran sedalam bawaan. Kalau kualitas analisanya terasa turun, naikkan lagi ke `high` — satu baris di config.
+`llm.reasoning_effort` memasang `medium` untuk `synthesis` dan `outlook`, serta **`low` untuk `technical` dan `whale`**. Keempatnya **menafsirkan** angka yang sudah dihitung kode, jadi tidak butuh penalaran sedalam bawaan. Kalau kualitas analisanya terasa turun, naikkan lagi — satu baris di config.
+
+**Kenapa `technical` dan `whale` turun lebih jauh dari yang lain.** Keduanya adalah langkah yang paling tidak membutuhkan penalaran dalam di seluruh pipeline: EMA, RSI, ATR, level kunci, rasio posisi whale vs ritel — semuanya sudah dihitung kode. Yang diminta ke model cuma membaca angka jadi lalu menuliskan tafsirnya. Angkanya mendukung: 93% biaya `technical` dan 91% biaya `whale` ada di sisi keluaran, sementara ringkasan yang benar-benar dirender halaman cuma ~150 dan ~186 token dari 3.129 dan 1.155 token yang ditagih. `synthesis` dan `outlook` tetap di `medium` karena keduanya harus merangkai sebab-akibat lintas belasan sumber sekaligus.
 
 Bentuk parameter penalaran berbeda antar provider dan berubah seiring model baru, jadi tebakan yang salah tidak boleh menghanguskan narasi utama: kalau ditolak (400/422), `llm.chat()` mengulang panggilannya **tanpa** parameter itu dan mencatatnya di `effort_ditolak`. Paling banter langkahnya berjalan pada biaya penuh — bukan hilang.
 
@@ -599,9 +617,46 @@ Konteks masuknya sendiri didominasi `berita` (3.239 token) dan `pernyataan_tokoh
 
 `reasoning_effort` **hanya boleh dipasang untuk langkah yang modelnya memang model penalar** (GPT-5.x, Gemini). Pada model Anthropic, `effort` justru *menyalakan* penalaran yang tadinya mati — hasilnya kebalikan dari hemat.
 
-Plafonnya dinaikkan ke **0.75** supaya putaran revisi critic tidak terpotong pada hari yang mahal. Itu bukan pelonggaran diam-diam: penghematannya dikerjakan di tempat yang benar, dan sejak sekarang hasilnya **terukur per langkah** lewat telemetri — bukan ditebak.
+#### Plafon per run: 0.40
 
-Satu run per hari pada rata-rata lama berarti sekitar **$16 per bulan**; efek perubahan di atas akan terbaca pada telemetri run-run berikutnya.
+Plafon lama **0.75** berasal dari era sebelum DeepSeek, saat rata-rata run memang $0,54. Setelah perpindahan itu ia jadi tiga kali lipat biaya sebenarnya — dan plafon yang tidak pernah tersentuh tidak menjaga apa pun. Sekarang **0.40**, dipilih dari anggaran bulanan $10 dibagi 30 hari, ditambah ruang di atas rata-rata.
+
+Hari termahal yang masih muat:
+
+```
+run normal                                          $0,243
++ promo Sonnet 5 habis (critic 22.227 token masuk)  +$0,029
++ critic menahan narasi -> `revisi` menulis ulang   +$0,070
+                                                   --------
+                                                    ~$0,342
+```
+
+Sisa ruangnya ~$0,06. Kalau critic dipanggil **ulang** untuk memverifikasi hasil revisi, tambahan ~$0,086 pasca-promo akan menembus plafon. Yang terjadi bukan brief gagal: pemeriksaan anggaran berlangsung *sebelum* sebuah panggilan, jadi langkah sisanya (`format`) dilewati dan brief tetap terbit dengan tata letak Telegram seadanya. Itu pertukaran yang diterima sadar.
+
+Kalau `budget_terpakai_pct` mulai sering menyentuh 100, naikkan ke 0.45 — **jangan menaikkannya tanpa melihat angka itu lebih dulu.**
+
+#### Tiga hal yang bisa menjebol anggaran, dan tidak satupun soal efisiensi kode
+
+1. **Promo Sonnet 5 habis 31 Agustus 2026** ($2/$10 → $3/$15). `critic` memakai Sonnet 5 dengan 22.227 token masuk — input terbesar di seluruh pipeline. Biayanya naik $0,029/run, atau **+$0,87/bulan**, jadi total ~$8,3/bulan. Kalau itu terlalu mepet, `critic` bisa dipindah ke `google/gemini-3.1-flash-lite-preview` yang **sudah terpasang sebagai cadangannya** dan tetap beda keluarga dari GPT-5.1 — hemat ~$1,7/bulan. Uji berdampingan dulu: brief yang terbit tanpa critic adalah brief yang tidak pernah diperiksa.
+2. **Plafon per run tidak menjaga anggaran bulanan.** Ia menjaga satu run. Yang menjaga bulanan adalah jumlah run × rata-rata.
+3. **Run manual ikut ditagih.** `workflow_dispatch` memakai kunci yang sama. Telemetri mencatat enam run `sore` dalam enam hari — semuanya run pengembangan. Satu run ekstra per hari = **+$7,4/bulan**, langsung jebol. Ini risiko terbesar terhadap anggaran, bukan pilihan model.
+
+#### Yang masih belum terjawab: 9.000 token di `critic`
+
+`critic` ditagih **22.227 token masuk**, hampir dua kali lipat `synthesis` (11.865) — padahal keduanya menerima konteks data yang identik dan critic cuma menambahkan teks yang diperiksa di atasnya. Dihitung dari panjang prompt yang benar-benar dikirim, angkanya semestinya ~13-14 ribu. Ada sekitar **9.000 token per run yang belum bisa dipertanggungjawabkan** — sekitar $0,018/run sekarang, $0,027 pasca-promo, atau **$0,65-0,82/bulan**.
+
+Selisih itu **tidak boleh ditutup dengan memangkas apa yang dilihat critic**. `src/main.py` memegang aturan tegas: critic memeriksa dengan data yang persis sama dengan yang dipakai synthesis, karena critic yang melihat lebih sedikit akan memvonis angka yang sah sebagai karangan — kegagalan yang sudah terjadi di produksi. Memangkas atas dasar tebakan berisiko membeli $0,80/bulan dengan harga narasi yang ditahan tanpa alasan.
+
+Karena itu langkah berikutnya adalah **mengukur lebih dulu**, dan alatnya sudah terpasang (lihat di bawah).
+
+#### Telemetri: model dan panjang prompt per langkah
+
+Dua field baru di `state/telemetri.jsonl`, keduanya menjawab pertanyaan yang sebelumnya cuma bisa ditebak:
+
+- **`model_per_langkah`** — model yang BENAR-BENAR melayani tiap langkah. Sebelumnya tidak ada satu berkas pun yang menyimpannya: `models_used` hanya hidup di memori dan tidak pernah ikut ke `latest.json` maupun telemetri. Akibatnya jatuhnya sebuah langkah ke model cadangan tidak terlihat di mana pun — dan itu bukan risiko teoretis: kalau DeepSeek menolak dan delapan langkah penyiapan data diam-diam jatuh ke Haiku, biayanya naik delapan kali lipat dan satu-satunya pertanda adalah tagihan di akhir bulan. Disimpan sebagai daftar karena satu langkah yang dibatch bisa dilayani dua model berbeda.
+- **`token_per_langkah.*.prompt_char`** — panjang karakter prompt yang dikirim, pendamping `masuk` yang ditagih. Tanpa pembanding ini `masuk` tidak bisa ditafsirkan sama sekali: pada 22.227 token, tidak ada cara membedakan "prompt kita memang segemuk itu" dari "kita ditagih di atas yang dikirim". Rasio karakter-per-token yang wajar untuk teks Indonesia ada di kisaran **3,5-4**; rasio yang jatuh jauh di bawah itu menandakan selisihnya bukan berasal dari payload kita. Rasionya juga dicetak per panggilan di log Actions.
+
+Satu run produksi dengan kedua field ini sudah cukup untuk memutuskan apa yang terjadi pada `critic`.
 
 **Aturan keluarga model dijaga saat runtime.** Config boleh mendaftarkan cadangan yang bertumpang tindih — misalnya `synthesis` jatuh ke `openai/gpt-5.1` sementara `critic` juga OpenAI. Sebelum critic dijalankan, kode memeriksa model mana yang BENAR-BENAR melayani synthesis, lalu menyaring pilihan critic agar tetap beda keluarga.
 

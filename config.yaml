@@ -147,11 +147,35 @@ llm:
   # (~$0,020). Selisihnya, sekitar $0,10 per run, adalah token yang ditagih
   # tapi tidak pernah muncul di halaman mana pun — tanda penalaran.
   #
-  # Empat langkah di bawah dipasang `medium`, bukan dimatikan: semuanya
+  # `synthesis` dan `outlook` dipasang `medium`, bukan dimatikan: keduanya
   # MENAFSIRKAN angka yang sudah dihitung kode, jadi tidak butuh penalaran
   # sedalam bawaan, tapi juga bukan tugas mekanis. Kalau kualitas analisanya
   # terasa turun, naikkan lagi ke `high` — satu baris, dan efeknya terukur
   # di `token_per_langkah` pada telemetri.
+  #
+  # `technical` dan `whale` DITURUNKAN ke `low` (23 Agustus 2026). Alasannya
+  # terukur, bukan tebakan: pada tarif GPT-5.1 ($1,25/$10 per 1 juta token)
+  # biaya keduanya nyaris seluruhnya ada di sisi KELUARAN, dan sebagian besar
+  # keluaran itu tidak pernah sampai ke pembaca. Rata-rata tiga run terakhir:
+  #
+  #   technical  masuk 2.013 tok ($0,0025) + keluar 3.129 tok ($0,0313)
+  #   whale      masuk   872 tok ($0,0011) + keluar 1.155 tok ($0,0116)
+  #
+  # 93% biaya `technical` dan 91% biaya `whale` ada di keluaran — sementara
+  # ringkasan yang benar-benar dirender halaman cuma ~150 dan ~186 token.
+  # Sisanya token penalaran yang ditagih tanpa pernah terlihat.
+  #
+  # Keduanya adalah langkah yang paling tidak membutuhkan penalaran dalam di
+  # seluruh pipeline: SEMUA angkanya — EMA, RSI, ATR, level kunci, rasio
+  # posisi whale vs ritel — sudah dihitung kode di src/analysis/technical.py
+  # dan src/collectors/whale.py. Yang diminta ke model cuma membaca angka
+  # jadi lalu menuliskan tafsirnya dalam beberapa kalimat. Beda dengan
+  # `synthesis`/`outlook` yang harus merangkai sebab-akibat lintas belasan
+  # sumber sekaligus, dan karena itu tetap di `medium`.
+  #
+  # Kalau ringkasan teknikal/whale mulai terasa dangkal atau kehilangan
+  # kaitan antar indikator, kembalikan ke `medium` — efeknya langsung
+  # terlihat di `token_per_langkah.technical.keluar` pada telemetri.
   #
   # critic memakai Sonnet 5. Tugasnya memeriksa angka, bukan menulis esai,
   # jadi `low` memadai — dan itu sekaligus memperkecil peluang balasannya
@@ -165,21 +189,40 @@ llm:
     critic: low
     synthesis: medium
     outlook: medium
-    technical: medium
-    whale: medium
+    technical: low
+    whale: low
 
-  # Dengan Sonnet, run terukur di produksi ~$0,26 saat catatan ini ditulis.
-  # Telemetri 9 run pertama (state/telemetri.jsonl) memberi angka yang jauh
-  # lebih tinggi: rata-rata $0,54, tertinggi $0,76 — plafonnya SENDIRI pun
-  # terlampaui, karena pemeriksaan anggaran terjadi sebelum panggilan dan
-  # satu panggilan besar bisa melewatinya di tengah jalan.
+  # PLAFON PER RUN — diturunkan 0.75 -> 0.40 (23 Agustus 2026).
   #
-  # Plafon dinaikkan ke 0.75 supaya revisi critic tidak terpotong pada hari
-  # yang mahal — bukan supaya boros: penghematan dikerjakan di tempat yang
-  # benar (prefilter berita, langkah agen kebijakan yang dibuang, keluaran
-  # filter yang jauh lebih pendek, upaya penalaran critic), dan hasilnya
-  # sekarang bisa diukur per langkah lewat telemetri.
-  max_cost_usd_per_run: 0.75
+  # Angka lama 0.75 berasal dari era sebelum langkah penyiapan data pindah ke
+  # DeepSeek, saat rata-rata run memang $0,54. Setelah perpindahan itu, tiga
+  # run terakhir rata-rata $0,243 — plafon 0.75 jadi tiga kali lipat biaya
+  # sebenarnya, dan plafon yang tidak pernah tersentuh tidak menjaga apa pun.
+  #
+  # Sasaran yang dijaga sekarang adalah ANGGARAN BULANAN $10. Pada satu run
+  # per hari itu $0,33/run rata-rata; 0.40 memberi ruang di atas rata-rata
+  # tanpa membiarkan satu run buruk menelan jatah tiga hari.
+  #
+  # Perhitungan hari termahal yang masih muat, pada tarif sekarang:
+  #
+  #   run normal                                        $0,243
+  #   + promo Sonnet 5 habis 31 Agt 2026 ($2/$10 -> $3/$15),
+  #     critic 22.227 token masuk                       +$0,029
+  #   + critic menahan narasi -> `revisi` menulis ulang +$0,070
+  #                                                    --------
+  #                                                     ~$0,342
+  #
+  # Sisa ruang ke 0.40 tinggal ~$0,06. Kalau critic dipanggil ULANG setelah
+  # revisi (jalur di src/main.py yang memverifikasi hasil revisi), tambahan
+  # ~$0,086 pasca-promo akan menembus plafon — pemeriksaan anggaran terjadi
+  # SEBELUM panggilan, jadi yang terjadi bukan brief gagal melainkan langkah
+  # sisanya (`format`) dilewati dan brief tetap terbit. Itu konsekuensi yang
+  # diterima sadar: hari mahal berakhir dengan pesan Telegram yang tata
+  # letaknya seadanya, bukan dengan tagihan yang jebol.
+  #
+  # Kalau `budget_terpakai_pct` di telemetri mulai sering menyentuh 100,
+  # naikkan ke 0.45 — jangan menaikkannya diam-diam tanpa melihat angka itu.
+  max_cost_usd_per_run: 0.40
 
 news:
   # Dinaikkan seiring bertambahnya feed. Langkah filter relevansi yang

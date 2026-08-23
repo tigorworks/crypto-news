@@ -474,12 +474,29 @@ class LLMClient:
                 )
 
     # -- biaya ---------------------------------------------------------
-    def _catat_biaya(self, model: str, usage: Dict[str, Any], durasi: float, step: str) -> None:
+    def _catat_biaya(
+        self,
+        model: str,
+        usage: Dict[str, Any],
+        durasi: float,
+        step: str,
+        prompt_chars: int = 0,
+    ) -> None:
         """Ambil biaya dari usage OpenRouter.
 
         OpenRouter mengembalikan biaya aktual di `usage.cost` (USD) saat
         `usage.include` aktif. Kalau tidak ada, biaya dianggap 0 dan hanya
         token yang dicatat — lebih baik daripada menebak tarif per model.
+
+        `prompt_chars` adalah panjang KARAKTER prompt yang benar-benar kita
+        kirim (system + user). Dicatat berdampingan dengan `tokens_in` yang
+        DITAGIH supaya keduanya bisa dibandingkan. Tanpa pembanding ini,
+        `tokens_in` tidak bisa ditafsirkan sama sekali: pada 22.227 token
+        masuk untuk step `critic`, tidak ada cara membedakan "prompt kita
+        memang segemuk itu" dari "kita ditagih jauh di atas yang dikirim".
+        Rasio karakter-per-token yang wajar untuk teks Indonesia ada di
+        kisaran 3,5-4; rasio yang jatuh jauh di bawah itu menandakan
+        selisihnya bukan berasal dari payload kita.
         """
         cost = float(usage.get("cost") or 0.0)
         tokens_in = int(usage.get("prompt_tokens") or 0)
@@ -491,6 +508,7 @@ class LLMClient:
                 "model": model,
                 "tokens_in": tokens_in,
                 "tokens_out": tokens_out,
+                "prompt_chars": int(prompt_chars),
                 "cost_usd": round(cost, 6),
                 "durasi_detik": round(durasi, 2),
             }
@@ -509,9 +527,14 @@ class LLMClient:
             if peringatkan:
                 self._sudah_peringatkan_budget = True
 
+        # Rasio karakter-per-token ikut dicetak: itu satu-satunya petunjuk
+        # langsung di log kalau sebuah step ditagih jauh di atas prompt yang
+        # dikirim (rasio anjlok) atau prompt-nya sendiri yang membengkak.
+        rasio = (prompt_chars / tokens_in) if tokens_in else 0.0
         log.info(
-            "LLM %-9s | %-32s | in %5d out %5d | $%.5f | %.1fs | total $%.5f",
-            step, model, tokens_in, tokens_out, cost, durasi, total_cost,
+            "LLM %-9s | %-32s | in %5d out %5d (%5d char, %.1f c/t) | $%.5f | %.1fs | total $%.5f",
+            step, model, tokens_in, tokens_out, prompt_chars, rasio,
+            cost, durasi, total_cost,
         )
 
         # Peringatan dini sebelum anggaran benar-benar habis. Tanpa ini,
@@ -641,7 +664,8 @@ class LLMClient:
         # Biaya dicatat lebih dulu: token yang terpakai tetap ditagih walaupun
         # balasannya nanti kita tolak.
         self._catat_biaya(
-            data.get("model", models[0]), data.get("usage") or {}, durasi, step
+            data.get("model", models[0]), data.get("usage") or {}, durasi, step,
+            prompt_chars=len(system) + len(user),
         )
 
         # Balasan yang terpotong di batas max_tokens hampir selalu JSON tak
