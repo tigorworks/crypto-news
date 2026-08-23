@@ -377,7 +377,7 @@
       "atr_harian_pct": 2.78,
       "jenis": "short_baru",
       "jenis_ringkas": "posisi jual baru",
-      "jenis_arti": "Harga turun karena ada yang masuk menjual, bukan sekadar pemilik posisi beli yang keluar. Tekanannya cenderung bertahan selama posisi jual itu belum ditutup.",
+      "jenis_arti": "Harga turun karena ada penjual baru yang masuk dan menahan posisinya, bukan sekadar pemilik posisi beli yang menutup posisinya. Tekanannya cenderung bertahan selama posisi jual baru itu belum ditutup.",
       "perubahan_oi_pct": 0.01,
       "volume_rasio_vs_rata": 1.35,
       "volume_konfirmasi": "dikonfirmasi",
@@ -391,7 +391,7 @@
         "ETF Bitcoin dan ether catat arus masuk $2,6 miliar di minggu terkuat sejak Oktober, volume tiga kali lipat",
         "Mengapa pengumuman dari Departemen Keuangan picu rally emas dan bitcoin minggu ini"
       ],
-      "ringkas": "Harga turun 1,85% dalam 24 jam — pergerakan dalam kisaran wajar. Harga turun karena ada yang masuk menjual, bukan sekadar pemilik posisi beli yang keluar. Tekanannya cenderung bertahan selama posisi jual itu belum ditutup. Volume di atas rata-rata, jadi pergerakannya terkonfirmasi. Ada 2 berita berdampak kuat yang searah."
+      "ringkas": "Harga turun 1,85% dalam 24 jam — pergerakan dalam kisaran wajar. Harga turun karena ada penjual baru yang masuk dan menahan posisinya, bukan sekadar pemilik posisi beli yang menutup posisinya. Tekanannya cenderung bertahan selama posisi jual baru itu belum ditutup. Volume di atas rata-rata, jadi pergerakannya terkonfirmasi. Ada 2 berita berdampak kuat yang searah."
     }
   },
   "market": {
@@ -1455,11 +1455,11 @@
   "conflicts": [
     {
       "tipe": "anomali_reaksi",
-      "keterangan": "Berita bullish berkekuatan 5 (\"Bitcoin Jumps $10,000 in a Week as Shorts Lose $3 Billion\") diikuti pergerakan harga -0,35% pada jam berikutnya — berlawanan arah."
+      "keterangan": "Berita bullish berdampak sangat besar (\"Bitcoin Jumps $10,000 in a Week as Shorts Lose $3 Billion\") diikuti pergerakan harga -0,35% pada jam berikutnya — berlawanan arah."
     },
     {
       "tipe": "anomali_reaksi",
-      "keterangan": "Berita bearish berkekuatan 4 (\"Can Bessent’s ‘Big Tool Kit’ Calm Bond Investors?\") diikuti pergerakan harga +0,65% pada jam berikutnya — berlawanan arah."
+      "keterangan": "Berita bearish berdampak besar (\"Can Bessent’s ‘Big Tool Kit’ Calm Bond Investors?\") diikuti pergerakan harga +0,65% pada jam berikutnya — berlawanan arah."
     },
     {
       "tipe": "catatan_ai",
