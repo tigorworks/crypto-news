@@ -375,6 +375,26 @@ function briefApp() {
     _siapkanSuara() {
       if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return;
 
+      // Ikon Lucide digambar dengan MENGGANTI elemen <i data-lucide> jadi
+      // SVG, dan itu hanya terjadi pada elemen yang sudah ada di DOM saat
+      // createIcons() dipanggil. Tombol-tombol di sini hidup di dalam
+      // <template x-if> yang isinya baru dirender Alpine setiap kali status
+      // berubah — jadi tanpa penggambaran ulang, tombolnya muncul KOSONG.
+      //
+      // Dulu cacat ini tidak terlihat karena tombolnya masih berlabel teks;
+      // begitu labelnya dilepas dan tinggal ikon, tombolnya jadi kotak polos.
+      //
+      // Pendaftaran watch WAJIB mendahului periksa() di bawah: `periksa()`
+      // menyetel suaraDidukung secara sinkron, dan watch yang didaftarkan
+      // setelahnya tidak pernah melihat perubahan pertama itu — persis
+      // keadaan saat bar-nya muncul untuk pertama kali.
+      //
+      // `bisaDibacakan` ikut diawasi, bukan cuma `suaraDidukung`: barnya
+      // baru benar-benar dirender setelah brief selesai dimuat, yang terjadi
+      // BELAKANGAN dan tidak menyentuh suaraDidukung sama sekali.
+      this.$watch('suaraStatus', () => this.$nextTick(() => this.gambarIkon()));
+      this.$watch('bisaDibacakan', () => this.$nextTick(() => this.gambarIkon()));
+
       const periksa = () => { this.suaraDidukung = !!this._suaraID(); };
       periksa();
       window.speechSynthesis.addEventListener?.('voiceschanged', periksa);

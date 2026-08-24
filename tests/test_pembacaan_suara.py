@@ -170,6 +170,56 @@ def test_tombol_muncul_dan_membacakan_isi_brief(halaman_suara):
     assert "ribu" in gabung
 
 
+def test_tombol_ikon_benar_benar_bergambar(halaman_suara):
+    """Tombolnya tanpa label teks, jadi ikon yang gagal render = tombol kosong.
+
+    Lucide bekerja dengan MENGGANTI <i data-lucide> jadi SVG, dan hanya pada
+    elemen yang sudah ada di DOM saat createIcons() dipanggil. Tombol di sini
+    hidup di dalam <template x-if> yang dirender ulang Alpine tiap kali
+    status berubah — tanpa penggambaran ulang, tombolnya kotak polos.
+    """
+    hal = halaman_suara()
+
+    tombol = hal.get_by_role("button", name="Dengarkan")
+    assert tombol.locator("svg").count() == 1, "ikon tombol Dengarkan tidak tergambar"
+
+    # Dan setelah status berubah, tombol yang BARU dirender juga harus digambar.
+    tombol.click()
+    hal.wait_for_function("() => window.__ucapan.length > 1")
+    for nama in ("Jeda", "Lewati", "Berhenti"):
+        assert hal.get_by_role("button", name=nama).locator("svg").count() == 1, (
+            f"ikon tombol {nama} tidak tergambar"
+        )
+
+
+def test_bar_suara_tetap_utuh(halaman_suara):
+    """Tombol, pengatur kecepatan, dan keterangan harus satu bar.
+
+    Ini menangkap pembungkus flex yang hilang: tanpa `<div class="flex">`
+    di sekeliling tombol, tag-nya tidak seimbang, `</div>` menutup bar
+    terlalu awal, dan blok kemajuan serta keterangan terlempar keluar —
+    halamannya tetap render, cuma berantakan, jadi tidak ada yang gagal.
+    """
+    hal = halaman_suara()
+    bar = hal.locator("#bar-suara")
+
+    # Keterangan dan pengatur kecepatan benar-benar DI DALAM bar.
+    assert "Dibacakan suara bawaan" in bar.inner_text()
+    assert bar.get_by_label("Kecepatan baca").count() == 1
+
+    # Tombol dan pengatur kecepatan berbagi satu baris.
+    tombol = hal.get_by_role("button", name="Dengarkan").bounding_box()
+    kecepatan = bar.get_by_label("Kecepatan baca").bounding_box()
+    assert abs(tombol["y"] - kecepatan["y"]) < tombol["height"], (
+        "tombol dan pengatur kecepatan tidak sebaris — pembungkus flex hilang?"
+    )
+
+    # Kemajuan muncul saat membaca, dan tetap di dalam bar.
+    hal.get_by_role("button", name="Dengarkan").click()
+    hal.wait_for_function("() => window.__ucapan.length > 1")
+    assert "%" in bar.inner_text()
+
+
 def test_tombol_hilang_kalau_tidak_ada_suara_indonesia(halaman_suara):
     """Brief Indonesia dengan fonetik Inggris lebih buruk daripada diam."""
     hal = halaman_suara(STUB_TANPA_ID)

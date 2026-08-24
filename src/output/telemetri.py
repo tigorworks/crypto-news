@@ -48,6 +48,31 @@ MAKS_BARIS = 400
 #: perubahan konfigurasi lama (model, plafon biaya) mulai mencemari rata-rata.
 JENDELA_RINGKASAN = 60
 
+#: Batas bawah untuk angka BIAYA saja: 23 Agustus 2026 pukul 00.00 WIB.
+#:
+#: Run sebelum tanggal ini datang dari dunia yang berbeda dan membuat setiap
+#: angka biaya menyesatkan kalau ikut dirata-rata:
+#:
+#:   - sembilan run pertama diisi ulang dari arsip (scripts/telemetri_dari_arsip.py),
+#:     jadi tidak punya rincian per langkah maupun jumlah panggilan sama sekali;
+#:   - sebagian besar sisanya run PENGEMBANGAN lewat workflow_dispatch, bukan
+#:     jadwal harian — enam run "sore" dalam enam hari;
+#:   - semuanya berjalan sebelum langkah penyiapan data pindah ke DeepSeek,
+#:     saat rata-rata run memang $0,54 alih-alih $0,24.
+#:
+#: Mencampurnya menghasilkan "rata-rata $0,4491" yang tidak menggambarkan
+#: satu pun konfigurasi yang pernah benar-benar berjalan.
+#:
+#: Batas ini SENGAJA hanya menyentuh keluaran biaya (`biaya`,
+#: `biaya_per_langkah`, `run`). Riwayat siaga, statistik critic, dan sumber
+#: yang gagal tetap memakai jendela penuh — panel riwayat siaga di halaman
+#: brief justru bergantung pada rentang hari yang panjang, dan memendekkannya
+#: adalah kemunduran yang tidak diminta siapa pun.
+#:
+#: `state/telemetri.jsonl` TIDAK dipangkas: catatan mentahnya utuh, dan
+#: menghapus baris ini cukup dengan menyetel konstanta di bawah jadi None.
+BIAYA_SEJAK_UTC = "2026-08-22T17:00:00Z"
+
 #: Jarak minimum sebuah run berikutnya boleh dianggap "sehari kemudian" saat
 #: mengukur apakah siaga jendela diikuti pergerakan harga. Brief terbit sekali
 #: sehari, tapi run manual bisa menyelip beberapa jam setelahnya — dan
@@ -315,7 +340,18 @@ def ringkas(path: Path = CATATAN_PATH, keluaran: Path = RINGKASAN_PATH) -> Dict[
     if not catatan:
         return {}
 
-    biaya = [c.get("biaya_usd") for c in catatan if c.get("biaya_usd")]
+    # Catatan yang dipakai untuk ANGKA BIAYA — lihat BIAYA_SEJAK_UTC.
+    # Kalau batasnya menyapu semuanya (misalnya setelah data direset),
+    # jendela penuh dipakai kembali: halaman biaya yang kosong sama sekali
+    # lebih membingungkan daripada halaman berisi run lama.
+    catatan_biaya = catatan
+    if BIAYA_SEJAK_UTC:
+        batas = to_utc(date_parser.parse(BIAYA_SEJAK_UTC))
+        tersaring = [c for c in catatan if (_waktu(c) or batas) >= batas]
+        if tersaring:
+            catatan_biaya = tersaring
+
+    biaya = [c.get("biaya_usd") for c in catatan_biaya if c.get("biaya_usd")]
     durasi = [c.get("durasi_detik") for c in catatan if c.get("durasi_detik")]
 
     # Critic: berapa sering ia BENAR-BENAR memeriksa, dan berapa sering
@@ -330,7 +366,7 @@ def ringkas(path: Path = CATATAN_PATH, keluaran: Path = RINGKASAN_PATH) -> Dict[
 
     langkah: Dict[str, List[float]] = {}
     token: Dict[str, Dict[str, List[int]]] = {}
-    for c in catatan:
+    for c in catatan_biaya:
         for nama, nilai in (c.get("biaya_per_langkah") or {}).items():
             langkah.setdefault(nama, []).append(float(nilai))
         for nama, t in (c.get("token_per_langkah") or {}).items():
@@ -352,20 +388,27 @@ def ringkas(path: Path = CATATAN_PATH, keluaran: Path = RINGKASAN_PATH) -> Dict[
             per_tingkat.setdefault(r["tingkat"], []).append(r["perubahan_pct"])
 
     ambang_peringatan = [
-        c for c in catatan
+        c for c in catatan_biaya
         if (c.get("budget_terpakai_pct") or 0) >= 85
     ]
 
     ringkasan = {
         "dibuat": iso_utc(now_utc()),
+        # `jumlah_run` tetap jendela PENUH: dipakai panel riwayat siaga di
+        # halaman brief ("N run tercatat"), yang memang bicara soal seluruh
+        # riwayat. Halaman biaya memakai `jumlah_run_biaya` di bawah, karena
+        # angka yang mendampingi sebuah rata-rata harus menyebut berapa run
+        # yang benar-benar masuk ke rata-rata itu.
         "jumlah_run": len(catatan),
+        "jumlah_run_biaya": len(catatan_biaya),
         "total_run_tersimpan": len(semua),
         "sejak": catatan[0].get("waktu_utc"),
         "biaya": {
             "rata_usd": _rata(biaya),
             "maks_usd": max(biaya) if biaya else None,
-            "terakhir_usd": catatan[-1].get("biaya_usd"),
+            "terakhir_usd": catatan_biaya[-1].get("biaya_usd"),
             "run_di_atas_85_persen_budget": len(ambang_peringatan),
+            "sejak": catatan_biaya[0].get("waktu_utc"),
         },
         # Diurutkan dari yang paling mahal: ini daftar yang dilihat lebih dulu
         # saat mencari di mana penghematan berikutnya masuk akal.
@@ -391,7 +434,7 @@ def ringkas(path: Path = CATATAN_PATH, keluaran: Path = RINGKASAN_PATH) -> Dict[
         # Rincian per run — sumber tabel di docs/cost.html. Dibatasi jendela
         # yang sama dengan ringkasan lain (60 run), jadi berkasnya tidak
         # tumbuh tanpa batas meski riwayat mentahnya menyimpan 400 baris.
-        "run": _rincian_per_run(catatan),
+        "run": _rincian_per_run(catatan_biaya),
         "critic": {
             "dijalankan": len(diperiksa),
             "menahan": len(menahan),

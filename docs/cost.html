@@ -95,8 +95,11 @@
           <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
             <div class="text-xs text-slate-500 dark:text-slate-400">Rata-rata per run</div>
             <div class="mt-1 text-xl font-bold angka" x-text="usd(data.biaya?.rata_usd)"></div>
+            <!-- `jumlah_run_biaya`, bukan `jumlah_run`: angka yang mendampingi
+                 sebuah rata-rata harus menyebut berapa run yang benar-benar
+                 masuk ke rata-rata itu, bukan berapa run yang tersimpan. -->
             <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400"
-                 x-text="data.jumlah_run + ' run terakhir'"></div>
+                 x-text="(data.jumlah_run_biaya ?? data.jumlah_run) + ' run'"></div>
           </div>
           <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
             <div class="text-xs text-slate-500 dark:text-slate-400">Proyeksi sebulan</div>
