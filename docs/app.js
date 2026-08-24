@@ -83,6 +83,204 @@ function pecahParagraf(teks) {
   return keluar;
 }
 
+/* =====================================================================
+   PEMBACAAN SUARA (text-to-speech)
+   =====================================================================
+
+   Suaranya memakai Web Speech API bawaan browser, bukan berkas audio yang
+   dibangkitkan pipeline. Alasannya biaya: brief ini ~14.000 karakter prosa
+   per hari, dan TTS berbayar termurah pun menambah beberapa dolar sebulan ke
+   anggaran yang totalnya $10 — untuk sesuatu yang sudah tersedia gratis di
+   perangkat pembaca. Konsekuensinya kualitas suara mengikuti mesin TTS di
+   perangkat masing-masing, dan itu pertukaran yang diterima sadar.
+
+   Pekerjaan yang sesungguhnya BUKAN memutar suaranya, tapi menyiapkan
+   teksnya. Prosa brief ini padat angka pasar dan akronim, dan mesin TTS
+   membacanya apa adanya:
+
+     "$77.614"   -> "dolar tujuh puluh tujuh koma enam ratus empat belas"
+     "0,93%"     -> "nol koma sembilan tiga persen"  (ini kebetulan benar)
+     "EMA20"     -> "ema dua puluh"
+     "$75.559–$78.065" -> dua angka yang berdempet tanpa jeda
+     "~$77.024"  -> tilde dibaca atau ditelan, keduanya salah
+
+   Yang pertama fatal: titik ribuan gaya Indonesia dibaca sebagai titik
+   desimal, jadi harga Bitcoin terdengar seperti angka tujuh puluh tujuh.
+   Karena itu seluruh angka diubah lebih dulu jadi bentuk yang memang
+   diucapkan orang ("77 ribu 614 dolar"), bukan diserahkan ke mesin TTS.
+
+   Ini mengikuti pola yang sudah dipegang proyek ini di src/utils/istilah.py:
+   KODE yang merapikan teks secara deterministik, bukan model, dan bukan
+   harapan bahwa mesin di seberang sana kebetulan menebak benar. */
+
+/* Akronim yang salah dibaca kalau dibiarkan utuh. Dua perlakuan:
+   dieja per huruf (dipisah spasi) atau diganti kata penuh. */
+const AKRONIM_SUARA = {
+  // Diganti kata penuh: bentuk ejaannya justru lebih membingungkan.
+  BTC: 'Bitcoin',
+  AS: 'Amerika Serikat',
+  OI: 'open interest',
+  BB: 'Bollinger Band',
+  PDB: 'produk domestik bruto',
+  GDP: 'produk domestik bruto',
+  // Dieja per huruf.
+  EMA: 'E M A', RSI: 'R S I', MACD: 'M A C D', ATR: 'A T R', OBV: 'O B V',
+  VWAP: 'V W A P', DVOL: 'D V O L', DXY: 'D X Y', VIX: 'V I X',
+  ETF: 'E T F', FOMC: 'F O M C', CPI: 'C P I', NFP: 'N F P', PCE: 'P C E',
+  MVRV: 'M V R V', NVT: 'N V T', UST: 'U S T', CEO: 'C E O',
+};
+
+/* Angka -> bentuk yang diucapkan orang Indonesia.
+
+   Bukan sekadar menghapus titik ribuan: "77614" dibaca mesin TTS sebagai
+   deret yang panjang dan sulit ditangkap sambil menyetir atau berjalan.
+   "77 ribu 614" adalah cara orang benar-benar menyebut harga. */
+function angkaTerbilang(nilai) {
+  if (!Number.isFinite(nilai)) return '';
+  if (nilai < 0) return 'minus ' + angkaTerbilang(-nilai);
+
+  const bulat = Math.floor(nilai);
+  const pecahan = nilai - bulat;
+
+  const bagian = [];
+  let sisa = bulat;
+  for (const [batas, nama] of [[1e12, 'triliun'], [1e9, 'miliar'], [1e6, 'juta'], [1e3, 'ribu']]) {
+    if (sisa >= batas) {
+      bagian.push(Math.floor(sisa / batas) + ' ' + nama);
+      sisa = sisa % batas;
+    }
+  }
+  if (sisa > 0 || !bagian.length) bagian.push(String(sisa));
+
+  let hasil = bagian.join(' ');
+  if (pecahan > 0) {
+    // Desimal dibulatkan ke dua angka — presisi di luar itu tidak menambah
+    // apa pun saat didengar — lalu diucapkan DIGIT PER DIGIT.
+    //
+    // Digit per digit bukan gaya-gayaan: itu memang cara angka desimal
+    // dibaca dalam bahasa Indonesia ("nol koma sembilan tiga", bukan "nol
+    // koma sembilan puluh tiga"), dan sekaligus menutup jebakan angka
+    // kecil. Tanpa padding dua digit, 0,05 dibulatkan jadi "5" lalu
+    // terdengar sebagai "nol koma lima" — sepuluh kali lipat nilainya.
+    let desimal = String(Math.round(pecahan * 100)).padStart(2, '0');
+    desimal = desimal.replace(/0$/, '');   // 0,50 -> "koma 5", bukan "koma 5 0"
+    if (desimal) hasil += ' koma ' + desimal.split('').join(' ');
+  }
+  return hasil;
+}
+
+/* "77.614" / "1,92" (gaya Indonesia) -> Number. */
+function _uraiAngkaID(teks) {
+  const bersih = String(teks).replace(/\./g, '').replace(',', '.');
+  const nilai = Number(bersih);
+  return Number.isFinite(nilai) ? nilai : null;
+}
+
+const _SATUAN_BESAR = '(?:\\s+(triliun|miliar|milyar|juta|ribu))?';
+
+/* Ubah satu blok prosa jadi teks yang enak didengar.
+
+   Urutannya penting: rentang harga diproses SEBELUM mata uang tunggal,
+   supaya "$75.559–$78.065" tidak terpecah jadi dua angka tanpa kata
+   penghubung. */
+function untukSuara(teks) {
+  let s = String(teks || '');
+  if (!s.trim()) return '';
+
+  // Tilde "sekitar" — dibaca atau ditelan mesin TTS, dua-duanya salah.
+  s = s.replace(/~\s*/g, 'sekitar ');
+
+  // Rentang mata uang: "$75.559–$78.065" -> "... sampai ...".
+  //
+  // Pola angkanya WAJIB berakhir di digit (`[\d.,]*\d`, bukan `[\d.,]+`).
+  // Dengan `+` yang rakus, "$78.065." di ujung kalimat ikut menelan titik
+  // penutupnya — kalimat berikutnya lalu menyambung tanpa jeda, dan
+  // pecahUcapan() kehilangan batas kalimat untuk memotong.
+  s = s.replace(
+    new RegExp('\\$\\s*([\\d.,]*\\d)' + _SATUAN_BESAR + '\\s*[–—-]\\s*\\$\\s*([\\d.,]*\\d)' + _SATUAN_BESAR, 'g'),
+    (cocok, a, sa, b, sb) => {
+      const na = _uraiAngkaID(a); const nb = _uraiAngkaID(b);
+      if (na === null || nb === null) return cocok;
+      return `${angkaTerbilang(na)}${sa ? ' ' + sa : ''} sampai ${angkaTerbilang(nb)}${sb ? ' ' + sb : ''} dolar`;
+    },
+  );
+
+  // Mata uang tunggal. Satuan besar (juta/miliar) tetap di antara angka dan
+  // "dolar", karena itu urutan yang diucapkan: "1 koma 92 miliar dolar".
+  s = s.replace(
+    new RegExp('\\$\\s*([\\d.,]*\\d)' + _SATUAN_BESAR, 'g'),
+    (cocok, angka, satuan) => {
+      const nilai = _uraiAngkaID(angka);
+      if (nilai === null) return cocok;
+      return `${angkaTerbilang(nilai)}${satuan ? ' ' + satuan : ''} dolar`;
+    },
+  );
+
+  // Rentang persen sebelum persen tunggal, dengan alasan yang sama.
+  s = s.replace(/([\d.,]*\d)\s*[–—]\s*([\d.,]*\d)\s*%/g, (cocok, a, b) => {
+    const na = _uraiAngkaID(a); const nb = _uraiAngkaID(b);
+    if (na === null || nb === null) return cocok;
+    return `${angkaTerbilang(na)} sampai ${angkaTerbilang(nb)} persen`;
+  });
+  s = s.replace(/([\d.,]*\d)\s*%/g, (cocok, angka) => {
+    const nilai = _uraiAngkaID(angka);
+    return nilai === null ? cocok : `${angkaTerbilang(nilai)} persen`;
+  });
+
+  // Angka telanjang yang masih memakai titik ribuan. Dibatasi pada yang
+  // BENAR-BENAR berpola ribuan (titik diikuti tepat tiga digit), supaya
+  // penomoran biasa dan akhir kalimat tidak ikut tersentuh.
+  s = s.replace(/\b\d{1,3}(?:\.\d{3})+(?:,\d+)?\b/g, (cocok) => {
+    const nilai = _uraiAngkaID(cocok);
+    return nilai === null ? cocok : angkaTerbilang(nilai);
+  });
+
+  // Akronim. Yang berekor angka (EMA20, EMA200) diberi jeda sebelum
+  // angkanya, kalau tidak terdengar menyatu jadi satu kata.
+  const kunci = Object.keys(AKRONIM_SUARA).sort((a, b) => b.length - a.length);
+  s = s.replace(new RegExp('\\b(' + kunci.join('|') + ')(\\d*)\\b', 'g'),
+    (cocok, akr, angka) => AKRONIM_SUARA[akr] + (angka ? ' ' + angka : ''));
+
+  // Rentang angka telanjang dan tanda hubung panjang jadi jeda yang wajar.
+  s = s.replace(/(\d)\s*[–—]\s*(\d)/g, '$1 sampai $2');
+  s = s.replace(/\s*[–—]\s*/g, ', ');
+
+  // Sisa simbol yang tidak punya bunyi.
+  s = s.replace(/[«»"'"'`]/g, '');
+  s = s.replace(/\s*\/\s*/g, ' atau ');
+  s = s.replace(/&/g, ' dan ');
+
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+/* Pecah jadi potongan pendek untuk diucapkan satu per satu.
+
+   Bukan sekadar kerapian: Chrome memotong utterance yang panjang di sekitar
+   detik ke-15 dan berhenti diam-diam di tengah kalimat. Memecahnya per
+   kalimat membuat tiap potongan jauh di bawah ambang itu, dan sekaligus
+   memberi titik berhenti yang rapi saat pembaca menekan jeda. */
+function pecahUcapan(teks, maks = 220) {
+  const bersih = String(teks || '').trim();
+  if (!bersih) return [];
+
+  const kalimat = bersih.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const keluar = [];
+  for (const k of kalimat) {
+    if (k.length <= maks) { keluar.push(k); continue; }
+    // Kalimat yang tetap kepanjangan dipecah di koma, lalu di spasi.
+    let sisa = k;
+    while (sisa.length > maks) {
+      let potong = sisa.lastIndexOf(', ', maks);
+      if (potong < maks * 0.4) potong = sisa.lastIndexOf(' ', maks);
+      if (potong <= 0) potong = maks;
+      keluar.push(sisa.slice(0, potong + 1).trim());
+      sisa = sisa.slice(potong + 1).trim();
+    }
+    if (sisa) keluar.push(sisa);
+  }
+  return keluar;
+}
+
 /* Angka gaya Indonesia: titik ribuan, koma desimal. */
 function formatAngka(nilai, desimal = 2) {
   if (nilai === null || nilai === undefined || Number.isNaN(nilai)) return '—';
@@ -122,6 +320,19 @@ function briefApp() {
     perHalaman: 3,
     perHalamanAgenda: 5,
     grafik: null,
+    // -- pembacaan suara --------------------------------------------
+    // `suaraDidukung` menampung DUA syarat sekaligus: browsernya punya Web
+    // Speech API, DAN perangkatnya benar-benar punya suara berbahasa
+    // Indonesia. Tanpa syarat kedua, menekan tombolnya menghasilkan brief
+    // berbahasa Indonesia yang dibacakan dengan fonetik Inggris — lebih
+    // buruk daripada tidak ada tombolnya sama sekali.
+    suaraDidukung: false,
+    suaraStatus: 'diam',    // diam | main | jeda
+    suaraJudul: '',
+    suaraKecepatan: 1,
+    suaraGalat: '',
+    _suaraAntre: [],
+    _suaraIndeks: 0,
     _jam: null,
     _detak: 0,          // dinaikkan tiap menit supaya waktu relatif ikut menyegar
     tampilKeAtas: false,
@@ -150,6 +361,34 @@ function briefApp() {
       };
       window.addEventListener('scroll', this._padaGulir, { passive: true });
       this._padaGulir();   // halaman bisa dibuka dalam keadaan sudah tergulir
+
+      this._siapkanSuara();
+    },
+
+    /* Deteksi dukungan suara Indonesia, dan hentikan bacaan saat pindah halaman.
+
+       Daftar suara diperiksa DUA KALI: sekali sekarang, sekali lagi setelah
+       `voiceschanged`. Chrome memulangkan daftar kosong pada pemanggilan
+       pertama dan baru mengisinya belakangan secara asinkron — memeriksa
+       sekali saja berarti tombolnya tidak pernah muncul di Chrome, browser
+       yang justru paling banyak dipakai pembaca. */
+    _siapkanSuara() {
+      if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return;
+
+      const periksa = () => { this.suaraDidukung = !!this._suaraID(); };
+      periksa();
+      window.speechSynthesis.addEventListener?.('voiceschanged', periksa);
+
+      try {
+        const simpan = Number(localStorage.getItem('suara_kecepatan'));
+        if (simpan >= 0.5 && simpan <= 2) this.suaraKecepatan = simpan;
+      } catch (e) { /* localStorage diblokir */ }
+
+      // Bacaan yang masih berbunyi saat tab ditutup akan TERUS berbunyi:
+      // speechSynthesis hidup di level browser, bukan halaman. Tanpa ini,
+      // pembaca yang menutup tab di tengah brief harus mencari sendiri dari
+      // mana suaranya datang.
+      window.addEventListener('beforeunload', () => window.speechSynthesis.cancel());
     },
 
     /* Gulir balik ke puncak. <html> memakai scroll-smooth, jadi animasinya
@@ -1706,6 +1945,173 @@ function briefApp() {
 
     get adaPernyataan() {
       return this.pernyataanTersaring.length > 0;
+    },
+
+    // ---------------------------------------------------------------
+    // PEMBACAAN SUARA
+    //
+    // Yang dibacakan SENGAJA bukan seluruh halaman. Tabel, chip, angka
+    // makro, dan navigasi tidak punya arti apa pun kalau diucapkan
+    // berurutan — yang punya arti adalah prosanya. Urutannya mengikuti
+    // urutan baca di halaman: geopolitik dulu (keputusan terbesar yang
+    // menggerakkan harga), lalu narasi, sebab, pandangan ke depan,
+    // teknikal, dan whale.
+    // ---------------------------------------------------------------
+
+    /* Daftar bagian yang akan dibacakan, sudah dinormalkan untuk suara. */
+    get segmenSuara() {
+      const ai = this.data?.ai;
+      if (!ai) return [];
+
+      const calon = [];
+      const harga = this.data?.price?.last;
+      if (harga) {
+        // Pembuka pendek: pendengar perlu tahu ini brief kapan dan harga
+        // berapa sebelum masuk ke analisanya.
+        calon.push({
+          judul: 'Pembuka',
+          teks: `Ringkasan pasar kripto, ${this.data.generated_at_wib || ''}. `
+              + `Bitcoin berada di ${untukSuara('$' + formatAngka(harga, 0))}.`,
+        });
+      }
+
+      const o = ai.outlook || {};
+      calon.push({ judul: 'Geopolitik & regulasi', teks: o.narasi_geopolitik });
+      calon.push({ judul: 'Narasi utama', teks: ai.narrative });
+
+      const sebab = (ai.penyebab_pergerakan || [])
+        .map((p, i) => `${i + 1}. ${p.faktor}. ${p.dasar || ''}`)
+        .join(' ');
+      calon.push({ judul: 'Penyebab pergerakan', teks: sebab });
+
+      calon.push({
+        judul: 'Pandangan ke depan',
+        teks: [o.ringkasan, o.skenario_naik?.pemicu, o.skenario_turun?.pemicu]
+          .filter(Boolean).join(' '),
+      });
+      calon.push({ judul: 'Pembacaan teknikal', teks: (ai.teknikal || {}).ringkasan });
+      calon.push({ judul: 'Whale & sinyal palsu', teks: (ai.whale || {}).ringkasan });
+
+      return calon
+        .map((s) => ({ judul: s.judul, teks: untukSuara(s.teks) }))
+        .filter((s) => s.teks.length > 20);
+    },
+
+    get bisaDibacakan() {
+      return this.suaraDidukung && this.segmenSuara.length > 0;
+    },
+
+    /* Suara berbahasa Indonesia yang tersedia di perangkat ini.
+
+       Dicari ulang tiap kali dibutuhkan, bukan disimpan sekali: Chrome
+       memulangkan daftar KOSONG pada pemanggilan pertama dan baru mengisinya
+       setelah event `voiceschanged`. Menyimpan hasil panggilan pertama
+       berarti fitur ini mati di Chrome tanpa sebab yang terlihat. */
+    _suaraID() {
+      const daftar = window.speechSynthesis?.getVoices?.() || [];
+      return daftar.find((v) => v.lang === 'id-ID')
+          || daftar.find((v) => (v.lang || '').toLowerCase().startsWith('id'))
+          || null;
+    },
+
+    _siapkanAntrean() {
+      this._suaraAntre = [];
+      this.segmenSuara.forEach((seg, iSeg) => {
+        for (const potong of pecahUcapan(seg.teks)) {
+          this._suaraAntre.push({ teks: potong, segmen: iSeg, judul: seg.judul });
+        }
+      });
+    },
+
+    _ucapkanBerikutnya() {
+      const antre = this._suaraAntre || [];
+      if (this._suaraIndeks >= antre.length) { this.hentikanBaca(); return; }
+
+      const bagian = antre[this._suaraIndeks];
+      this.suaraJudul = bagian.judul;
+
+      const ucap = new SpeechSynthesisUtterance(bagian.teks);
+      ucap.lang = 'id-ID';
+      const suara = this._suaraID();
+      if (suara) ucap.voice = suara;
+      ucap.rate = this.suaraKecepatan;
+
+      ucap.onend = () => {
+        // Berhenti karena ditekan pengguna tidak boleh memicu potongan
+        // berikutnya: `cancel()` juga membangkitkan onend.
+        if (this.suaraStatus !== 'main') return;
+        this._suaraIndeks += 1;
+        this._ucapkanBerikutnya();
+      };
+      ucap.onerror = (e) => {
+        // "interrupted"/"canceled" adalah akibat wajar dari tombol berhenti.
+        if (e?.error === 'interrupted' || e?.error === 'canceled') return;
+        this.suaraGalat = 'Pembacaan terhenti: ' + (e?.error || 'sebab tidak diketahui');
+        this.hentikanBaca();
+      };
+
+      window.speechSynthesis.speak(ucap);
+    },
+
+    mulaiBaca() {
+      if (!this.bisaDibacakan) return;
+      this.suaraGalat = '';
+      window.speechSynthesis.cancel();
+      this._siapkanAntrean();
+      this._suaraIndeks = 0;
+      this.suaraStatus = 'main';
+      this._ucapkanBerikutnya();
+    },
+
+    jedaBaca() {
+      if (this.suaraStatus !== 'main') return;
+      window.speechSynthesis.pause();
+      this.suaraStatus = 'jeda';
+    },
+
+    lanjutBaca() {
+      if (this.suaraStatus !== 'jeda') return;
+      this.suaraStatus = 'main';
+      window.speechSynthesis.resume();
+    },
+
+    hentikanBaca() {
+      this.suaraStatus = 'diam';
+      this.suaraJudul = '';
+      this._suaraIndeks = 0;
+      window.speechSynthesis?.cancel?.();
+    },
+
+    /* Lompat ke bagian berikutnya tanpa menunggu yang sekarang selesai. */
+    lewatiBagian() {
+      const antre = this._suaraAntre || [];
+      const sekarang = antre[this._suaraIndeks]?.segmen;
+      if (sekarang === undefined) return;
+      let i = this._suaraIndeks;
+      while (i < antre.length && antre[i].segmen === sekarang) i += 1;
+      if (i >= antre.length) { this.hentikanBaca(); return; }
+      this._suaraIndeks = i;
+      this.suaraStatus = 'main';
+      window.speechSynthesis.cancel();
+      this._ucapkanBerikutnya();
+    },
+
+    ubahKecepatan(nilai) {
+      this.suaraKecepatan = Number(nilai) || 1;
+      // Kecepatan hanya berlaku untuk utterance BARU; yang sedang berbunyi
+      // harus dimulai ulang dari potongan ini supaya perubahannya terasa
+      // saat itu juga, bukan setelah kalimat yang panjang selesai.
+      if (this.suaraStatus === 'main') {
+        window.speechSynthesis.cancel();
+        this._ucapkanBerikutnya();
+      }
+      try { localStorage.setItem('suara_kecepatan', String(this.suaraKecepatan)); } catch (e) { /* diblokir */ }
+    },
+
+    get progresSuara() {
+      const total = (this._suaraAntre || []).length;
+      if (!total || this.suaraStatus === 'diam') return 0;
+      return Math.round((this._suaraIndeks / total) * 100);
     },
 
     get daftarMakro() {

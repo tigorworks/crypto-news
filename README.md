@@ -511,6 +511,41 @@ Halaman dirancang mobile-first dan diuji di lebar 360px, 390px, dan 430px:
 
 ---
 
+## Pembacaan suara
+
+Bagian **Ulasan Lengkap** punya tombol **Dengarkan**: brief dibacakan dengan suara bahasa Indonesia, lengkap dengan jeda, lompat bagian, dan pengatur kecepatan. Berguna justru pada brief sepanjang ini — 7.000 karakter prosa bisa didengar sambil menyetir atau sarapan.
+
+**Suaranya dari Web Speech API bawaan browser, bukan berkas audio yang dibangkitkan pipeline.** Alasannya biaya: brief ini ~14.000 karakter prosa per hari, dan TTS berbayar termurah pun menambah beberapa dolar sebulan ke anggaran yang totalnya $10 — untuk sesuatu yang sudah tersedia gratis di perangkat pembaca. Pipeline tidak tersentuh sama sekali, dan tidak ada satu byte pun tambahan yang di-commit tiap hari. Konsekuensinya kualitas suara mengikuti mesin TTS masing-masing perangkat, dan itu pertukaran yang diterima sadar.
+
+### Yang sulit bukan memutarnya, tapi menyiapkan teksnya
+
+Prosa brief ini padat angka pasar dan akronim, dan mesin TTS membacanya apa adanya:
+
+| Ditulis | Dibaca mesin TTS | Setelah disiapkan |
+|---|---|---|
+| `$77.614` | "dolar tujuh puluh tujuh koma enam ratus empat belas" | "77 ribu 614 dolar" |
+| `$75.559–$78.065` | dua angka berdempet tanpa jeda | "75 ribu 559 sampai 78 ribu 65 dolar" |
+| `$1,92 miliar` | satuannya hilang di tengah | "1 koma 9 2 miliar dolar" |
+| `~$77.024` | tilde dibaca atau ditelan | "sekitar 77 ribu 24 dolar" |
+| `EMA20` | "ema dua puluh" | "E M A 20" |
+| `BTC`, `AS`, `OI` | "b-t-c", "as", "o-i" | "Bitcoin", "Amerika Serikat", "open interest" |
+
+Yang pertama fatal: **titik ribuan gaya Indonesia dibaca sebagai titik desimal**, jadi harga Bitcoin terdengar seperti angka tujuh puluh tujuh — dan pendengar tidak punya cara tahu ia salah dengar. Karena itu seluruh angka diubah lebih dulu jadi bentuk yang memang diucapkan orang, bukan diserahkan ke mesin TTS.
+
+Ini mengikuti pola yang sudah dipegang proyek ini di `src/utils/istilah.py`: **kode** yang merapikan teks secara deterministik, bukan model, dan bukan harapan bahwa mesin di seberang sana kebetulan menebak benar.
+
+Desimal diucapkan digit per digit (`0,93` → "nol koma sembilan tiga") karena itu memang cara membacanya dalam bahasa Indonesia — dan sekaligus menutup jebakan angka kecil: tanpa padding dua digit, `0,05` dibulatkan jadi `"5"` lalu terdengar sebagai "nol koma lima", **sepuluh kali lipat nilainya**.
+
+### Tiga hal lain yang ditangani
+
+- **Teks dipecah per kalimat.** Chrome memotong utterance panjang di sekitar detik ke-15 dan berhenti diam-diam di tengah kalimat. Tiap potongan dijaga di bawah 220 karakter, yang sekaligus memberi titik berhenti rapi saat pembaca menekan jeda.
+- **Daftar suara diperiksa dua kali.** Chrome memulangkan daftar kosong pada pemanggilan pertama dan baru mengisinya setelah event `voiceschanged`; memeriksa sekali saja membuat tombolnya tidak pernah muncul di Chrome.
+- **Bar-nya hilang total kalau perangkat tidak punya suara Indonesia.** Tombol yang menghasilkan brief berbahasa Indonesia dibacakan dengan fonetik Inggris lebih buruk daripada tidak ada tombolnya sama sekali. Suara `id-ID` tersedia bawaan di Android, macOS, dan iOS (Damayanti); di Windows dan Linux desktop perlu dipasang lebih dulu.
+
+Yang dibacakan **sengaja bukan seluruh halaman** — tabel, chip, dan angka makro tidak punya arti kalau diucapkan berurutan. Urutannya mengikuti urutan baca halaman: pembuka (harga + waktu), geopolitik & regulasi, narasi utama, penyebab pergerakan, pandangan ke depan, teknikal, whale.
+
+---
+
 ## Setup
 
 ### 1. Fork / clone repo

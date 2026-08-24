@@ -29,7 +29,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@0.451.0/dist/umd/lucide.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<script src="app.js?v=cb1d49d7"></script>
+<script src="app.js?v=1e4d2cd8"></script>
 
 <style>
   [x-cloak] { display: none !important; }
@@ -1294,6 +1294,99 @@
               </template>
             </div>
           </div>
+
+          <!-- ===== PEMBACAAN SUARA =====
+               Ditempatkan di sini, bukan di header halaman: yang dibacakan
+               adalah prosa bagian INI, dan di titik inilah pembaca memutuskan
+               "panjang juga — dengarkan saja."
+
+               Seluruh bar hilang kalau perangkatnya tidak punya suara
+               berbahasa Indonesia. Tombol yang menghasilkan brief Indonesia
+               dibacakan dengan fonetik Inggris lebih buruk daripada tidak ada
+               tombolnya sama sekali. -->
+          <template x-if="bisaDibacakan">
+            <div class="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30 p-3">
+              <div class="flex items-center gap-2 flex-wrap">
+                <template x-if="suaraStatus === 'diam'">
+                  <button type="button" @click="mulaiBaca()"
+                          class="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5
+                                 bg-indigo-600 text-white hover:bg-indigo-700 transition">
+                    <i data-lucide="headphones" class="w-4 h-4"></i>
+                    Dengarkan
+                  </button>
+                </template>
+
+                <template x-if="suaraStatus === 'main'">
+                  <button type="button" @click="jedaBaca()"
+                          class="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5
+                                 border border-slate-300 dark:border-slate-600 hover:bg-white dark:hover:bg-slate-700 transition">
+                    <i data-lucide="pause" class="w-4 h-4"></i> Jeda
+                  </button>
+                </template>
+
+                <template x-if="suaraStatus === 'jeda'">
+                  <button type="button" @click="lanjutBaca()"
+                          class="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5
+                                 bg-indigo-600 text-white hover:bg-indigo-700 transition">
+                    <i data-lucide="play" class="w-4 h-4"></i> Lanjut
+                  </button>
+                </template>
+
+                <template x-if="suaraStatus !== 'diam'">
+                  <span class="flex items-center gap-2">
+                    <button type="button" @click="lewatiBagian()" title="Lompat ke bagian berikutnya"
+                            class="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5
+                                   border border-slate-300 dark:border-slate-600 hover:bg-white dark:hover:bg-slate-700 transition">
+                      <i data-lucide="skip-forward" class="w-4 h-4"></i>
+                      <span class="hidden sm:inline">Lewati</span>
+                    </button>
+                    <button type="button" @click="hentikanBaca()"
+                            class="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5
+                                   border border-slate-300 dark:border-slate-600 hover:bg-white dark:hover:bg-slate-700 transition">
+                      <i data-lucide="square" class="w-4 h-4"></i>
+                      <span class="hidden sm:inline">Berhenti</span>
+                    </button>
+                  </span>
+                </template>
+
+                <label class="ml-auto flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  Kecepatan
+                  <select aria-label="Kecepatan baca" @change="ubahKecepatan($event.target.value)"
+                          class="text-xs px-1.5 py-1 rounded-md border border-slate-300 dark:border-slate-600
+                                 bg-white dark:bg-slate-700">
+                    <template x-for="k in [0.8, 0.9, 1, 1.1, 1.25, 1.5]" :key="k">
+                      <option :value="k" :selected="k === suaraKecepatan"
+                              x-text="k === 1 ? 'Normal' : k + '×'"></option>
+                    </template>
+                  </select>
+                </label>
+              </div>
+
+              <!-- Bagian yang sedang dibacakan + kemajuannya. Tanpa ini,
+                   pembaca yang menekan jeda tidak punya cara tahu sudah
+                   sampai mana, dan brief sepanjang ini punya enam bagian. -->
+              <template x-if="suaraStatus !== 'diam'">
+                <div class="mt-2.5">
+                  <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                    <span x-text="suaraJudul"></span>
+                    <span x-text="progresSuara + '%'"></span>
+                  </div>
+                  <div class="mt-1 h-1 rounded-full bg-slate-200 dark:bg-slate-600 overflow-hidden">
+                    <div class="h-full bg-indigo-500 transition-all" :style="`width: ${progresSuara}%`"></div>
+                  </div>
+                </div>
+              </template>
+
+              <template x-if="suaraGalat">
+                <p class="mt-2 text-xs text-amber-700 dark:text-amber-400" x-text="suaraGalat"></p>
+              </template>
+
+              <p class="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+                Dibacakan suara bawaan perangkatmu. Angka sudah diubah ke bentuk ucapan
+                supaya harga tidak terdengar salah.
+              </p>
+            </div>
+          </template>
 
           <!-- Bagian yang ditahan critic (kalau ada) sengaja tidak diberi tahu
                ke pembaca — brief ini untuk pemakaian pribadi, dan membeberkan
