@@ -513,7 +513,21 @@ Halaman dirancang mobile-first dan diuji di lebar 360px, 390px, dan 430px:
 
 ## Pembacaan suara
 
-Bagian **Ulasan Lengkap** punya tombol **Dengarkan**: brief dibacakan dengan suara bahasa Indonesia, lengkap dengan jeda, lompat bagian, dan pengatur kecepatan. Berguna justru pada brief sepanjang ini — 7.000 karakter prosa bisa didengar sambil menyetir atau sarapan.
+Tombol **Dengarkan** di header membacakan **seluruh isi halaman** dengan suara bahasa Indonesia — 21 bagian, sekitar 21.000 karakter, kira-kira 28 menit pada kecepatan normal. Lengkap dengan jeda, lompat bagian, dan pengatur kecepatan.
+
+Tombolnya di header, bukan menempel pada salah satu bagian: yang dibacakan seluruh halaman, jadi menempelkannya pada satu bagian akan menyiratkan cakupan yang lebih sempit dari kenyataannya. Di sana ia juga ikut sticky — pendengar bisa menjeda dari mana pun tanpa menggulir balik. Saat berbunyi, sebuah strip tipis di bawah header menampilkan bagian yang sedang dibacakan beserta kemajuannya, plus tombol lewati dan berhenti.
+
+Urutannya mengikuti urutan baca halaman:
+
+| | Bagian |
+|---|---|
+| **Angka** | pembuka (harga, rentang) · perubahan sejak brief kemarin · pergerakan 24 jam · indikator harian · level kunci · posisi pasar · makro · opsi · valuasi on-chain · aliran dana · whale vs ritel · sinyal bertentangan |
+| **Prosa** | geopolitik & regulasi · narasi utama · penyebab pergerakan · pandangan ke depan · pembacaan teknikal · whale & sinyal palsu |
+| **Daftar** | agenda tiga hari ke depan · berita utama · pernyataan tokoh |
+
+**Angka tidak dibacakan sebagai daftar.** Sebuah tabel yang diucapkan sel demi sel ("dxy 98,86, ust10y 4,74, wti 86,13") tidak bisa diikuti siapa pun — pendengar kehilangan konteks di angka ketiga. Tiap bagian angka karena itu dirakit jadi **kalimat** lebih dulu, dengan satuan dan arah yang eksplisit: *"Indeks dolar DXY 98,86, naik 0,06 persen. Yield obligasi Amerika Serikat 10 tahun 4,74 persen, naik 0,89 persen."*
+
+Itu juga sebabnya bagian-bagian ini dibangun kode, bukan diambil dari DOM: teks yang terbaca di layar bersandar pada tata letak — kolom, label, warna — yang seluruhnya hilang begitu diucapkan.
 
 **Suaranya dari Web Speech API bawaan browser, bukan berkas audio yang dibangkitkan pipeline.** Alasannya biaya: brief ini ~14.000 karakter prosa per hari, dan TTS berbayar termurah pun menambah beberapa dolar sebulan ke anggaran yang totalnya $10 — untuk sesuatu yang sudah tersedia gratis di perangkat pembaca. Pipeline tidak tersentuh sama sekali, dan tidak ada satu byte pun tambahan yang di-commit tiap hari. Konsekuensinya kualitas suara mengikuti mesin TTS masing-masing perangkat, dan itu pertukaran yang diterima sadar.
 
@@ -529,20 +543,40 @@ Prosa brief ini padat angka pasar dan akronim, dan mesin TTS membacanya apa adan
 | `~$77.024` | tilde dibaca atau ditelan | "sekitar 77 ribu 24 dolar" |
 | `EMA20` | "ema dua puluh" | "E M A 20" |
 | `BTC`, `AS`, `OI` | "b-t-c", "as", "o-i" | "Bitcoin", "Amerika Serikat", "open interest" |
+| `zona jenuh_beli` | garis bawahnya ikut terucap | "zona jenuh beli" |
+| `-0,002%` | tanda minus ditelan | "minus 0 koma 0 0 2 persen" |
+| `$500B` | "500 dolar B" | "500 miliar dolar" |
+| `$2.74T` | **274** triliun — seratus kali lipat | "2 koma 7 4 triliun dolar" |
+| `Core PCE m/m` | "m atau m" | "Core P C E bulanan" |
 
 Yang pertama fatal: **titik ribuan gaya Indonesia dibaca sebagai titik desimal**, jadi harga Bitcoin terdengar seperti angka tujuh puluh tujuh — dan pendengar tidak punya cara tahu ia salah dengar. Karena itu seluruh angka diubah lebih dulu jadi bentuk yang memang diucapkan orang, bukan diserahkan ke mesin TTS.
 
 Ini mengikuti pola yang sudah dipegang proyek ini di `src/utils/istilah.py`: **kode** yang merapikan teks secara deterministik, bukan model, dan bukan harapan bahwa mesin di seberang sana kebetulan menebak benar.
 
-Desimal diucapkan digit per digit (`0,93` → "nol koma sembilan tiga") karena itu memang cara membacanya dalam bahasa Indonesia — dan sekaligus menutup jebakan angka kecil: tanpa padding dua digit, `0,05` dibulatkan jadi `"5"` lalu terdengar sebagai "nol koma lima", **sepuluh kali lipat nilainya**.
+Desimal diucapkan digit per digit (`0,93` → "nol koma sembilan tiga") karena itu memang cara membacanya dalam bahasa Indonesia — dan sekaligus menutup jebakan angka kecil: tanpa padding, `0,05` dibulatkan jadi `"5"` lalu terdengar sebagai "nol koma lima", **sepuluh kali lipat nilainya**.
+
+Ketelitiannya **mengikuti besaran**, tidak dipatok dua angka. Funding rate hidup di orde 0,007%: dibulatkan dua desimal ia jadi "0,01" — bukan sekadar kehilangan presisi, tapi mengucapkan angka yang salah.
+
+**Titik tidak selalu pemisah ribuan.** Judul berita yang belum diterjemahkan memakai gaya Inggris, dan di sana titik adalah koma desimal: `$2.74T` berarti 2,74 triliun, bukan 274. Pembedanya tidak ambigu — kelompok ribuan gaya Indonesia selalu tepat tiga digit, jadi titik yang diikuti satu atau dua digit pasti desimal.
+
+Sebagian jebakan di atas baru muncul ketika **seluruh** halaman ikut dibacakan: bagian angka mengambil nilai enum dan judul berita langsung dari data, jadi ia tidak pernah lewat `src/utils/istilah.py` yang membereskan garis bawah untuk prosa tulisan AI.
 
 ### Tiga hal lain yang ditangani
 
 - **Teks dipecah per kalimat.** Chrome memotong utterance panjang di sekitar detik ke-15 dan berhenti diam-diam di tengah kalimat. Tiap potongan dijaga di bawah 220 karakter, yang sekaligus memberi titik berhenti rapi saat pembaca menekan jeda.
 - **Daftar suara diperiksa dua kali.** Chrome memulangkan daftar kosong pada pemanggilan pertama dan baru mengisinya setelah event `voiceschanged`; memeriksa sekali saja membuat tombolnya tidak pernah muncul di Chrome.
-- **Bar-nya hilang total kalau perangkat tidak punya suara Indonesia.** Tombol yang menghasilkan brief berbahasa Indonesia dibacakan dengan fonetik Inggris lebih buruk daripada tidak ada tombolnya sama sekali. Suara `id-ID` tersedia bawaan di Android, macOS, dan iOS (Damayanti); di Windows dan Linux desktop perlu dipasang lebih dulu.
+- **Tombolnya hilang total kalau perangkat tidak punya suara Indonesia.** Tombol yang membacakan teks berbahasa Indonesia dengan fonetik Inggris lebih buruk daripada tidak ada tombolnya sama sekali. Suara `id-ID` tersedia bawaan di Android, macOS, dan iOS (Damayanti); di Windows dan Linux desktop perlu dipasang lebih dulu.
 
-Yang dibacakan **sengaja bukan seluruh halaman** — tabel, chip, dan angka makro tidak punya arti kalau diucapkan berurutan. Urutannya mengikuti urutan baca halaman: pembuka (harga + waktu), geopolitik & regulasi, narasi utama, penyebab pergerakan, pandangan ke depan, teknikal, whale.
+### Header sticky tidak boleh membengkak
+
+Header ini sudah memuat badge kualitas data, tombol berlangganan, dan pengatur tema. Menambahkan tombol keempat membuat judul halaman membungkus satu baris lagi di layar 360px — dan itu terjadi **tepat saat pembacaan dimulai**, jadi header sticky-nya melebar persis ketika isi halaman paling perlu terlihat. Pernah terukur 395px dari layar setinggi 640px.
+
+Dua hal yang menahannya, keduanya lahir dari pengukuran:
+
+- **Kontrol sekunder (lewati, berhenti) hidup di strip, bukan di baris header.** Di strip keduanya gratis: barisnya memang baru muncul saat membaca. Header karena itu selalu berisi tepat satu tombol suara, apa pun statusnya.
+- **`min-w-0` pada judul bagian di strip.** Tanpanya `truncate` tidak pernah berlaku — item flex tidak boleh menyusut di bawah lebar kontennya secara bawaan — dan strip yang seharusnya satu baris ikut membungkus.
+
+Sekarang strip menambah tepat 41px di semua lebar yang diuji (360px, 390px, 430px), dan uji `test_header_tidak_membengkak_di_ponsel` menjaganya tetap begitu.
 
 ---
 
