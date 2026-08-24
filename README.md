@@ -513,7 +513,7 @@ Halaman dirancang mobile-first dan diuji di lebar 360px, 390px, dan 430px:
 
 ## Pembacaan suara
 
-Tombol **Dengarkan** di header membacakan **seluruh isi halaman** dengan suara bahasa Indonesia — 21 bagian, sekitar 21.000 karakter, kira-kira 28 menit pada kecepatan normal. Lengkap dengan jeda, lompat bagian, dan pengatur kecepatan.
+Tombol **Dengarkan** di header membacakan **seluruh isi halaman** dengan suara bahasa Indonesia, lengkap dengan jeda, lompat bagian, dan pengatur kecepatan.
 
 Tombolnya di header, bukan menempel pada salah satu bagian: yang dibacakan seluruh halaman, jadi menempelkannya pada satu bagian akan menyiratkan cakupan yang lebih sempit dari kenyataannya. Di sana ia juga ikut sticky — pendengar bisa menjeda dari mana pun tanpa menggulir balik. Saat berbunyi, sebuah strip tipis di bawah header menampilkan bagian yang sedang dibacakan beserta kemajuannya, plus tombol lewati dan berhenti.
 
@@ -521,11 +521,13 @@ Urutannya mengikuti urutan baca halaman:
 
 | | Bagian |
 |---|---|
-| **Angka** | pembuka (harga, rentang) · perubahan sejak brief kemarin · pergerakan 24 jam · indikator harian · level kunci · posisi pasar · makro · opsi · valuasi on-chain · aliran dana · whale vs ritel · sinyal bertentangan |
+| **Angka** | pembuka (harga, rentang) · perubahan sejak brief kemarin · level kunci · posisi pasar |
 | **Prosa** | geopolitik & regulasi · narasi utama · penyebab pergerakan · pandangan ke depan · pembacaan teknikal · whale & sinyal palsu |
 | **Daftar** | agenda tiga hari ke depan · berita utama · pernyataan tokoh |
 
-**Angka tidak dibacakan sebagai daftar.** Sebuah tabel yang diucapkan sel demi sel ("dxy 98,86, ust10y 4,74, wti 86,13") tidak bisa diikuti siapa pun — pendengar kehilangan konteks di angka ketiga. Tiap bagian angka karena itu dirakit jadi **kalimat** lebih dulu, dengan satuan dan arah yang eksplisit: *"Indeks dolar DXY 98,86, naik 0,06 persen. Yield obligasi Amerika Serikat 10 tahun 4,74 persen, naik 0,89 persen."*
+**Bagian angka dipangkas jadi cuma yang penting**, bukan seluruh tabel data mentah dibacakan satu per satu. Rincian teknikal harian (EMA/RSI/MACD/Bollinger), makro (DXY/yield/emas/minyak/VIX/USDJPY/Nasdaq), opsi Deribit, valuasi on-chain, aliran dana, dan posisi whale vs ritel sengaja dibuang dari bacaan angka: nilainya sudah terwakili di prosa ulasan ("Pembacaan teknikal", "Whale & sinyal palsu"), dan mendengarkan belasan angka berturut-turut sebelum sampai ke ulasan bikin pendengar bosan lalu berhenti dengar sebelum sampai ke bagian yang paling ingin mereka dengar. Yang tersisa di bagian angka cuma yang benar-benar dibutuhkan sebelum masuk ke narasi: harga hari ini, apa yang berubah sejak kemarin, level kunci, dan posisi pasar (funding, fear & greed, ETF, likuidasi).
+
+**Angka tidak dibacakan sebagai daftar.** Sebuah tabel yang diucapkan sel demi sel ("funding 0,01%, fear and greed 62, etf masuk 120 juta") tidak bisa diikuti siapa pun — pendengar kehilangan konteks di angka ketiga. Tiap bagian angka karena itu dirakit jadi **kalimat** lebih dulu, dengan satuan dan arah yang eksplisit: *"Bitcoin berada di 91 ribu 240 dolar, naik 1,2 persen dalam 24 jam. Dibanding brief kemarin, harga naik 0,8 persen."*
 
 Itu juga sebabnya bagian-bagian ini dibangun kode, bukan diambil dari DOM: teks yang terbaca di layar bersandar pada tata letak — kolom, label, warna — yang seluruhnya hilang begitu diucapkan.
 

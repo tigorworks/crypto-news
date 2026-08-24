@@ -353,7 +353,7 @@ def test_kecepatan_diterapkan_ke_ucapan_berikutnya(halaman_suara):
 
 
 def test_seluruh_isi_halaman_ikut_dibacakan(halaman_suara):
-    """Bukan cuma prosa ulasan — angka, daftar, dan berita ikut."""
+    """Bukan cuma prosa ulasan — angka penting, daftar, dan berita ikut."""
     hal = halaman_suara()
     judul = hal.evaluate(
         "() => Alpine.$data(document.querySelector('[x-data]')).segmenSuara.map((s) => s.judul)"
@@ -361,17 +361,37 @@ def test_seluruh_isi_halaman_ikut_dibacakan(halaman_suara):
 
     assert judul[0] == "Pembuka"
     kurang = {
-        "Indikator harian", "Level kunci", "Posisi pasar", "Makro", "Opsi",
-        "Valuasi on-chain", "Whale vs ritel",       # angka
-        "Geopolitik & regulasi", "Narasi utama",    # prosa ulasan
-        "Berita utama", "Pernyataan tokoh",         # daftar
+        "Perubahan sejak kemarin", "Level kunci", "Posisi pasar",  # angka penting
+        "Geopolitik & regulasi", "Narasi utama",                  # prosa ulasan
+        "Berita utama", "Pernyataan tokoh",                       # daftar
     } - set(judul)
     assert not kurang, f"bagian ini tidak ikut dibacakan: {sorted(kurang)}"
 
-    # Urutannya mengikuti urutan baca halaman: angka dulu, lalu ulasan,
-    # baru daftar panjang di ekor.
-    assert judul.index("Indikator harian") < judul.index("Narasi utama")
+    # Urutannya mengikuti urutan baca halaman: angka penting dulu, lalu
+    # langsung ulasan, baru daftar panjang di ekor.
+    assert judul.index("Posisi pasar") < judul.index("Narasi utama")
     assert judul.index("Narasi utama") < judul.index("Berita utama")
+
+
+def test_bagian_angka_niche_dipangkas(halaman_suara):
+    """Rincian teknikal/makro/opsi/on-chain/whale mentah dibuang dari bacaan.
+
+    Nilainya sudah terwakili di narasi ulasan ("Pembacaan teknikal", "Whale
+    & sinyal palsu"), dan mendengarkan belasan angka berturut-turut sebelum
+    sampai ke ulasan bikin pendengar bosan lalu berhenti dengar. Angka
+    dipangkas jadi cuma yang penting, lalu langsung lanjut ke ulasan.
+    """
+    hal = halaman_suara()
+    judul = set(hal.evaluate(
+        "() => Alpine.$data(document.querySelector('[x-data]')).segmenSuara.map((s) => s.judul)"
+    ))
+
+    dibuang = {
+        "Pergerakan 24 jam", "Indikator harian", "Makro", "Opsi",
+        "Valuasi on-chain", "Aliran dana", "Whale vs ritel", "Sinyal bertentangan",
+    }
+    masih_ada = dibuang & judul
+    assert not masih_ada, f"bagian angka niche seharusnya sudah dipangkas: {sorted(masih_ada)}"
 
 
 def test_angka_dirakit_jadi_kalimat_bukan_daftar(halaman_suara):
@@ -386,11 +406,8 @@ def test_angka_dirakit_jadi_kalimat_bukan_daftar(halaman_suara):
       return Object.fromEntries(d.segmenSuara.map((s) => [s.judul, s.teks]));
     }""")
 
-    makro = segmen["Makro"]
-    assert "Indeks dolar" in makro
-    # "AS" ikut diperluas jadi "Amerika Serikat" oleh untukSuara().
-    assert "yield obligasi Amerika Serikat 10 tahun" in makro
-    assert "naik" in makro or "turun" in makro, "arah perubahan tidak terucap"
+    perubahan = segmen["Perubahan sejak kemarin"]
+    assert "naik" in perubahan or "turun" in perubahan, "arah perubahan tidak terucap"
 
     pembuka = segmen["Pembuka"]
     assert "dolar" in pembuka, "satuan mata uang tidak terucap"
