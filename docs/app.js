@@ -2027,15 +2027,22 @@ function briefApp() {
     // ---------------------------------------------------------------
     // PEMBACAAN SUARA
     //
-    // SELURUH isi halaman dibacakan, bukan cuma prosa ulasannya: harga,
-    // teknikal, posisi pasar, makro, opsi, on-chain, whale, agenda, berita,
-    // dan pernyataan tokoh. Urutannya mengikuti urutan baca halaman.
+    // Bukan seluruh halaman dibacakan mentah-mentah. Bagian ANGKA dipangkas
+    // jadi cuma yang penting — harga, perubahan sejak brief kemarin, level
+    // kunci, dan posisi pasar (funding, fear & greed, ETF, likuidasi) — lalu
+    // LANGSUNG lanjut ke prosa ulasan (narasi, penyebab pergerakan, outlook).
+    // Rincian teknikal/makro/opsi/on-chain/whale mentah sengaja dibuang dari
+    // sini: nilainya sudah terwakili di narasi ulasan ("Pembacaan teknikal",
+    // "Whale & sinyal palsu"), dan mendengarkan belasan angka berturut-turut
+    // sebelum sampai ke ulasan bikin pendengar bosan lalu berhenti dengar.
+    // Baru setelah ulasan, agenda/berita/pernyataan tokoh (_segmenDaftar)
+    // menutup pembacaan.
     //
-    // Angka TIDAK dibacakan sebagai daftar. Sebuah tabel yang diucapkan
-    // sel demi sel ("dxy 98,86, ust10y 4,74, wti 86,13") tidak bisa diikuti
-    // siapa pun — pendengar kehilangan konteks di angka ketiga. Karena itu
-    // tiap bagian angka dirakit jadi KALIMAT lebih dulu, dengan satuan dan
-    // arah yang eksplisit, lalu barulah diserahkan ke untukSuara().
+    // Angka yang tersisa TIDAK dibacakan sebagai daftar. Sebuah tabel yang
+    // diucapkan sel demi sel ("dxy 98,86, ust10y 4,74, wti 86,13") tidak bisa
+    // diikuti siapa pun — pendengar kehilangan konteks di angka ketiga.
+    // Karena itu tiap bagian angka dirakit jadi KALIMAT lebih dulu, dengan
+    // satuan dan arah yang eksplisit, lalu barulah diserahkan ke untukSuara().
     //
     // Itu juga sebabnya bagian-bagian ini dibangun kode, bukan diambil dari
     // DOM: teks yang terbaca di layar bersandar pada tata letak (kolom,
@@ -2065,7 +2072,6 @@ function briefApp() {
       const d = this.data;
       if (!d) return [];
       const keluar = [];
-      const t1d = d.technical?.['1d'] || {};
 
       // -- Pembuka: kapan, berapa, dan bergerak ke mana ----------------
       const p = d.price || {};
@@ -2100,52 +2106,6 @@ function briefApp() {
                + ` jadi ${diff.fear_greed.sekarang}.`);
         }
         keluar.push({ judul: 'Perubahan sejak kemarin', teks: b.join(' ') });
-      }
-
-      // -- Pergerakan 24 jam: klasifikasi yang dihitung kode ------------
-      const gerak = d.technical?.pergerakan_24j;
-      if (gerak?.arah) {
-        const b = [
-          `Pergerakan 24 jam tergolong ${gerak.besaran},`,
-          `arah ${gerak.arah}, ${this._sPct(gerak.perubahan_pct)}.`,
-          `Sebagai pembanding, satu hari normal bergerak ${this._sPct(gerak.atr_harian_pct)}.`,
-        ];
-        if (gerak.jenis_ringkas) b.push(`Jenisnya ${gerak.jenis_ringkas}.`);
-        if (gerak.jenis_arti) b.push(gerak.jenis_arti);
-        keluar.push({ judul: 'Pergerakan 24 jam', teks: b.join(' ') });
-      }
-
-      // -- Indikator candle harian -------------------------------------
-      if (t1d.momentum) {
-        const tren = t1d.tren || {};
-        const mom = t1d.momentum || {};
-        const vol = t1d.volatilitas || {};
-        const vlm = t1d.volume || {};
-        const b = ['Indikator candle harian.'];
-
-        const diAtas = ['ema20', 'ema50', 'ema100', 'ema200']
-          .filter((k) => tren.posisi?.[k] === 'di_atas');
-        if (diAtas.length === 4) b.push('Harga di atas seluruh EMA utama, dari EMA20 sampai EMA200.');
-        else if (diAtas.length) b.push(`Harga di atas ${diAtas.join(', ')}.`);
-        else b.push('Harga di bawah seluruh EMA utama.');
-        if (tren.struktur) b.push(`Struktur trennya ${tren.struktur}.`);
-
-        if (mom.rsi != null) {
-          b.push(`RSI ${formatAngka(mom.rsi, 1)}, zona ${mom.rsi_zona || 'netral'}.`);
-        }
-        if (mom.macd_arah) b.push(`MACD ${mom.macd_arah}.`);
-        if (vol.posisi_dalam_band) {
-          b.push(`Harga berada di bagian ${vol.posisi_dalam_band} Bollinger Band,`
-               + ` dengan rentang harian ${this._sPct(vol.atr_pct)}.`);
-        }
-        if (vlm.rasio_vs_rata != null) {
-          const v = Number(vlm.rasio_vs_rata);
-          const nilai = formatAngka(v, 2) + ' kali';
-          b.push(v >= 1.2 ? `Volume ${nilai} rata-rata 20 hari, jadi pergerakannya terkonfirmasi volume.`
-               : (v < 0.8 ? `Volume cuma ${nilai} rata-rata 20 hari, jadi pergerakannya tidak terkonfirmasi volume.`
-                          : `Volume ${nilai} rata-rata 20 hari, tergolong biasa.`));
-        }
-        keluar.push({ judul: 'Indikator harian', teks: b.join(' ') });
       }
 
       // -- Level kunci --------------------------------------------------
@@ -2185,103 +2145,6 @@ function briefApp() {
         }
         if (m.btc_dominance_pct != null) b.push(`Dominasi Bitcoin ${this._sPct(m.btc_dominance_pct)}.`);
         if (b.length) keluar.push({ judul: 'Posisi pasar', teks: b.join(' ') });
-      }
-
-      // -- Makro ---------------------------------------------------------
-      const mk = d.macro || {};
-      if (mk.dxy != null || mk.ust10y != null) {
-        const b = ['Makro.'];
-        // Kolom keempat: satuan. Yield dan indeks tidak punya, tapi emas dan
-        // minyak berharga dolar — tanpa satuannya "emas 4.671" bisa terdengar
-        // seperti indeks, bukan harga per ons.
-        const baris = [
-          ['Indeks dolar DXY', mk.dxy, mk.dxy_change_pct, 2, ''],
-          ['yield obligasi AS 10 tahun', mk.ust10y, mk.ust10y_change_pct, 2, ' persen'],
-          ['emas', mk.gold, mk.gold_change_pct, 0, ' dolar'],
-          ['minyak WTI', mk.wti, mk.wti_change_pct, 2, ' dolar'],
-          ['indeks volatilitas VIX', mk.vix, mk.vix_change_pct, 2, ''],
-          ['dolar terhadap yen', mk.usdjpy, mk.usdjpy_change_pct, 2, ' yen'],
-          ['Nasdaq', mk.nasdaq, mk.nasdaq_change_pct, 0, ''],
-        ];
-        for (const [nama, nilai, ubah, des, satuan] of baris) {
-          if (nilai == null) continue;
-          b.push(`${nama} ${formatAngka(nilai, des)}${satuan}`
-               + `${ubah == null ? '' : ', ' + this._sArah(ubah)}.`);
-        }
-        keluar.push({ judul: 'Makro', teks: b.join(' ') });
-      }
-
-      // -- Opsi Deribit ---------------------------------------------------
-      const op = d.options || {};
-      if (op.dvol != null) {
-        const b = [`Opsi Deribit. Volatilitas implied DVOL ${formatAngka(op.dvol, 1)}.`];
-        if (op.iv_rv_ratio != null) {
-          const r = Number(op.iv_rv_ratio);
-          b.push(`Rasio volatilitas implied terhadap realized ${formatAngka(r, 2)} kali,`
-               + ` jadi opsinya ${r > 1.15 ? 'tergolong mahal' : (r < 0.85 ? 'tergolong murah' : 'berharga wajar')}.`);
-        }
-        if (op.put_call_ratio_oi != null) b.push(`Rasio put terhadap call ${formatAngka(op.put_call_ratio_oi, 2)}.`);
-        if (op.max_pain_expiry_terdekat) b.push(`Max pain expiry terdekat di ${this._sUsd(op.max_pain_expiry_terdekat)}.`);
-        keluar.push({ judul: 'Opsi', teks: b.join(' ') });
-      }
-
-      // -- Valuasi on-chain -------------------------------------------------
-      const oc = d.onchain || {};
-      if (oc.mvrv != null) {
-        const b = [`Valuasi on-chain. MVRV ${formatAngka(oc.mvrv, 2)}, zona ${oc.mvrv_zona || 'wajar'},`
-                 + ` ${this._sArah(oc.mvrv_perubahan_30hari_pct)} dalam 30 hari.`];
-        if (oc.alamat_aktif != null) {
-          b.push(`Alamat aktif ${formatAngka(oc.alamat_aktif, 0)},`
-               + ` ${this._sArah(oc.alamat_aktif_perubahan_30hari_pct)} dalam 30 hari.`);
-        }
-        if (oc.market_cap_usd != null) {
-          // Triliun begitu melewati seribu miliar: "1 ribu 546 miliar dolar"
-          // adalah angka yang benar tapi tidak pernah diucapkan siapa pun.
-          const t = oc.market_cap_usd / 1e12;
-          b.push(t >= 1
-            ? `Kapitalisasi pasar ${this._sUsd(t, 2)} triliun.`
-            : `Kapitalisasi pasar ${this._sUsd(oc.market_cap_usd / 1e9, 0)} miliar.`);
-        }
-        keluar.push({ judul: 'Valuasi on-chain', teks: b.join(' ') });
-      }
-
-      // -- Aliran dana --------------------------------------------------------
-      const fl = d.flows || {};
-      if (fl.premium_coinbase_pct != null || fl.stablecoin_cap_usd != null) {
-        const b = ['Aliran dana.'];
-        if (fl.premium_coinbase_pct != null) {
-          b.push(`Premium Coinbase ${this._sPct(fl.premium_coinbase_pct, 3)}, ${fl.premium_coinbase_label || 'seimbang'}.`);
-        }
-        if (fl.stablecoin_cap_usd != null) {
-          b.push(`Pasokan stablecoin ${this._sUsd(fl.stablecoin_cap_usd / 1e9, 1)} miliar,`
-               + ` ${this._sArah(fl.stablecoin_perubahan_24j_pct, 3)} dalam 24 jam.`);
-        }
-        keluar.push({ judul: 'Aliran dana', teks: b.join(' ') });
-      }
-
-      // -- Posisi whale vs ritel -----------------------------------------------
-      const w = d.whale || {};
-      if (w.whale_long_pct != null) {
-        const b = [
-          `Posisi top trader ${this._sPct(w.whale_long_pct)} long berbanding ${this._sPct(w.whale_short_pct)} short.`,
-          `Ritel ${this._sPct(w.ritel_long_pct)} long berbanding ${this._sPct(w.ritel_short_pct)} short.`,
-        ];
-        if (w.divergensi_label) b.push(`Keduanya ${w.divergensi_label}.`);
-        if (w.taker_buy_sell_ratio != null) {
-          b.push(`Rasio beli terhadap jual di sisi taker ${formatAngka(w.taker_buy_sell_ratio, 2)},`
-               + ` ${w.taker_tren || ''}.`);
-        }
-        keluar.push({ judul: 'Whale vs ritel', teks: b.join(' ') });
-      }
-
-      // -- Sinyal bertentangan ---------------------------------------------------
-      const konflik = d.conflicts || [];
-      if (konflik.length) {
-        keluar.push({
-          judul: 'Sinyal bertentangan',
-          teks: 'Sinyal yang saling bertentangan hari ini. '
-              + konflik.slice(0, 4).map((c) => c.keterangan).filter(Boolean).join(' '),
-        });
       }
 
       return keluar;
