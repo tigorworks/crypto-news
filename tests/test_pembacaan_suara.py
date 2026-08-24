@@ -39,9 +39,17 @@ Object.defineProperty(window, 'speechSynthesis', {
     addEventListener() {},
     speak(u) {
       window.__ucapan.push({ text: u.text, lang: u.lang, rate: u.rate, voice: u.voice?.lang });
-      // onend ditunda satu tick: memanggilnya serentak membuat rekursi
-      // sedalam antreannya dan menghabiskan stack di brief yang panjang.
-      this._pending = setTimeout(() => u.onend && u.onend(), 0);
+      // onend ditunda 50ms, BUKAN 0.
+      //
+      // Dengan 0, antrean habis secepat event loop sanggup: seluruh bacaan
+      // (21 bagian, ratusan potongan) selesai dalam ratusan milidetik, dan
+      // uji yang memeriksa keadaan "sedang membaca" gagal berselang-seling
+      // — di CI lolos, di sini tidak, atau sebaliknya. Persis itu yang
+      // terjadi setelah cakupan bacaan naik dari 6 bagian jadi 21.
+      //
+      // 50ms membuat pembacaan berjalan cukup lama untuk diperiksa, tanpa
+      // memperlambat uji: yang ditunggu paling banter beberapa potongan.
+      this._pending = setTimeout(() => u.onend && u.onend(), 50);
     },
     cancel() { window.__batal += 1; clearTimeout(this._pending); },
     pause() { this.paused = true; },
@@ -228,16 +236,19 @@ def test_kontrol_ada_di_header_dan_ikut_sticky(halaman_suara):
     assert hal.locator("header #suara-header").count() == 1
     assert hal.locator("#bar-suara").count() == 0, "bar lama di bagian ulasan belum dilepas"
 
-    # Gulir jauh ke bawah: tombolnya harus tetap terlihat.
-    hal.get_by_role("button", name="Dengarkan").click()
-    hal.wait_for_function("() => window.__ucapan.length > 1")
+    # Gulir jauh ke bawah: kontrolnya harus tetap terlihat di dekat puncak.
+    #
+    # Yang diperiksa KELOMPOK kontrolnya, bukan tombol tertentu. Tombol mana
+    # yang tampil bergantung pada status pembacaan, dan mengikatnya ke
+    # "Jeda" membuat uji ini bergantung pada pembacaan yang kebetulan belum
+    # selesai — sumber kegagalan berselang-seling yang tidak ada kaitannya
+    # dengan hal yang sedang diuji.
     hal.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
     hal.wait_for_timeout(200)
 
-    jeda = hal.get_by_role("button", name="Jeda")
-    assert jeda.is_visible()
-    kotak = jeda.bounding_box()
-    assert kotak["y"] < 200, "kontrol suara tidak ikut sticky saat halaman digulir"
+    ctl = hal.locator("#suara-header")
+    assert ctl.is_visible()
+    assert ctl.bounding_box()["y"] < 200, "kontrol suara tidak ikut sticky saat halaman digulir"
 
 
 def test_header_tidak_membengkak_di_ponsel(peramban, alamat):
