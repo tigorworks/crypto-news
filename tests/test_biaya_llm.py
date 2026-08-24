@@ -164,6 +164,70 @@ def test_telemetri_mencatat_token_per_langkah(tmp_path):
     assert sintesis["rata_token_masuk"] == 11400
 
 
+def test_angka_biaya_dibatasi_sejak_tanggal_tertentu(tmp_path, monkeypatch):
+    """Run dari konfigurasi lama tidak boleh mencemari rata-rata biaya.
+
+    Sembilan run pertama diisi ulang dari arsip dan sebagian besar sisanya
+    run pengembangan, semuanya sebelum langkah penyiapan data pindah ke
+    DeepSeek. Merata-ratakannya bersama run sekarang menghasilkan angka yang
+    tidak menggambarkan satu pun konfigurasi yang pernah berjalan.
+    """
+    monkeypatch.setattr(telemetri, "BIAYA_SEJAK_UTC", "2026-08-22T17:00:00Z")
+
+    path = tmp_path / "telemetri.jsonl"
+    baris = [
+        # Sebelum batas: era lama, mahal.
+        {"waktu_utc": "2026-08-20T08:42:36Z", "biaya_usd": 0.75,
+         "budget_terpakai_pct": 126.5, "siaga": {"risiko_jendela": "sedang"}, "harga": 74000},
+        {"waktu_utc": "2026-08-22T10:14:00Z", "biaya_usd": 0.33,
+         "budget_terpakai_pct": 44.0, "siaga": {"risiko_jendela": "rendah"}, "harga": 75000},
+        # Sesudah batas: konfigurasi sekarang.
+        {"waktu_utc": "2026-08-22T23:43:00Z", "biaya_usd": 0.26,
+         "budget_terpakai_pct": 65.0, "biaya_per_langkah": {"synthesis": 0.2},
+         "siaga": {"risiko_jendela": "rendah"}, "harga": 77000},
+        {"waktu_utc": "2026-08-23T23:42:12Z", "biaya_usd": 0.24,
+         "budget_terpakai_pct": 60.0, "biaya_per_langkah": {"synthesis": 0.18},
+         "siaga": {"risiko_jendela": "rendah"}, "harga": 78000},
+    ]
+    path.write_text("".join(json.dumps(b) + "\n" for b in baris), encoding="utf-8")
+
+    hasil = telemetri.ringkas(path=path, keluaran=tmp_path / "ringkas.json")
+
+    # Hanya dua run terakhir yang masuk ke angka biaya.
+    assert hasil["jumlah_run_biaya"] == 2
+    assert hasil["biaya"]["rata_usd"] == pytest.approx(0.25)
+    assert hasil["biaya"]["maks_usd"] == 0.26
+    assert hasil["biaya"]["run_di_atas_85_persen_budget"] == 0   # yang 126,5% jatuh di luar
+    assert [r["waktu_utc"] for r in hasil["run"]] == [
+        "2026-08-23T23:42:12Z", "2026-08-22T23:43:00Z",
+    ]
+
+    # Yang BUKAN biaya tetap memakai jendela penuh: panel riwayat siaga di
+    # halaman brief bergantung pada rentang hari yang panjang, dan
+    # memendekkannya adalah kemunduran yang tidak diminta siapa pun.
+    assert hasil["jumlah_run"] == 4
+    assert len(hasil["riwayat_siaga"]) == 4
+
+
+def test_batas_biaya_tidak_mengosongkan_halaman(tmp_path, monkeypatch):
+    """Kalau batasnya menyapu semua run, jendela penuh dipakai kembali.
+
+    Halaman biaya yang kosong sama sekali lebih membingungkan daripada
+    halaman berisi run lama — dan itu keadaan yang wajar terjadi setelah
+    data direset.
+    """
+    monkeypatch.setattr(telemetri, "BIAYA_SEJAK_UTC", "2027-01-01T00:00:00Z")
+
+    path = tmp_path / "telemetri.jsonl"
+    path.write_text(json.dumps({
+        "waktu_utc": "2026-08-22T23:43:00Z", "biaya_usd": 0.26,
+    }) + "\n", encoding="utf-8")
+
+    hasil = telemetri.ringkas(path=path, keluaran=tmp_path / "ringkas.json")
+    assert hasil["jumlah_run_biaya"] == 1
+    assert hasil["biaya"]["rata_usd"] == pytest.approx(0.26)
+
+
 def test_telemetri_mencatat_model_per_langkah(tmp_path):
     """Jatuhnya sebuah langkah ke model cadangan harus terlihat.
 

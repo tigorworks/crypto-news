@@ -154,29 +154,51 @@ function angkaTerbilang(nilai) {
 
   let hasil = bagian.join(' ');
   if (pecahan > 0) {
-    // Desimal dibulatkan ke dua angka — presisi di luar itu tidak menambah
-    // apa pun saat didengar — lalu diucapkan DIGIT PER DIGIT.
+    // Desimal diucapkan DIGIT PER DIGIT. Bukan gaya-gayaan: itu memang cara
+    // angka desimal dibaca dalam bahasa Indonesia ("nol koma sembilan tiga",
+    // bukan "nol koma sembilan puluh tiga"), dan sekaligus menutup jebakan
+    // angka kecil. Tanpa padding, 0,05 dibulatkan jadi "5" lalu terdengar
+    // sebagai "nol koma lima" — sepuluh kali lipat nilainya.
     //
-    // Digit per digit bukan gaya-gayaan: itu memang cara angka desimal
-    // dibaca dalam bahasa Indonesia ("nol koma sembilan tiga", bukan "nol
-    // koma sembilan puluh tiga"), dan sekaligus menutup jebakan angka
-    // kecil. Tanpa padding dua digit, 0,05 dibulatkan jadi "5" lalu
-    // terdengar sebagai "nol koma lima" — sepuluh kali lipat nilainya.
-    let desimal = String(Math.round(pecahan * 100)).padStart(2, '0');
-    desimal = desimal.replace(/0$/, '');   // 0,50 -> "koma 5", bukan "koma 5 0"
+    // Ketelitiannya MENGIKUTI BESARAN, tidak dipatok dua angka. Funding rate
+    // hidup di orde 0,007%: dibulatkan dua desimal ia jadi "0,01" — bukan
+    // sekadar kehilangan presisi, tapi mengucapkan angka yang salah. Empat
+    // angka di bawah 0,1 cukup untuk seluruh metrik yang dibacakan halaman
+    // ini, dan tetap pendek didengar karena nol di belakang dibuang.
+    const angkaDesimal = Math.abs(nilai) < 0.1 ? 4 : 2;
+    const skala = 10 ** angkaDesimal;
+    let desimal = String(Math.round(pecahan * skala)).padStart(angkaDesimal, '0');
+    desimal = desimal.replace(/0+$/, '');   // 0,50 -> "koma 5", bukan "koma 5 0"
     if (desimal) hasil += ' koma ' + desimal.split('').join(' ');
   }
   return hasil;
 }
 
-/* "77.614" / "1,92" (gaya Indonesia) -> Number. */
+/* "77.614" / "1,92" (gaya Indonesia) -> Number.
+
+   Titik TIDAK selalu pemisah ribuan. Judul berita yang belum diterjemahkan
+   memakai gaya Inggris, dan di sana titik adalah koma desimal: "$2.74T"
+   berarti 2,74 triliun, bukan 274. Dibaca sebagai pemisah ribuan, angkanya
+   terucap seratus kali lipat.
+
+   Pembedanya tidak ambigu: kelompok ribuan gaya Indonesia SELALU tepat tiga
+   digit. Titik yang diikuti satu atau dua digit karena itu pasti desimal. */
 function _uraiAngkaID(teks) {
-  const bersih = String(teks).replace(/\./g, '').replace(',', '.');
+  let bersih = String(teks);
+  if (/^\d{1,3}(?:\.\d{3})*(?:,\d+)?$/.test(bersih)) {
+    bersih = bersih.replace(/\./g, '').replace(',', '.');   // gaya Indonesia
+  } else {
+    bersih = bersih.replace(/,/g, '');                      // gaya Inggris
+  }
   const nilai = Number(bersih);
   return Number.isFinite(nilai) ? nilai : null;
 }
 
-const _SATUAN_BESAR = '(?:\\s+(triliun|miliar|milyar|juta|ribu))?';
+//: Satuan besar yang boleh menyusul angka. Huruf kapital ikut dicocokkan
+//: (`[Mm]iliar`) karena judul berita yang sudah diterjemahkan menulisnya di
+//: awal frasa — "$2,6 Miliar" — dan tanpa itu satuannya terlempar ke
+//: belakang jadi "2 koma 6 dolar Miliar".
+const _SATUAN_BESAR = '(?:\\s+([Tt]riliun|[Mm]iliar|[Mm]ilyar|[Jj]uta|[Rr]ibu))?';
 
 /* Ubah satu blok prosa jadi teks yang enak didengar.
 
@@ -189,6 +211,33 @@ function untukSuara(teks) {
 
   // Tilde "sekitar" — dibaca atau ditelan mesin TTS, dua-duanya salah.
   s = s.replace(/~\s*/g, 'sekitar ');
+
+  // Tanda minus di depan angka. Mesin TTS kerap MENELANNYA tanpa jejak,
+  // dan angka negatif yang terdengar positif adalah kesalahan yang tidak
+  // bisa dideteksi pendengar. Dipisahkan dari tanda hubung biasa dengan
+  // syarat: harus menempel pada digit dan didahului spasi atau awal teks.
+  s = s.replace(/(^|[\s(])-(?=[\d.,]*\d)/g, '$1minus ');
+
+  // Singkatan besaran gaya Inggris yang menempel pada angka ($500B, $2.74T).
+  // Datang dari judul berita asli yang tidak diterjemahkan; tanpa ini
+  // hurufnya tertinggal dan terucap sebagai "500 dolar B".
+  s = s.replace(/(\d)\s*([BTMK])\b/g, (cocok, digit, huruf) => {
+    const satuan = { B: 'miliar', T: 'triliun', M: 'juta', K: 'ribu' }[huruf];
+    return `${digit} ${satuan}`;
+  });
+
+  // Satuan besar berbahasa Inggris, dari judul berita yang belum
+  // diterjemahkan. Diterjemahkan LEBIH DULU supaya pola mata uang di bawah
+  // mengenalinya sebagai satuan dan menempatkannya sebelum kata "dolar".
+  s = s.replace(/\b(trillion|billion|million|thousand)\b/gi, (cocok) => ({
+    trillion: 'triliun', billion: 'miliar', million: 'juta', thousand: 'ribu',
+  })[cocok.toLowerCase()]);
+
+  // Periode data ekonomi: "m/m", "q/q", "y/y". Harus lebih dulu dari aturan
+  // garis miring di bawah, yang akan mengubahnya jadi "m atau m".
+  s = s.replace(/\bm\s*\/\s*m\b/gi, 'bulanan');
+  s = s.replace(/\bq\s*\/\s*q\b/gi, 'kuartalan');
+  s = s.replace(/\by\s*\/\s*y\b/gi, 'tahunan');
 
   // Rentang mata uang: "$75.559–$78.065" -> "... sampai ...".
   //
@@ -245,8 +294,16 @@ function untukSuara(teks) {
   s = s.replace(/(\d)\s*[–—]\s*(\d)/g, '$1 sampai $2');
   s = s.replace(/\s*[–—]\s*/g, ', ');
 
+  // Nama enum yang bocor dari data ke prosa: "jenuh_beli", "short_covering".
+  // Prinsipnya sama dengan src/utils/istilah.py, yang membereskannya di sisi
+  // pipeline untuk teks tulisan AI — tapi bagian angka yang dirakit di sini
+  // mengambil nilai enum LANGSUNG dari data, jadi ia tidak pernah lewat
+  // jalur itu. Garis bawah yang terucap jadi "jenuh garis bawah beli".
+  s = s.replace(/\b([a-z]+)_([a-z_]+)\b/g, (cocok) => cocok.replace(/_/g, ' '));
+
   // Sisa simbol yang tidak punya bunyi.
   s = s.replace(/[«»"'"'`]/g, '');
+  s = s.replace(/\s*·\s*/g, ', ');
   s = s.replace(/\s*\/\s*/g, ' atau ');
   s = s.replace(/&/g, ' dan ');
 
@@ -374,6 +431,26 @@ function briefApp() {
        yang justru paling banyak dipakai pembaca. */
     _siapkanSuara() {
       if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return;
+
+      // Ikon Lucide digambar dengan MENGGANTI elemen <i data-lucide> jadi
+      // SVG, dan itu hanya terjadi pada elemen yang sudah ada di DOM saat
+      // createIcons() dipanggil. Tombol-tombol di sini hidup di dalam
+      // <template x-if> yang isinya baru dirender Alpine setiap kali status
+      // berubah — jadi tanpa penggambaran ulang, tombolnya muncul KOSONG.
+      //
+      // Dulu cacat ini tidak terlihat karena tombolnya masih berlabel teks;
+      // begitu labelnya dilepas dan tinggal ikon, tombolnya jadi kotak polos.
+      //
+      // Pendaftaran watch WAJIB mendahului periksa() di bawah: `periksa()`
+      // menyetel suaraDidukung secara sinkron, dan watch yang didaftarkan
+      // setelahnya tidak pernah melihat perubahan pertama itu — persis
+      // keadaan saat bar-nya muncul untuk pertama kali.
+      //
+      // `bisaDibacakan` ikut diawasi, bukan cuma `suaraDidukung`: barnya
+      // baru benar-benar dirender setelah brief selesai dimuat, yang terjadi
+      // BELAKANGAN dan tidak menyentuh suaraDidukung sama sekali.
+      this.$watch('suaraStatus', () => this.$nextTick(() => this.gambarIkon()));
+      this.$watch('bisaDibacakan', () => this.$nextTick(() => this.gambarIkon()));
 
       const periksa = () => { this.suaraDidukung = !!this._suaraID(); };
       periksa();
@@ -1950,51 +2027,352 @@ function briefApp() {
     // ---------------------------------------------------------------
     // PEMBACAAN SUARA
     //
-    // Yang dibacakan SENGAJA bukan seluruh halaman. Tabel, chip, angka
-    // makro, dan navigasi tidak punya arti apa pun kalau diucapkan
-    // berurutan — yang punya arti adalah prosanya. Urutannya mengikuti
-    // urutan baca di halaman: geopolitik dulu (keputusan terbesar yang
-    // menggerakkan harga), lalu narasi, sebab, pandangan ke depan,
-    // teknikal, dan whale.
+    // SELURUH isi halaman dibacakan, bukan cuma prosa ulasannya: harga,
+    // teknikal, posisi pasar, makro, opsi, on-chain, whale, agenda, berita,
+    // dan pernyataan tokoh. Urutannya mengikuti urutan baca halaman.
+    //
+    // Angka TIDAK dibacakan sebagai daftar. Sebuah tabel yang diucapkan
+    // sel demi sel ("dxy 98,86, ust10y 4,74, wti 86,13") tidak bisa diikuti
+    // siapa pun — pendengar kehilangan konteks di angka ketiga. Karena itu
+    // tiap bagian angka dirakit jadi KALIMAT lebih dulu, dengan satuan dan
+    // arah yang eksplisit, lalu barulah diserahkan ke untukSuara().
+    //
+    // Itu juga sebabnya bagian-bagian ini dibangun kode, bukan diambil dari
+    // DOM: teks yang terbaca di layar bersandar pada tata letak (kolom,
+    // label, warna) yang seluruhnya hilang begitu diucapkan.
     // ---------------------------------------------------------------
 
-    /* Daftar bagian yang akan dibacakan, sudah dinormalkan untuk suara. */
-    get segmenSuara() {
-      const ai = this.data?.ai;
-      if (!ai) return [];
+    /* Pembantu format khusus suara. */
+    _sUsd(nilai, desimal = 0) {
+      return (nilai === null || nilai === undefined)
+        ? '' : '$' + formatAngka(nilai, desimal);
+    },
+    _sPct(nilai, desimal = 2) {
+      return (nilai === null || nilai === undefined)
+        ? '' : formatAngka(nilai, desimal) + '%';
+    },
+    /* "naik 0,93%" / "turun 1,2%" — arah dieja, bukan diserahkan ke tanda minus,
+       yang kerap ditelan mesin TTS tanpa jejak. */
+    _sArah(nilai, desimal = 2) {
+      if (nilai === null || nilai === undefined) return '';
+      const n = Number(nilai);
+      const kata = n > 0 ? 'naik' : (n < 0 ? 'turun' : 'datar');
+      return n === 0 ? 'datar' : `${kata} ${this._sPct(Math.abs(n), desimal)}`;
+    },
 
-      const calon = [];
-      const harga = this.data?.price?.last;
-      if (harga) {
-        // Pembuka pendek: pendengar perlu tahu ini brief kapan dan harga
-        // berapa sebelum masuk ke analisanya.
-        calon.push({
-          judul: 'Pembuka',
-          teks: `Ringkasan pasar kripto, ${this.data.generated_at_wib || ''}. `
-              + `Bitcoin berada di ${untukSuara('$' + formatAngka(harga, 0))}.`,
+    /* Bagian ANGKA: dirakit dari data, satu paragraf per bagian halaman. */
+    get _segmenAngka() {
+      const d = this.data;
+      if (!d) return [];
+      const keluar = [];
+      const t1d = d.technical?.['1d'] || {};
+
+      // -- Pembuka: kapan, berapa, dan bergerak ke mana ----------------
+      const p = d.price || {};
+      if (p.last) {
+        const bagian = [
+          `Ringkasan pasar kripto, ${d.generated_at_wib || ''}.`,
+          `Bitcoin berada di ${this._sUsd(p.last)}, ${this._sArah(p.change_24h_pct)} dalam 24 jam.`,
+        ];
+        if (p.low_24h && p.high_24h) {
+          bagian.push(`Rentang 24 jam ${this._sUsd(p.low_24h)} sampai ${this._sUsd(p.high_24h)}.`);
+        }
+        keluar.push({ judul: 'Pembuka', teks: bagian.join(' ') });
+      }
+
+      // -- Apa yang BERUBAH sejak brief sebelumnya ---------------------
+      // Ditempatkan lebih awal daripada di halaman: pendengar yang mengikuti
+      // tiap hari sebenarnya menunggu jawaban ini, bukan angka absolutnya.
+      const diff = d.diff_vs_previous;
+      if (diff?.tersedia) {
+        const b = [`Dibanding brief ${diff.dibanding}:`];
+        if (diff.harga) b.push(`harga ${this._sArah(diff.harga.selisih_pct)},`);
+        if (diff.sentimen) {
+          b.push(`skor sentimen berita dari ${formatAngka(diff.sentimen.sebelumnya, 1)}`
+               + ` jadi ${formatAngka(diff.sentimen.sekarang, 1)},`);
+        }
+        if (diff.rsi_1d) {
+          b.push(`RSI harian dari ${formatAngka(diff.rsi_1d.sebelumnya, 1)}`
+               + ` jadi ${formatAngka(diff.rsi_1d.sekarang, 1)},`);
+        }
+        if (diff.fear_greed) {
+          b.push(`indeks Fear and Greed dari ${diff.fear_greed.sebelumnya}`
+               + ` jadi ${diff.fear_greed.sekarang}.`);
+        }
+        keluar.push({ judul: 'Perubahan sejak kemarin', teks: b.join(' ') });
+      }
+
+      // -- Pergerakan 24 jam: klasifikasi yang dihitung kode ------------
+      const gerak = d.technical?.pergerakan_24j;
+      if (gerak?.arah) {
+        const b = [
+          `Pergerakan 24 jam tergolong ${gerak.besaran},`,
+          `arah ${gerak.arah}, ${this._sPct(gerak.perubahan_pct)}.`,
+          `Sebagai pembanding, satu hari normal bergerak ${this._sPct(gerak.atr_harian_pct)}.`,
+        ];
+        if (gerak.jenis_ringkas) b.push(`Jenisnya ${gerak.jenis_ringkas}.`);
+        if (gerak.jenis_arti) b.push(gerak.jenis_arti);
+        keluar.push({ judul: 'Pergerakan 24 jam', teks: b.join(' ') });
+      }
+
+      // -- Indikator candle harian -------------------------------------
+      if (t1d.momentum) {
+        const tren = t1d.tren || {};
+        const mom = t1d.momentum || {};
+        const vol = t1d.volatilitas || {};
+        const vlm = t1d.volume || {};
+        const b = ['Indikator candle harian.'];
+
+        const diAtas = ['ema20', 'ema50', 'ema100', 'ema200']
+          .filter((k) => tren.posisi?.[k] === 'di_atas');
+        if (diAtas.length === 4) b.push('Harga di atas seluruh EMA utama, dari EMA20 sampai EMA200.');
+        else if (diAtas.length) b.push(`Harga di atas ${diAtas.join(', ')}.`);
+        else b.push('Harga di bawah seluruh EMA utama.');
+        if (tren.struktur) b.push(`Struktur trennya ${tren.struktur}.`);
+
+        if (mom.rsi != null) {
+          b.push(`RSI ${formatAngka(mom.rsi, 1)}, zona ${mom.rsi_zona || 'netral'}.`);
+        }
+        if (mom.macd_arah) b.push(`MACD ${mom.macd_arah}.`);
+        if (vol.posisi_dalam_band) {
+          b.push(`Harga berada di bagian ${vol.posisi_dalam_band} Bollinger Band,`
+               + ` dengan rentang harian ${this._sPct(vol.atr_pct)}.`);
+        }
+        if (vlm.rasio_vs_rata != null) {
+          const v = Number(vlm.rasio_vs_rata);
+          const nilai = formatAngka(v, 2) + ' kali';
+          b.push(v >= 1.2 ? `Volume ${nilai} rata-rata 20 hari, jadi pergerakannya terkonfirmasi volume.`
+               : (v < 0.8 ? `Volume cuma ${nilai} rata-rata 20 hari, jadi pergerakannya tidak terkonfirmasi volume.`
+                          : `Volume ${nilai} rata-rata 20 hari, tergolong biasa.`));
+        }
+        keluar.push({ judul: 'Indikator harian', teks: b.join(' ') });
+      }
+
+      // -- Level kunci --------------------------------------------------
+      const lv = d.technical?.key_levels;
+      if (lv?.support?.length || lv?.resistance?.length) {
+        const b = [];
+        if (lv.support?.length) {
+          b.push(`Support terdekat ${lv.support.slice(0, 3).map((x) => this._sUsd(x)).join(', lalu ')}.`);
+        }
+        if (lv.resistance?.length) {
+          b.push(`Resistance terdekat ${lv.resistance.slice(0, 3).map((x) => this._sUsd(x)).join(', lalu ')}.`);
+        }
+        if (lv.invalidasi_naik) b.push(`Skenario naik batal kalau harga jatuh di bawah ${this._sUsd(lv.invalidasi_naik)}.`);
+        if (lv.invalidasi_turun) b.push(`Skenario turun batal kalau harga tembus di atas ${this._sUsd(lv.invalidasi_turun)}.`);
+        keluar.push({ judul: 'Level kunci', teks: b.join(' ') });
+      }
+
+      // -- Posisi pasar --------------------------------------------------
+      const m = d.market || {};
+      if (Object.keys(m).length) {
+        const b = [];
+        if (m.funding_rate != null) {
+          b.push(`Funding rate ${this._sPct(m.funding_rate * 100, 4)},`
+               + ` rata-rata tujuh hari ${this._sPct(m.funding_rata_7h_pct, 4)}.`);
+        }
+        if (m.fear_greed?.value != null) {
+          b.push(`Indeks Fear and Greed ${m.fear_greed.value}, ${m.fear_greed.label},`
+               + ` dari ${m.fear_greed.previous} kemarin.`);
+        }
+        if (m.etf_flow_usd != null) {
+          const arah = m.etf_flow_usd >= 0 ? 'mencatat arus masuk' : 'mencatat arus keluar';
+          b.push(`ETF Bitcoin AS ${arah} ${this._sUsd(Math.abs(m.etf_flow_usd) / 1e6, 1)} juta.`);
+        }
+        if (m.likuidasi_total_usd != null) {
+          b.push(`Likuidasi 24 jam ${this._sUsd(m.likuidasi_total_usd / 1e6, 1)} juta,`
+               + ` sisi ${m.likuidasi_sisi_dominan || 'seimbang'}.`);
+        }
+        if (m.btc_dominance_pct != null) b.push(`Dominasi Bitcoin ${this._sPct(m.btc_dominance_pct)}.`);
+        if (b.length) keluar.push({ judul: 'Posisi pasar', teks: b.join(' ') });
+      }
+
+      // -- Makro ---------------------------------------------------------
+      const mk = d.macro || {};
+      if (mk.dxy != null || mk.ust10y != null) {
+        const b = ['Makro.'];
+        // Kolom keempat: satuan. Yield dan indeks tidak punya, tapi emas dan
+        // minyak berharga dolar — tanpa satuannya "emas 4.671" bisa terdengar
+        // seperti indeks, bukan harga per ons.
+        const baris = [
+          ['Indeks dolar DXY', mk.dxy, mk.dxy_change_pct, 2, ''],
+          ['yield obligasi AS 10 tahun', mk.ust10y, mk.ust10y_change_pct, 2, ' persen'],
+          ['emas', mk.gold, mk.gold_change_pct, 0, ' dolar'],
+          ['minyak WTI', mk.wti, mk.wti_change_pct, 2, ' dolar'],
+          ['indeks volatilitas VIX', mk.vix, mk.vix_change_pct, 2, ''],
+          ['dolar terhadap yen', mk.usdjpy, mk.usdjpy_change_pct, 2, ' yen'],
+          ['Nasdaq', mk.nasdaq, mk.nasdaq_change_pct, 0, ''],
+        ];
+        for (const [nama, nilai, ubah, des, satuan] of baris) {
+          if (nilai == null) continue;
+          b.push(`${nama} ${formatAngka(nilai, des)}${satuan}`
+               + `${ubah == null ? '' : ', ' + this._sArah(ubah)}.`);
+        }
+        keluar.push({ judul: 'Makro', teks: b.join(' ') });
+      }
+
+      // -- Opsi Deribit ---------------------------------------------------
+      const op = d.options || {};
+      if (op.dvol != null) {
+        const b = [`Opsi Deribit. Volatilitas implied DVOL ${formatAngka(op.dvol, 1)}.`];
+        if (op.iv_rv_ratio != null) {
+          const r = Number(op.iv_rv_ratio);
+          b.push(`Rasio volatilitas implied terhadap realized ${formatAngka(r, 2)} kali,`
+               + ` jadi opsinya ${r > 1.15 ? 'tergolong mahal' : (r < 0.85 ? 'tergolong murah' : 'berharga wajar')}.`);
+        }
+        if (op.put_call_ratio_oi != null) b.push(`Rasio put terhadap call ${formatAngka(op.put_call_ratio_oi, 2)}.`);
+        if (op.max_pain_expiry_terdekat) b.push(`Max pain expiry terdekat di ${this._sUsd(op.max_pain_expiry_terdekat)}.`);
+        keluar.push({ judul: 'Opsi', teks: b.join(' ') });
+      }
+
+      // -- Valuasi on-chain -------------------------------------------------
+      const oc = d.onchain || {};
+      if (oc.mvrv != null) {
+        const b = [`Valuasi on-chain. MVRV ${formatAngka(oc.mvrv, 2)}, zona ${oc.mvrv_zona || 'wajar'},`
+                 + ` ${this._sArah(oc.mvrv_perubahan_30hari_pct)} dalam 30 hari.`];
+        if (oc.alamat_aktif != null) {
+          b.push(`Alamat aktif ${formatAngka(oc.alamat_aktif, 0)},`
+               + ` ${this._sArah(oc.alamat_aktif_perubahan_30hari_pct)} dalam 30 hari.`);
+        }
+        if (oc.market_cap_usd != null) {
+          // Triliun begitu melewati seribu miliar: "1 ribu 546 miliar dolar"
+          // adalah angka yang benar tapi tidak pernah diucapkan siapa pun.
+          const t = oc.market_cap_usd / 1e12;
+          b.push(t >= 1
+            ? `Kapitalisasi pasar ${this._sUsd(t, 2)} triliun.`
+            : `Kapitalisasi pasar ${this._sUsd(oc.market_cap_usd / 1e9, 0)} miliar.`);
+        }
+        keluar.push({ judul: 'Valuasi on-chain', teks: b.join(' ') });
+      }
+
+      // -- Aliran dana --------------------------------------------------------
+      const fl = d.flows || {};
+      if (fl.premium_coinbase_pct != null || fl.stablecoin_cap_usd != null) {
+        const b = ['Aliran dana.'];
+        if (fl.premium_coinbase_pct != null) {
+          b.push(`Premium Coinbase ${this._sPct(fl.premium_coinbase_pct, 3)}, ${fl.premium_coinbase_label || 'seimbang'}.`);
+        }
+        if (fl.stablecoin_cap_usd != null) {
+          b.push(`Pasokan stablecoin ${this._sUsd(fl.stablecoin_cap_usd / 1e9, 1)} miliar,`
+               + ` ${this._sArah(fl.stablecoin_perubahan_24j_pct, 3)} dalam 24 jam.`);
+        }
+        keluar.push({ judul: 'Aliran dana', teks: b.join(' ') });
+      }
+
+      // -- Posisi whale vs ritel -----------------------------------------------
+      const w = d.whale || {};
+      if (w.whale_long_pct != null) {
+        const b = [
+          `Posisi top trader ${this._sPct(w.whale_long_pct)} long berbanding ${this._sPct(w.whale_short_pct)} short.`,
+          `Ritel ${this._sPct(w.ritel_long_pct)} long berbanding ${this._sPct(w.ritel_short_pct)} short.`,
+        ];
+        if (w.divergensi_label) b.push(`Keduanya ${w.divergensi_label}.`);
+        if (w.taker_buy_sell_ratio != null) {
+          b.push(`Rasio beli terhadap jual di sisi taker ${formatAngka(w.taker_buy_sell_ratio, 2)},`
+               + ` ${w.taker_tren || ''}.`);
+        }
+        keluar.push({ judul: 'Whale vs ritel', teks: b.join(' ') });
+      }
+
+      // -- Sinyal bertentangan ---------------------------------------------------
+      const konflik = d.conflicts || [];
+      if (konflik.length) {
+        keluar.push({
+          judul: 'Sinyal bertentangan',
+          teks: 'Sinyal yang saling bertentangan hari ini. '
+              + konflik.slice(0, 4).map((c) => c.keterangan).filter(Boolean).join(' '),
         });
       }
 
+      return keluar;
+    },
+
+    /* Bagian DAFTAR: agenda, berita, pernyataan tokoh. */
+    get _segmenDaftar() {
+      const d = this.data;
+      if (!d) return [];
+      const keluar = [];
+
+      // Agenda: hanya yang benar-benar di depan mata. Membacakan tiga puluh
+      // hari ke depan mengubur yang penting di antara yang belum relevan.
+      const agenda = (d.calendar || []).filter((a) => (a.jam_lagi ?? 999) <= 72).slice(0, 6);
+      if (agenda.length) {
+        keluar.push({
+          judul: 'Agenda tiga hari ke depan',
+          teks: 'Agenda tiga hari ke depan. '
+              + agenda.map((a) => `${a.nama}, ${a.waktu_wib}, dampak ${a.dampak}.`).join(' '),
+        });
+      }
+
+      // Berita: judul terjemahan + ringkasannya. Judul saja terlalu miskin
+      // untuk didengar — pendengar tidak bisa memindai ulang seperti membaca.
+      const berita = (d.news || []).slice(0, 8);
+      if (berita.length) {
+        keluar.push({
+          judul: 'Berita utama',
+          teks: 'Berita utama hari ini. '
+              + berita.map((b, i) => {
+                const judul = b.judul_id || b.judul || '';
+                const ringkas = b.ringkasan_id || '';
+                return `${i + 1}. ${judul}. ${ringkas}`;
+              }).join(' '),
+        });
+      }
+
+      const pernyataan = (d.statements || []).slice(0, 5);
+      if (pernyataan.length) {
+        keluar.push({
+          judul: 'Pernyataan tokoh',
+          teks: 'Pernyataan tokoh berpengaruh. '
+              + pernyataan.map((s) => {
+                const inti = s.ringkasan || s.kutipan || '';
+                const dampak = s.dampak_btc ? ` Dampaknya ke Bitcoin dinilai ${s.dampak_btc}.` : '';
+                return `${s.tokoh || 'Seorang tokoh'}: ${inti}${dampak}`;
+              }).join(' '),
+        });
+      }
+
+      return keluar;
+    },
+
+    /* Bagian PROSA dari ulasan lengkap. */
+    get _segmenUlasan() {
+      const ai = this.data?.ai;
+      if (!ai) return [];
       const o = ai.outlook || {};
-      calon.push({ judul: 'Geopolitik & regulasi', teks: o.narasi_geopolitik });
-      calon.push({ judul: 'Narasi utama', teks: ai.narrative });
 
       const sebab = (ai.penyebab_pergerakan || [])
         .map((p, i) => `${i + 1}. ${p.faktor}. ${p.dasar || ''}`)
         .join(' ');
-      calon.push({ judul: 'Penyebab pergerakan', teks: sebab });
 
-      calon.push({
-        judul: 'Pandangan ke depan',
-        teks: [o.ringkasan, o.skenario_naik?.pemicu, o.skenario_turun?.pemicu]
-          .filter(Boolean).join(' '),
-      });
-      calon.push({ judul: 'Pembacaan teknikal', teks: (ai.teknikal || {}).ringkasan });
-      calon.push({ judul: 'Whale & sinyal palsu', teks: (ai.whale || {}).ringkasan });
+      return [
+        { judul: 'Geopolitik & regulasi', teks: o.narasi_geopolitik },
+        { judul: 'Narasi utama', teks: ai.narrative },
+        { judul: 'Penyebab pergerakan', teks: sebab },
+        {
+          judul: 'Pandangan ke depan',
+          teks: [o.ringkasan, o.skenario_naik?.pemicu, o.skenario_turun?.pemicu]
+            .filter(Boolean).join(' '),
+        },
+        { judul: 'Pembacaan teknikal', teks: (ai.teknikal || {}).ringkasan },
+        { judul: 'Whale & sinyal palsu', teks: (ai.whale || {}).ringkasan },
+      ];
+    },
 
-      return calon
+    /* Seluruh isi halaman, sudah dinormalkan untuk suara. */
+    get segmenSuara() {
+      if (!this.data) return [];
+      return [...this._segmenAngka, ...this._segmenUlasan, ...this._segmenDaftar]
         .map((s) => ({ judul: s.judul, teks: untukSuara(s.teks) }))
         .filter((s) => s.teks.length > 20);
+    },
+
+    /* Perkiraan lama baca, untuk pendengar yang perlu tahu ia sedang
+       memulai sesuatu yang panjang. ~13 karakter per detik pada kecepatan
+       normal, diukur kasar dari suara id-ID bawaan. */
+    get durasiSuaraMenit() {
+      const huruf = this.segmenSuara.reduce((a, s) => a + s.teks.length, 0);
+      return Math.max(1, Math.round(huruf / 13 / 60 / (this.suaraKecepatan || 1)));
     },
 
     get bisaDibacakan() {
