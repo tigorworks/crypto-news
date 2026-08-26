@@ -7,6 +7,7 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
+from ..analysis import technical
 from ..utils.http import HttpError, post_json
 
 log = logging.getLogger(__name__)
@@ -546,6 +547,18 @@ def _blok_sinyal_palsu(brief: Dict[str, Any], maks: int = 2) -> List[str]:
     baris = ["", f"{EMOJI['jebakan']} <b>Sinyal Perlu Diwaspadai</b>"]
     for s in sinyal[:maks]:
         baris.append(f"• {esc(s.get('keterangan', ''))}")
+        # Kalimat berangka di atas menyebut APA yang terjadi tanpa pernah
+        # menyebut apa artinya — pembaca yang tidak tahu istilahnya berhenti
+        # di situ. Satu kalimat arti, bukan paragraf penjelas versi web:
+        # ruang di pesan Telegram sudah diperebutkan tangga degradasi, dan
+        # yang paling kurang di sini memang cuma kesimpulannya.
+        #
+        # `arti_singkat` baru ada sejak brief 26 Agustus 2026; arsip lama
+        # dirakit ulang dari `jenis` supaya pesan yang dikirim dari brief lama
+        # (mis. lewat kirim ulang) tetap lengkap.
+        arti = s.get("arti_singkat") or technical.arti_singkat_pola(s.get("jenis", ""))
+        if arti:
+            baris.append(f"  <i>{esc(arti)}</i>")
     return baris
 
 

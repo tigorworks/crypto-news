@@ -131,6 +131,32 @@ Ditambah divergensi posisi: Binance memisahkan statistik *top trader* (proksi pe
 
 Semua ini disajikan sebagai **petunjuk probabilistik, bukan bukti**. Prompt secara eksplisit melarang model mengarang cerita manipulasi dari sinyal yang tipis, dan setiap temuan wajib menyertakan tingkat keyakinan.
 
+#### Polanya menjelaskan dirinya sendiri
+
+Kartu "Sinyal Palsu" dulu berbunyi persis satu kalimat: *"Harga menembus swing high 79.500 hingga 80.000 lalu ditutup kembali di 78.993 — level dipicu tanpa diikuti."* Kalimat itu benar, padat, dan **hanya bisa dibaca oleh orang yang sudah tahu apa itu swing high** dan kenapa penutupan di bawahnya penting. Pembaca yang tidak tahu melihat tiga angka tanpa satu pun kalimat yang memberi tahu apa yang harus disimpulkan darinya — dan itu keluhan yang datang dari pembacanya sendiri.
+
+Tiap pola sekarang membawa `penjelasan`: paragraf tetap dengan urutan yang selalu sama.
+
+| Bagian | Isinya |
+|---|---|
+| Apa yang diukur | Rumus deteksinya dalam kalimat biasa — 40 candle, swing high dari candle sebelum lima hari terakhir, syarat tembus-lalu-tutup-di-bawah |
+| Apa artinya di pasar | Kenapa order menumpuk di atas puncak lama, kenapa harga yang tidak bertahan berarti likuiditas dipanen dan bukan tren baru |
+| Seberapa kuat | Hanya untuk sapuan, satu-satunya pola yang `kekuatan`-nya bervariasi: volume candle penyapu >1,5× rata-rata atau tidak |
+| Apa yang membatalkan | Penutupan harian kembali di atas level yang disapu — bagian yang paling sering dilewatkan, dan justru itu yang menjaga petunjuk tidak dibaca sebagai kepastian |
+
+**Teksnya ditulis kode, bukan model**, dan itu pilihan sadar — bukan penghematan:
+
+1. **Isinya memang tetap.** Cara sebuah pola dideteksi ditentukan rumus di `technical.py`, dan artinya di pasar tidak berubah dari hari ke hari. Yang berubah tiap hari cuma angkanya, dan angka itu sudah ada di `keterangan` — dihitung kode, tidak pernah lewat model. Paragraf penjelasnya sengaja **tidak mengulang angka**, jadi tidak ada dua tempat yang bisa saling bertentangan.
+2. **Angka karangan adalah kegagalan termahal di repo ini** (lihat bagian critic). Meminta model menuliskan ulang penjelasan berangka setiap hari berarti membuka kelas kesalahan itu demi keuntungan nol.
+3. **Justru paling dibutuhkan saat langkah LLM gagal** — alasan yang persis sama dengan `pergerakan_24j`.
+4. **Brief yang sudah terbit bisa dilengkapi tanpa satu pun panggilan model.** `python -m scripts.lengkapi_penjelasan_sinyal` merakit penjelasan dari `jenis` dan `kekuatan` yang memang sudah tersimpan, lalu menulisnya ke `latest.json` dan arsip. Idempoten, jadi aman dijalankan ulang tiap kali teksnya diperbaiki. Tanpa ini, perbaikan baru terlihat pada run berikutnya — belasan jam kemudian, karena brief terbit sekali sehari.
+
+Paragraf ini **tidak ikut dikirim ke LLM** (`technical.sinyal_tanpa_penjelasan()` menyaringnya sebelum konteks disusun): isinya tetap dan prinsip pembacaan yang sama sudah ada di prompt `whale`, jadi mengirimkannya cuma menambah ~1.000 token per run tanpa menambah informasi.
+
+Halaman menyimpan **cadangan teks yang sama** di `docs/app.js` untuk arsip yang terbit sebelum perubahan ini — pola yang sama, dirakit di sisi tampilan. Sama seperti `_pecah_paragraf()`, keduanya dijaga **identik huruf per huruf** oleh `tests/test_penjelasan_sinyal.py`; halaman dan pipeline yang menjelaskan pola sama dengan kalimat berbeda adalah kegagalan diam. Kalau teksnya diubah: ubah di `technical.py`, lalu regenerasi bloknya di `app.js` — jangan menyunting keduanya terpisah.
+
+Di Telegram yang ruangnya diperebutkan tangga degradasi, yang ikut cuma **satu kalimat inti** per pola (`arti_singkat`) — bukan seluruh paragraf. Kalimat itu ditulis terpisah, bukan hasil pemotongan paragraf `arti`: kalimat pertama sebuah penjelasan belum tentu kalimat yang paling penting.
+
 ### Bentuk analisa harian
 
 Narasi AI mengikuti struktur laporan analis, bukan ringkasan bebas:

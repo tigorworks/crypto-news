@@ -375,7 +375,14 @@
         "arah": "bearish",
         "keterangan": "Harga menembus swing high 79.500 hingga 80.000 lalu ditutup kembali di 78.993 — level dipicu tanpa diikuti.",
         "kekuatan": 4,
-        "timeframe": "1d"
+        "timeframe": "1d",
+        "penjelasan": [
+          "Kode mengambil 40 candle terakhir, lalu mencari titik tertinggi dari candle-candle SEBELUM lima hari terakhir — itulah yang disebut swing high pada kalimat di atas. Sesudah itu lima candle terbaru diperiksa satu per satu: adakah yang sempat naik melewati level tersebut tapi ditutup kembali di bawahnya.",
+          "Di atas puncak lama biasanya menumpuk order yang menunggu dipicu: stop-loss milik yang berposisi jual, dan order beli otomatis milik yang mengejar breakout. Harga yang menyentuh area itu memicu semuanya sekaligus — dan kalau setelah itu justru ditarik turun lalu ditutup di bawah level, artinya tidak ada permintaan lanjutan yang menampung. Kenaikan tadi memanen likuiditas, bukan memulai tren baru. Itu sebabnya polanya dibaca condong turun.",
+          "Volume pada candle yang menyapu lebih dari 1,5 kali rata-rata. Sapuannya terjadi dengan partisipasi besar, bukan sekadar bayangan tipis di jam sepi — itu yang membuat polanya lebih layak diperhitungkan.",
+          "Yang membatalkan pembacaan ini: satu penutupan harian kembali di atas level yang disapu. Kalau itu terjadi, yang tadi terlihat seperti sapuan berubah jadi breakout yang benar-benar diterima pasar."
+        ],
+        "arti_singkat": "Order di atas puncak lama terpicu lalu harga tidak bertahan — likuiditas dipanen, bukan tren baru."
       }
     ],
     "pergerakan_24j": {

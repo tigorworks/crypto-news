@@ -83,6 +83,66 @@ function pecahParagraf(teks) {
   return keluar;
 }
 
+/* Penjelasan pola "sinyal palsu" untuk brief yang SUDAH TERSIMPAN.
+
+ * Pipeline melampirkan `penjelasan` ke tiap sinyal sejak brief 26 Agustus
+ * 2026, dan itu yang dipakai kalau ada. Blok di bawah adalah cadangan untuk
+ * seluruh arsip yang terbit SEBELUM itu: tanpanya mereka selamanya cuma
+ * memuat satu kalimat berangka yang hanya bisa dibaca orang yang sudah tahu
+ * apa itu swing high — persis keluhan yang memicu perubahan ini.
+ *
+ * Ditulis sebagai objek yang bisa diparse sebagai JSON apa adanya. Itu bukan
+ * gaya penulisan melainkan syarat: tests/test_penjelasan_sinyal.py
+ * membandingkannya HURUF PER HURUF dengan _PENJELASAN_POLA di
+ * src/analysis/technical.py. Halaman dan pipeline yang menjelaskan pola yang
+ * sama dengan kalimat berbeda adalah kegagalan diam — tidak ada error, cuma
+ * arsip yang berbunyi lain dari brief hari ini.
+ *
+ * Kalau mengubah teksnya: ubah di technical.py, lalu regenerasi blok ini,
+ * jangan menyunting keduanya dengan tangan. */
+const PENJELASAN_POLA = {
+  "sapuan_likuiditas_atas": {
+    "cara_ukur": "Kode mengambil 40 candle terakhir, lalu mencari titik tertinggi dari candle-candle SEBELUM lima hari terakhir — itulah yang disebut swing high pada kalimat di atas. Sesudah itu lima candle terbaru diperiksa satu per satu: adakah yang sempat naik melewati level tersebut tapi ditutup kembali di bawahnya.",
+    "arti": "Di atas puncak lama biasanya menumpuk order yang menunggu dipicu: stop-loss milik yang berposisi jual, dan order beli otomatis milik yang mengejar breakout. Harga yang menyentuh area itu memicu semuanya sekaligus — dan kalau setelah itu justru ditarik turun lalu ditutup di bawah level, artinya tidak ada permintaan lanjutan yang menampung. Kenaikan tadi memanen likuiditas, bukan memulai tren baru. Itu sebabnya polanya dibaca condong turun.",
+    "pembatal": "Yang membatalkan pembacaan ini: satu penutupan harian kembali di atas level yang disapu. Kalau itu terjadi, yang tadi terlihat seperti sapuan berubah jadi breakout yang benar-benar diterima pasar."
+  },
+  "sapuan_likuiditas_bawah": {
+    "cara_ukur": "Kode mengambil 40 candle terakhir, lalu mencari titik terendah dari candle-candle SEBELUM lima hari terakhir — itulah yang disebut swing low pada kalimat di atas. Sesudah itu lima candle terbaru diperiksa satu per satu: adakah yang sempat turun menembus level tersebut tapi ditutup kembali di atasnya.",
+    "arti": "Di bawah dasar lama menumpuk stop-loss milik yang berposisi beli, dan di sanalah likuiditas paling mudah dipanen. Harga yang menusuk area itu memaksa mereka keluar — lalu, kalau harga langsung pulih dan ditutup di atas level, penurunan tadi tidak menemukan penjual lanjutan. Yang terjadi adalah stop dipanen, bukan tekanan jual sungguhan. Itu sebabnya polanya dibaca condong naik.",
+    "pembatal": "Yang membatalkan pembacaan ini: satu penutupan harian kembali di bawah level yang ditembus. Kalau itu terjadi, penurunannya bukan sapuan melainkan kelanjutan tren turun."
+  },
+  "penolakan_atas": {
+    "cara_ukur": "Kode membandingkan tiga bagian candle terakhir: badannya (jarak harga buka ke harga tutup), bayangan atasnya, dan rentang penuh candle. Pola ini tercatat kalau bayangan atas lebih dari dua kali panjang badan sekaligus mengisi lebih dari separuh rentangnya.",
+    "arti": "Bayangan panjang di atas berarti harga sempat naik jauh ke area itu lalu didorong balik sebelum candle-nya tutup. Sepanjang periode itu ada yang bersedia menjual dalam jumlah cukup besar untuk menyerap seluruh kenaikannya. Areanya jadi layak dicatat sebagai tempat penawaran jual menumpuk.",
+    "pembatal": "Kalau candle berikutnya berhasil ditutup di atas ujung bayangan itu, penawaran jual tadi berarti sudah habis diserap dan pembacaannya gugur."
+  },
+  "penolakan_bawah": {
+    "cara_ukur": "Kode membandingkan tiga bagian candle terakhir: badannya (jarak harga buka ke harga tutup), bayangan bawahnya, dan rentang penuh candle. Pola ini tercatat kalau bayangan bawah lebih dari dua kali panjang badan sekaligus mengisi lebih dari separuh rentangnya.",
+    "arti": "Bayangan panjang di bawah berarti harga sempat jatuh jauh ke area itu lalu diangkat kembali sebelum candle-nya tutup. Ada yang bersedia membeli dalam jumlah cukup besar untuk menyerap seluruh tekanan jualnya. Areanya jadi layak dicatat sebagai tempat permintaan menumpuk.",
+    "pembatal": "Kalau candle berikutnya ditutup di bawah ujung bayangan itu, permintaan tadi berarti sudah habis dan pembacaannya gugur."
+  },
+  "absorpsi_volume": {
+    "cara_ukur": "Kode membandingkan volume candle terakhir dengan rata-rata candle sebelumnya, lalu mengukur berapa persen harga benar-benar berpindah dari buka ke tutup. Pola tercatat kalau volumenya lebih dari 2,5 kali rata-rata sementara harganya bergerak kurang dari 0,3 persen.",
+    "arti": "Volume sebesar itu normalnya menggerakkan harga. Kalau harganya tetap di tempat, berarti ada pihak yang terus menampung order lawan dalam ukuran besar di harga yang sama — pola yang lazim ketika pemain besar membangun atau melepas posisi tanpa mau menggerakkan harga melawan dirinya sendiri. Arahnya sendiri belum ketahuan; yang bisa disimpulkan cuma bahwa harga di area ini sedang ditahan seseorang.",
+    "pembatal": "Arahnya baru terbaca ketika harga akhirnya lepas dari area itu — sisi mana yang ditinggalkan menunjukkan siapa yang tadi menyerap."
+  },
+  "breakout_volume_lemah": {
+    "cara_ukur": "Kode mencari puncak tertinggi sebelum lima candle terakhir beserta volume pada candle puncak itu, lalu membandingkannya dengan candle sekarang. Pola tercatat kalau harga membuat tertinggi baru sementara volumenya kurang dari 70 persen volume di puncak sebelumnya.",
+    "arti": "Tertinggi baru semestinya menarik lebih banyak peserta, bukan lebih sedikit. Kenaikan dengan volume yang justru mengecil berarti yang mendorong tinggal sedikit: harga naik karena tidak ada yang menghalangi, bukan karena permintaannya bertambah. Kenaikan seperti ini lebih gampang berbalik begitu penjual muncul.",
+    "pembatal": "Kalau candle berikutnya melanjutkan naik dengan volume yang membesar, kekurangan partisipasi tadi sudah terjawab dan pembacaannya gugur."
+  },
+  "posisi_padat": {
+    "cara_ukur": "Ini satu-satunya pola di kartu ini yang tidak dihitung dari candle. Kode membaca funding rate kontrak perpetual — biaya yang dibayar satu sisi posisi kepada sisi lawannya setiap 8 jam — bersama perubahan open interest, yaitu jumlah kontrak yang masih terbuka. Pola tercatat kalau funding-nya ekstrem (di atas 0,05 persen per 8 jam) sementara open interest bertambah.",
+    "arti": "Funding yang mahal berarti satu sisi jauh lebih ramai dari sisi lawannya, dan open interest yang naik berarti keramaian itu masih bertambah — bukan sedang bubar. Posisi yang menumpuk di satu sisi sekaligus mahal untuk dipertahankan adalah bahan bakar likuidasi beruntun: begitu harga bergerak melawan, sebagian terpaksa keluar, dan penutupan paksa itu mendorong harga lebih jauh ke arah yang sama.",
+    "pembatal": "Tekanannya mereda dengan sendirinya begitu funding kembali normal atau open interest turun — keduanya tanda bahwa posisi yang menumpuk tadi sudah keluar."
+  }
+};
+
+const CATATAN_VOLUME_SAPUAN = {
+  "4": "Volume pada candle yang menyapu lebih dari 1,5 kali rata-rata. Sapuannya terjadi dengan partisipasi besar, bukan sekadar bayangan tipis di jam sepi — itu yang membuat polanya lebih layak diperhitungkan.",
+  "3": "Volume pada candle yang menyapu tidak jauh di atas rata-rata, jadi bobotnya sedang saja. Pola seperti ini bisa juga muncul dari likuiditas yang kebetulan tipis, bukan dari perburuan stop."
+};
+
 /* =====================================================================
    PEMBACAAN SUARA (text-to-speech)
    =====================================================================
@@ -831,6 +891,23 @@ function briefApp() {
         breakout_volume_lemah: 'Breakout dengan volume lemah',
         posisi_padat: 'Posisi derivatif padat',
       }[jenis] || (jenis || '').replace(/_/g, ' ');
+    },
+
+    /* Paragraf penjelas sebuah pola. Brief baru sudah membawanya sendiri;
+       arsip lama dirakit di sini dari PENJELASAN_POLA supaya ikut terbaca.
+       Urutannya sama dengan penjelasan_pola() di technical.py: apa yang
+       diukur, apa artinya, catatan volume (sapuan saja), lalu pembatalnya. */
+    penjelasanSinyal(s) {
+      if (Array.isArray(s?.penjelasan) && s.penjelasan.length) return s.penjelasan;
+      const bagian = PENJELASAN_POLA[s?.jenis];
+      if (!bagian) return [];
+      const paragraf = [bagian.cara_ukur, bagian.arti];
+      if ((s.jenis || '').startsWith('sapuan_likuiditas')) {
+        const catatan = CATATAN_VOLUME_SAPUAN[String(s.kekuatan)];
+        if (catatan) paragraf.push(catatan);
+      }
+      paragraf.push(bagian.pembatal);
+      return paragraf;
     },
 
     labelStatus(status) {

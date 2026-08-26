@@ -756,6 +756,260 @@ def key_levels(per_tf: Dict[str, Dict[str, Any]], price: float, atr_1d: Optional
     }
 
 
+# --------------------------------------------------------------------------
+# Penjelasan pola untuk pembaca yang tidak membaca kodenya
+# --------------------------------------------------------------------------
+# Kartu "Sinyal Palsu" dulu cuma memuat satu kalimat berisi angka — "Harga
+# menembus swing high 79.500 hingga 80.000 lalu ditutup kembali di 78.993".
+# Kalimat itu BENAR dan padat, tapi hanya bisa dibaca oleh orang yang sudah
+# tahu apa itu swing high dan kenapa penutupan di bawahnya penting. Pembaca
+# yang tidak tahu melihat tiga angka tanpa satu pun kalimat yang memberi tahu
+# apa yang harus ia simpulkan darinya.
+#
+# KENAPA TEKS TETAP, BUKAN LLM. Ini pilihan sadar, bukan penghematan:
+#
+#   1. Isinya memang tetap. Cara sebuah pola dideteksi ditentukan oleh rumus
+#      di file ini, dan artinya di pasar tidak berubah dari hari ke hari.
+#      Yang berubah tiap hari cuma angkanya — dan angka itu sudah ada di
+#      `keterangan`, dihitung kode, tidak pernah lewat model.
+#   2. Angka karangan adalah kegagalan paling mahal di repo ini (lihat bagian
+#      critic di README). Meminta model menuliskan ulang penjelasan berangka
+#      tiap hari berarti membuka kelas kesalahan itu untuk keuntungan nol.
+#   3. Penjelasan ini justru paling dibutuhkan pada hari seluruh langkah LLM
+#      gagal — sama seperti `pergerakan_24j`, yang klasifikasinya juga ditulis
+#      kode dengan alasan yang persis sama.
+#   4. Karena tidak butuh data selain `jenis` dan `kekuatan`, brief yang SUDAH
+#      terbit bisa dilengkapi tanpa satu pun panggilan model
+#      (`scripts.lengkapi_penjelasan_sinyal`).
+#
+# Bentuknya tiga bagian tetap, selalu urut: apa yang DIUKUR kode, apa ARTINYA
+# di pasar, lalu apa yang MEMBATALKAN pembacaannya. Bagian ketiga yang paling
+# sering dilewatkan penjelasan pola candle di tempat lain, dan justru itu yang
+# menjaga pembaca tidak memperlakukan petunjuk sebagai kepastian.
+_PENJELASAN_POLA: Dict[str, Dict[str, str]] = {
+    "sapuan_likuiditas_atas": {
+        "cara_ukur": (
+            "Kode mengambil 40 candle terakhir, lalu mencari titik tertinggi dari "
+            "candle-candle SEBELUM lima hari terakhir — itulah yang disebut swing high "
+            "pada kalimat di atas. Sesudah itu lima candle terbaru diperiksa satu per "
+            "satu: adakah yang sempat naik melewati level tersebut tapi ditutup kembali "
+            "di bawahnya."
+        ),
+        "arti": (
+            "Di atas puncak lama biasanya menumpuk order yang menunggu dipicu: "
+            "stop-loss milik yang berposisi jual, dan order beli otomatis milik yang "
+            "mengejar breakout. Harga yang menyentuh area itu memicu semuanya sekaligus "
+            "— dan kalau setelah itu justru ditarik turun lalu ditutup di bawah level, "
+            "artinya tidak ada permintaan lanjutan yang menampung. Kenaikan tadi "
+            "memanen likuiditas, bukan memulai tren baru. Itu sebabnya polanya dibaca "
+            "condong turun."
+        ),
+        "pembatal": (
+            "Yang membatalkan pembacaan ini: satu penutupan harian kembali di atas level "
+            "yang disapu. Kalau itu terjadi, yang tadi terlihat seperti sapuan berubah "
+            "jadi breakout yang benar-benar diterima pasar."
+        ),
+    },
+    "sapuan_likuiditas_bawah": {
+        "cara_ukur": (
+            "Kode mengambil 40 candle terakhir, lalu mencari titik terendah dari "
+            "candle-candle SEBELUM lima hari terakhir — itulah yang disebut swing low "
+            "pada kalimat di atas. Sesudah itu lima candle terbaru diperiksa satu per "
+            "satu: adakah yang sempat turun menembus level tersebut tapi ditutup kembali "
+            "di atasnya."
+        ),
+        "arti": (
+            "Di bawah dasar lama menumpuk stop-loss milik yang berposisi beli, dan di "
+            "sanalah likuiditas paling mudah dipanen. Harga yang menusuk area itu "
+            "memaksa mereka keluar — lalu, kalau harga langsung pulih dan ditutup di "
+            "atas level, penurunan tadi tidak menemukan penjual lanjutan. Yang terjadi "
+            "adalah stop dipanen, bukan tekanan jual sungguhan. Itu sebabnya polanya "
+            "dibaca condong naik."
+        ),
+        "pembatal": (
+            "Yang membatalkan pembacaan ini: satu penutupan harian kembali di bawah level "
+            "yang ditembus. Kalau itu terjadi, penurunannya bukan sapuan melainkan "
+            "kelanjutan tren turun."
+        ),
+    },
+    "penolakan_atas": {
+        "cara_ukur": (
+            "Kode membandingkan tiga bagian candle terakhir: badannya (jarak harga buka "
+            "ke harga tutup), bayangan atasnya, dan rentang penuh candle. Pola ini "
+            "tercatat kalau bayangan atas lebih dari dua kali panjang badan sekaligus "
+            "mengisi lebih dari separuh rentangnya."
+        ),
+        "arti": (
+            "Bayangan panjang di atas berarti harga sempat naik jauh ke area itu lalu "
+            "didorong balik sebelum candle-nya tutup. Sepanjang periode itu ada yang "
+            "bersedia menjual dalam jumlah cukup besar untuk menyerap seluruh "
+            "kenaikannya. Areanya jadi layak dicatat sebagai tempat penawaran jual "
+            "menumpuk."
+        ),
+        "pembatal": (
+            "Kalau candle berikutnya berhasil ditutup di atas ujung bayangan itu, "
+            "penawaran jual tadi berarti sudah habis diserap dan pembacaannya gugur."
+        ),
+    },
+    "penolakan_bawah": {
+        "cara_ukur": (
+            "Kode membandingkan tiga bagian candle terakhir: badannya (jarak harga buka "
+            "ke harga tutup), bayangan bawahnya, dan rentang penuh candle. Pola ini "
+            "tercatat kalau bayangan bawah lebih dari dua kali panjang badan sekaligus "
+            "mengisi lebih dari separuh rentangnya."
+        ),
+        "arti": (
+            "Bayangan panjang di bawah berarti harga sempat jatuh jauh ke area itu lalu "
+            "diangkat kembali sebelum candle-nya tutup. Ada yang bersedia membeli dalam "
+            "jumlah cukup besar untuk menyerap seluruh tekanan jualnya. Areanya jadi "
+            "layak dicatat sebagai tempat permintaan menumpuk."
+        ),
+        "pembatal": (
+            "Kalau candle berikutnya ditutup di bawah ujung bayangan itu, permintaan tadi "
+            "berarti sudah habis dan pembacaannya gugur."
+        ),
+    },
+    "absorpsi_volume": {
+        "cara_ukur": (
+            "Kode membandingkan volume candle terakhir dengan rata-rata candle "
+            "sebelumnya, lalu mengukur berapa persen harga benar-benar berpindah dari "
+            "buka ke tutup. Pola tercatat kalau volumenya lebih dari 2,5 kali rata-rata "
+            "sementara harganya bergerak kurang dari 0,3 persen."
+        ),
+        "arti": (
+            "Volume sebesar itu normalnya menggerakkan harga. Kalau harganya tetap di "
+            "tempat, berarti ada pihak yang terus menampung order lawan dalam ukuran "
+            "besar di harga yang sama — pola yang lazim ketika pemain besar membangun "
+            "atau melepas posisi tanpa mau menggerakkan harga melawan dirinya sendiri. "
+            "Arahnya sendiri belum ketahuan; yang bisa disimpulkan cuma bahwa harga di "
+            "area ini sedang ditahan seseorang."
+        ),
+        "pembatal": (
+            "Arahnya baru terbaca ketika harga akhirnya lepas dari area itu — sisi mana "
+            "yang ditinggalkan menunjukkan siapa yang tadi menyerap."
+        ),
+    },
+    "breakout_volume_lemah": {
+        "cara_ukur": (
+            "Kode mencari puncak tertinggi sebelum lima candle terakhir beserta volume "
+            "pada candle puncak itu, lalu membandingkannya dengan candle sekarang. Pola "
+            "tercatat kalau harga membuat tertinggi baru sementara volumenya kurang dari "
+            "70 persen volume di puncak sebelumnya."
+        ),
+        "arti": (
+            "Tertinggi baru semestinya menarik lebih banyak peserta, bukan lebih sedikit. "
+            "Kenaikan dengan volume yang justru mengecil berarti yang mendorong tinggal "
+            "sedikit: harga naik karena tidak ada yang menghalangi, bukan karena "
+            "permintaannya bertambah. Kenaikan seperti ini lebih gampang berbalik begitu "
+            "penjual muncul."
+        ),
+        "pembatal": (
+            "Kalau candle berikutnya melanjutkan naik dengan volume yang membesar, "
+            "kekurangan partisipasi tadi sudah terjawab dan pembacaannya gugur."
+        ),
+    },
+    "posisi_padat": {
+        "cara_ukur": (
+            "Ini satu-satunya pola di kartu ini yang tidak dihitung dari candle. Kode "
+            "membaca funding rate kontrak perpetual — biaya yang dibayar satu sisi posisi "
+            "kepada sisi lawannya setiap 8 jam — bersama perubahan open interest, yaitu "
+            "jumlah kontrak yang masih terbuka. Pola tercatat kalau funding-nya ekstrem "
+            "(di atas 0,05 persen per 8 jam) sementara open interest bertambah."
+        ),
+        "arti": (
+            "Funding yang mahal berarti satu sisi jauh lebih ramai dari sisi lawannya, "
+            "dan open interest yang naik berarti keramaian itu masih bertambah — bukan "
+            "sedang bubar. Posisi yang menumpuk di satu sisi sekaligus mahal untuk "
+            "dipertahankan adalah bahan bakar likuidasi beruntun: begitu harga bergerak "
+            "melawan, sebagian terpaksa keluar, dan penutupan paksa itu mendorong harga "
+            "lebih jauh ke arah yang sama."
+        ),
+        "pembatal": (
+            "Tekanannya mereda dengan sendirinya begitu funding kembali normal atau open "
+            "interest turun — keduanya tanda bahwa posisi yang menumpuk tadi sudah keluar."
+        ),
+    },
+}
+
+# Hanya sapuan likuiditas yang `kekuatan`-nya benar-benar bervariasi (4 kalau
+# volume candle penyapu >1,5x rata-rata, 3 kalau tidak). Pola lain memakai
+# nilai tetap, jadi menuliskan "kekuatan 4" untuk mereka tidak menambah satu
+# pun informasi. Angka itu sendiri memang tidak pernah ditampilkan ke pembaca
+# — yang ditampilkan adalah apa yang membuatnya 4.
+_CATATAN_VOLUME_SAPUAN = {
+    4: (
+        "Volume pada candle yang menyapu lebih dari 1,5 kali rata-rata. Sapuannya "
+        "terjadi dengan partisipasi besar, bukan sekadar bayangan tipis di jam sepi — "
+        "itu yang membuat polanya lebih layak diperhitungkan."
+    ),
+    3: (
+        "Volume pada candle yang menyapu tidak jauh di atas rata-rata, jadi bobotnya "
+        "sedang saja. Pola seperti ini bisa juga muncul dari likuiditas yang kebetulan "
+        "tipis, bukan dari perburuan stop."
+    ),
+}
+
+# Satu kalimat inti per pola, untuk tempat yang benar-benar sempit (Telegram).
+# Sengaja bukan hasil pemotongan `arti` di atas: kalimat pertama sebuah
+# paragraf penjelas belum tentu kalimat yang paling penting.
+_ARTI_SINGKAT_POLA = {
+    "sapuan_likuiditas_atas":
+        "Order di atas puncak lama terpicu lalu harga tidak bertahan — likuiditas dipanen, bukan tren baru.",
+    "sapuan_likuiditas_bawah":
+        "Stop di bawah dasar lama terpicu lalu harga pulih — likuiditas dipanen, bukan tekanan jual sungguhan.",
+    "penolakan_atas":
+        "Kenaikan ke area itu habis diserap penjual sebelum candle tutup.",
+    "penolakan_bawah":
+        "Tekanan jual ke area itu habis diserap pembeli sebelum candle tutup.",
+    "absorpsi_volume":
+        "Ada yang menampung order dalam ukuran besar di harga ini; arahnya belum ketahuan.",
+    "breakout_volume_lemah":
+        "Tertinggi baru dibuat oleh makin sedikit peserta — kenaikan tanpa konfirmasi.",
+    "posisi_padat":
+        "Posisi menumpuk di satu sisi dan mahal dipertahankan — bahan bakar likuidasi beruntun.",
+}
+
+
+def penjelasan_pola(jenis: str, kekuatan: Optional[int] = None) -> List[str]:
+    """Paragraf penjelas sebuah pola: cara diukur, artinya, lalu pembatalnya.
+
+    Memulangkan daftar kosong untuk pola yang tidak dikenal — pola baru yang
+    lupa diberi entri lebih baik tampil tanpa penjelasan daripada tampil
+    dengan penjelasan pola lain.
+    """
+    bagian = _PENJELASAN_POLA.get(jenis)
+    if not bagian:
+        return []
+
+    paragraf = [bagian["cara_ukur"], bagian["arti"]]
+    if jenis.startswith("sapuan_likuiditas"):
+        catatan = _CATATAN_VOLUME_SAPUAN.get(kekuatan)
+        if catatan:
+            paragraf.append(catatan)
+    paragraf.append(bagian["pembatal"])
+    return paragraf
+
+
+def arti_singkat_pola(jenis: str) -> str:
+    """Satu kalimat inti pola, untuk tempat yang sempit. "" kalau tak dikenal."""
+    return _ARTI_SINGKAT_POLA.get(jenis, "")
+
+
+#: Field penjelas yang murni untuk DIBACA MANUSIA di halaman dan Telegram.
+#: Isinya tetap dan sudah diketahui model (prompt whale memuat prinsip
+#: pembacaan yang sama), jadi mengirimkannya ke LLM cuma menambah token tanpa
+#: menambah informasi — sekitar 1.000 token per run pada tiga pola.
+_FIELD_TAMPILAN = ("penjelasan", "arti_singkat")
+
+
+def sinyal_tanpa_penjelasan(sinyal: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Salinan daftar sinyal tanpa field penjelas — bentuk yang dikirim ke LLM."""
+    return [
+        {k: v for k, v in s.items() if k not in _FIELD_TAMPILAN}
+        for s in sinyal
+    ]
+
+
 def deteksi_sinyal_palsu(
     klines: List[Dict[str, Any]],
     funding_rate: Optional[float] = None,
@@ -887,6 +1141,14 @@ def deteksi_sinyal_palsu(
                 ),
                 "kekuatan": 4,
             })
+
+    # Penjelasan dilampirkan di satu tempat, bukan diulang di tujuh titik
+    # append di atas: yang membedakan tiap pola cuma `jenis` dan `kekuatan`,
+    # dan mengulang pemanggilannya per pola berarti pola yang ditambahkan
+    # nanti gampang lupa diberi penjelasan tanpa satu pun tanda.
+    for s in sinyal:
+        s["penjelasan"] = penjelasan_pola(s["jenis"], s.get("kekuatan"))
+        s["arti_singkat"] = arti_singkat_pola(s["jenis"])
 
     return sinyal
 
