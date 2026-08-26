@@ -1,127 +1,288 @@
 {
-  "dibuat": "2026-08-25T23:46:30Z",
-  "jumlah_run": 20,
-  "jumlah_run_biaya": 5,
-  "total_run_tersimpan": 20,
+  "dibuat": "2026-08-26T16:49:28Z",
+  "jumlah_run": 21,
+  "jumlah_run_biaya": 6,
+  "total_run_tersimpan": 21,
   "sejak": "2026-08-17T11:28:02Z",
   "biaya": {
-    "rata_usd": 0.2358,
+    "rata_usd": 0.2355,
     "maks_usd": 0.25778,
-    "terakhir_usd": 0.20221,
+    "terakhir_usd": 0.234,
     "run_di_atas_85_persen_budget": 0,
     "sejak": "2026-08-22T23:43:00Z"
   },
   "biaya_per_langkah": [
     {
       "langkah": "synthesis",
-      "rata_usd": 0.0696,
-      "run": 5,
-      "total_usd": 0.34811,
-      "rata_token_masuk": 13042.4,
-      "rata_token_keluar": 5332.0
+      "rata_usd": 0.0701,
+      "run": 6,
+      "total_usd": 0.42058,
+      "rata_token_masuk": 13054.1667,
+      "rata_token_keluar": 5378.0
     },
     {
       "langkah": "critic",
-      "rata_usd": 0.0595,
-      "run": 5,
-      "total_usd": 0.29744,
-      "rata_token_masuk": 23710.0,
-      "rata_token_keluar": 1206.8
+      "rata_usd": 0.0599,
+      "run": 6,
+      "total_usd": 0.35958,
+      "rata_token_masuk": 23835.6667,
+      "rata_token_keluar": 1225.8333
     },
     {
       "langkah": "outlook",
-      "rata_usd": 0.0594,
-      "run": 5,
-      "total_usd": 0.2972,
-      "rata_token_masuk": 10446.4,
-      "rata_token_keluar": 4638.2
+      "rata_usd": 0.0588,
+      "run": 6,
+      "total_usd": 0.35288,
+      "rata_token_masuk": 10458.1667,
+      "rata_token_keluar": 4574.0
     },
     {
       "langkah": "technical",
-      "rata_usd": 0.0221,
-      "run": 5,
-      "total_usd": 0.11063,
-      "rata_token_masuk": 2143.2,
-      "rata_token_keluar": 1944.6
+      "rata_usd": 0.0213,
+      "run": 6,
+      "total_usd": 0.12753,
+      "rata_token_masuk": 2160.0,
+      "rata_token_keluar": 1855.5
     },
     {
       "langkah": "whale",
       "rata_usd": 0.0099,
-      "run": 5,
-      "total_usd": 0.04965,
-      "rata_token_masuk": 908.0,
-      "rata_token_keluar": 879.4
+      "run": 6,
+      "total_usd": 0.05914,
+      "rata_token_masuk": 914.8333,
+      "rata_token_keluar": 871.3333
     },
     {
       "langkah": "classify",
-      "rata_usd": 0.0045,
-      "run": 5,
-      "total_usd": 0.0226,
-      "rata_token_masuk": 6677.4,
-      "rata_token_keluar": 5179.2
+      "rata_usd": 0.0046,
+      "run": 6,
+      "total_usd": 0.0276,
+      "rata_token_masuk": 6677.0,
+      "rata_token_keluar": 5612.3333
     },
     {
       "langkah": "filter",
-      "rata_usd": 0.0037,
-      "run": 5,
-      "total_usd": 0.01834,
-      "rata_token_masuk": 9690.0,
-      "rata_token_keluar": 3804.4
+      "rata_usd": 0.0039,
+      "run": 6,
+      "total_usd": 0.02343,
+      "rata_token_masuk": 9897.5,
+      "rata_token_keluar": 4001.3333
     },
     {
       "langkah": "statements",
       "rata_usd": 0.0036,
-      "run": 5,
-      "total_usd": 0.01813,
-      "rata_token_masuk": 6383.0,
-      "rata_token_keluar": 4460.2
+      "run": 6,
+      "total_usd": 0.02149,
+      "rata_token_masuk": 6301.1667,
+      "rata_token_keluar": 4436.1667
     },
     {
       "langkah": "x_posts",
       "rata_usd": 0.0016,
-      "run": 5,
-      "total_usd": 0.00822,
+      "run": 6,
+      "total_usd": 0.00989,
       "rata_token_masuk": 575.0,
-      "rata_token_keluar": 429.6
+      "rata_token_keluar": 429.8333
     },
     {
       "langkah": "agenda_dampak",
       "rata_usd": 0.0009,
-      "run": 5,
-      "total_usd": 0.00438,
-      "rata_token_masuk": 1485.4,
-      "rata_token_keluar": 1077.2
+      "run": 6,
+      "total_usd": 0.00526,
+      "rata_token_masuk": 1482.0,
+      "rata_token_keluar": 1083.3333
+    },
+    {
+      "langkah": "mechanism",
+      "rata_usd": 0.0008,
+      "run": 6,
+      "total_usd": 0.0047,
+      "rata_token_masuk": 1508.5,
+      "rata_token_keluar": 861.1667
     },
     {
       "langkah": "format",
       "rata_usd": 0.0007,
-      "run": 5,
-      "total_usd": 0.0036,
-      "rata_token_masuk": 1640.6,
-      "rata_token_keluar": 985.0
-    },
-    {
-      "langkah": "mechanism",
-      "rata_usd": 0.0007,
-      "run": 5,
-      "total_usd": 0.00351,
-      "rata_token_masuk": 1507.4,
-      "rata_token_keluar": 830.2
+      "run": 6,
+      "total_usd": 0.00441,
+      "rata_token_masuk": 1644.6667,
+      "rata_token_keluar": 956.3333
     },
     {
       "langkah": "riset",
       "rata_usd": 0.0002,
-      "run": 5,
-      "total_usd": 0.00079,
-      "rata_token_masuk": 585.6,
-      "rata_token_keluar": 42.0
+      "run": 6,
+      "total_usd": 0.00093,
+      "rata_token_masuk": 581.6667,
+      "rata_token_keluar": 42.6667
     }
   ],
   "durasi": {
-    "rata_detik": 457.42,
+    "rata_detik": 458.5238,
     "maks_detik": 712.4
   },
   "run": [
+    {
+      "waktu_utc": "2026-08-26T16:49:11Z",
+      "run_type": "sore",
+      "harga": 77978.55,
+      "biaya_usd": 0.234,
+      "budget_maks_usd": 0.4,
+      "budget_terpakai_pct": 58.5,
+      "token_masuk": 78905,
+      "token_keluar": 33110,
+      "panggilan_llm": 22,
+      "durasi_detik": 480.6,
+      "critic": {
+        "dijalankan": true,
+        "lolos": true
+      },
+      "langkah": [
+        {
+          "langkah": "synthesis",
+          "biaya_usd": 0.072471,
+          "masuk": 13113,
+          "keluar": 5608,
+          "prompt_char": 43228,
+          "panggilan": 1,
+          "model": [
+            "openai/gpt-5.1"
+          ]
+        },
+        {
+          "langkah": "critic",
+          "biaya_usd": 0.062138,
+          "masuk": 24464,
+          "keluar": 1321,
+          "prompt_char": 49141,
+          "panggilan": 1,
+          "model": [
+            "anthropic/claude-sonnet-5"
+          ]
+        },
+        {
+          "langkah": "outlook",
+          "biaya_usd": 0.055676,
+          "masuk": 10517,
+          "keluar": 4253,
+          "prompt_char": 33826,
+          "panggilan": 1,
+          "model": [
+            "openai/gpt-5.1"
+          ]
+        },
+        {
+          "langkah": "technical",
+          "biaya_usd": 0.016905,
+          "masuk": 2244,
+          "keluar": 1410,
+          "prompt_char": 6869,
+          "panggilan": 1,
+          "model": [
+            "openai/gpt-5.1"
+          ]
+        },
+        {
+          "langkah": "whale",
+          "biaya_usd": 0.009496,
+          "masuk": 949,
+          "keluar": 831,
+          "prompt_char": 3080,
+          "panggilan": 1,
+          "model": [
+            "openai/gpt-5.1"
+          ]
+        },
+        {
+          "langkah": "filter",
+          "biaya_usd": 0.005092,
+          "masuk": 10935,
+          "keluar": 4986,
+          "prompt_char": 39510,
+          "panggilan": 3,
+          "model": [
+            "deepseek/deepseek-v3.2"
+          ]
+        },
+        {
+          "langkah": "classify",
+          "biaya_usd": 0.005004,
+          "masuk": 6675,
+          "keluar": 7778,
+          "prompt_char": 22102,
+          "panggilan": 5,
+          "model": [
+            "deepseek/deepseek-v3.2"
+          ]
+        },
+        {
+          "langkah": "statements",
+          "biaya_usd": 0.003353,
+          "masuk": 5892,
+          "keluar": 4316,
+          "prompt_char": 18918,
+          "panggilan": 4,
+          "model": [
+            "deepseek/deepseek-v3.2"
+          ]
+        },
+        {
+          "langkah": "x_posts",
+          "biaya_usd": 0.001662,
+          "masuk": 575,
+          "keluar": 431,
+          "prompt_char": 1252,
+          "panggilan": 1,
+          "model": [
+            "x-ai/grok-4.3"
+          ]
+        },
+        {
+          "langkah": "mechanism",
+          "biaya_usd": 0.001191,
+          "masuk": 1514,
+          "keluar": 1016,
+          "prompt_char": 5416,
+          "panggilan": 1,
+          "model": [
+            "deepseek/deepseek-v3.2"
+          ]
+        },
+        {
+          "langkah": "agenda_dampak",
+          "biaya_usd": 0.000878,
+          "masuk": 1465,
+          "keluar": 1114,
+          "prompt_char": 4262,
+          "panggilan": 1,
+          "model": [
+            "deepseek/deepseek-v3.2"
+          ]
+        },
+        {
+          "langkah": "format",
+          "biaya_usd": 0.000808,
+          "masuk": 1665,
+          "keluar": 813,
+          "prompt_char": 5018,
+          "panggilan": 1,
+          "model": [
+            "deepseek/deepseek-v3.2"
+          ]
+        },
+        {
+          "langkah": "riset",
+          "biaya_usd": 0.000135,
+          "masuk": 562,
+          "keluar": 46,
+          "prompt_char": 1929,
+          "panggilan": 1,
+          "model": [
+            "deepseek/deepseek-v3.2"
+          ]
+        }
+      ]
+    },
     {
       "waktu_utc": "2026-08-25T23:46:04Z",
       "run_type": "pagi",
@@ -903,9 +1064,9 @@
     }
   ],
   "critic": {
-    "dijalankan": 15,
+    "dijalankan": 16,
     "menahan": 1,
-    "persen_menahan": 6.7,
+    "persen_menahan": 6.2,
     "bagian_tersering": {
       "narasi": 1
     }
@@ -1085,6 +1246,15 @@
       "kerapuhan": "rendah",
       "fase": "tutup_harian",
       "harga": 78647.0,
+      "harga_sesudah": null,
+      "perubahan_pct": null
+    },
+    {
+      "waktu_utc": "2026-08-26T16:49:11Z",
+      "tingkat": "rendah",
+      "kerapuhan": "rendah",
+      "fase": "buka",
+      "harga": 77978.55,
       "harga_sesudah": null,
       "perubahan_pct": null
     }
