@@ -174,7 +174,11 @@ def _konteks_llm(
             "interpretasi": teknikal.get("oi_price_interpretasi"),
             "perubahan_oi_pct": teknikal.get("oi_change_pct"),
         },
-        "sinyal_palsu_terdeteksi": teknikal.get("sinyal_palsu") or [],
+        # Tanpa paragraf penjelasnya: teks itu tetap, ditulis untuk pembaca
+        # halaman, dan isinya sudah ada di prompt masing-masing langkah.
+        "sinyal_palsu_terdeteksi": technical.sinyal_tanpa_penjelasan(
+            teknikal.get("sinyal_palsu") or []
+        ),
         "posisi_whale": posisi_whale,
         "pasar": pasar,
         # Data posisi institusional dan valuasi on-chain. Ini yang membedakan
@@ -720,7 +724,8 @@ def jalankan(cfg: Config, dry_run: bool = False) -> Dict[str, Any]:
         log.info("[16/21] LLM analisa whale dan sinyal palsu")
         hasil_whale_ai = news_analysis.analisa_whale(
             client, cfg.llm_models("whale"), posisi_whale,
-            teknikal.get("sinyal_palsu") or [], teknikal, price,
+            technical.sinyal_tanpa_penjelasan(teknikal.get("sinyal_palsu") or []),
+            teknikal, price,
         )
 
         # Sintesis melihat hasil dua langkah di atas supaya narasinya nyambung.
