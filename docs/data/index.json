@@ -1,6 +1,13 @@
 {
-  "updated_at": "2026-09-30T02:17:07Z",
+  "updated_at": "2026-10-01T02:15:33Z",
   "items": [
+    {
+      "file": "archive/2026-10-01-0916.json",
+      "waktu_wib": "1 Okt 2026, 09:16",
+      "waktu_utc": "2026-10-01T02:15:33Z",
+      "harga": 83634.8,
+      "sentimen": 38.8
+    },
     {
       "file": "archive/2026-09-30-0917.json",
       "waktu_wib": "30 Sep 2026, 09:17",
