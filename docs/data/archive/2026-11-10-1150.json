@@ -1,0 +1,1619 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-10T04:49:12Z",
+  "generated_at_wib": "10 November 2026, 11:49 WIB",
+  "run_type": "pagi",
+  "data_quality": {
+    "sources_ok": 13,
+    "sources_total": 13,
+    "skor_berbobot": 100.0,
+    "failed_sources": [],
+    "confidence": "baik",
+    "llm_cost_usd": 0.21462,
+    "llm_token_masuk": 72886,
+    "llm_token_keluar": 82894,
+    "llm_token_total": 155780,
+    "durasi_detik": 661.2,
+    "berita_corong": {
+      "terkumpul": 1105,
+      "segar": 393,
+      "unik": 379,
+      "kandidat_llm": 125,
+      "dipakai": 25
+    },
+    "catatan": [
+      "Riset berita tambahan: MEXC regulatory investigation; spot bitcoin ETF flows; leveraged bitcoin liquidations; US CPI bitcoin reaction; bitcoin options expiry; crypto exchange delisting",
+      "Feed gagal: coinjournal.net",
+      "Bagian AI 'narasi utama' gagal dihasilkan pada run ini."
+    ]
+  },
+  "price": {
+    "last": 74721.6,
+    "change_24h_pct": -0.39,
+    "high_24h": 75570.6,
+    "low_24h": 73751.0,
+    "volume_24h": 494970641.8609465
+  },
+  "price_series": [
+    {
+      "t": 1789171200000,
+      "c": 77281.0
+    },
+    {
+      "t": 1789257600000,
+      "c": 76836.0
+    },
+    {
+      "t": 1789344000000,
+      "c": 78195.7
+    },
+    {
+      "t": 1789430400000,
+      "c": 75641.0
+    },
+    {
+      "t": 1789516800000,
+      "c": 76201.2
+    },
+    {
+      "t": 1789603200000,
+      "c": 76419.3
+    },
+    {
+      "t": 1789689600000,
+      "c": 80903.0
+    },
+    {
+      "t": 1789776000000,
+      "c": 81265.8
+    },
+    {
+      "t": 1789862400000,
+      "c": 81179.6
+    },
+    {
+      "t": 1789948800000,
+      "c": 86617.8
+    },
+    {
+      "t": 1790035200000,
+      "c": 86209.1
+    },
+    {
+      "t": 1790121600000,
+      "c": 84399.5
+    },
+    {
+      "t": 1790208000000,
+      "c": 84409.8
+    },
+    {
+      "t": 1790294400000,
+      "c": 84099.0
+    },
+    {
+      "t": 1790380800000,
+      "c": 84439.9
+    },
+    {
+      "t": 1790467200000,
+      "c": 84479.0
+    },
+    {
+      "t": 1790553600000,
+      "c": 83500.1
+    },
+    {
+      "t": 1790640000000,
+      "c": 83657.5
+    },
+    {
+      "t": 1790726400000,
+      "c": 83618.4
+    },
+    {
+      "t": 1790812800000,
+      "c": 84877.4
+    },
+    {
+      "t": 1790899200000,
+      "c": 84518.9
+    },
+    {
+      "t": 1790985600000,
+      "c": 84754.9
+    },
+    {
+      "t": 1791072000000,
+      "c": 86525.1
+    },
+    {
+      "t": 1791158400000,
+      "c": 85759.7
+    },
+    {
+      "t": 1791244800000,
+      "c": 85553.9
+    },
+    {
+      "t": 1791331200000,
+      "c": 83323.0
+    },
+    {
+      "t": 1791417600000,
+      "c": 81760.0
+    },
+    {
+      "t": 1791504000000,
+      "c": 82626.6
+    },
+    {
+      "t": 1791590400000,
+      "c": 82985.1
+    },
+    {
+      "t": 1791676800000,
+      "c": 83760.4
+    },
+    {
+      "t": 1791763200000,
+      "c": 81853.1
+    },
+    {
+      "t": 1791849600000,
+      "c": 83172.2
+    },
+    {
+      "t": 1791936000000,
+      "c": 81682.6
+    },
+    {
+      "t": 1792022400000,
+      "c": 82232.4
+    },
+    {
+      "t": 1792108800000,
+      "c": 81617.5
+    },
+    {
+      "t": 1792195200000,
+      "c": 81489.4
+    },
+    {
+      "t": 1792281600000,
+      "c": 82109.3
+    },
+    {
+      "t": 1792368000000,
+      "c": 81943.8
+    },
+    {
+      "t": 1792454400000,
+      "c": 83026.9
+    },
+    {
+      "t": 1792540800000,
+      "c": 84097.6
+    },
+    {
+      "t": 1792627200000,
+      "c": 81417.0
+    },
+    {
+      "t": 1792713600000,
+      "c": 81188.2
+    },
+    {
+      "t": 1792800000000,
+      "c": 80880.9
+    },
+    {
+      "t": 1792886400000,
+      "c": 80157.0
+    },
+    {
+      "t": 1792972800000,
+      "c": 80146.0
+    },
+    {
+      "t": 1793059200000,
+      "c": 80907.5
+    },
+    {
+      "t": 1793145600000,
+      "c": 81350.9
+    },
+    {
+      "t": 1793232000000,
+      "c": 78007.2
+    },
+    {
+      "t": 1793318400000,
+      "c": 77306.1
+    },
+    {
+      "t": 1793404800000,
+      "c": 77532.2
+    },
+    {
+      "t": 1793491200000,
+      "c": 78342.5
+    },
+    {
+      "t": 1793577600000,
+      "c": 76809.0
+    },
+    {
+      "t": 1793664000000,
+      "c": 77454.2
+    },
+    {
+      "t": 1793750400000,
+      "c": 80508.0
+    },
+    {
+      "t": 1793836800000,
+      "c": 76087.4
+    },
+    {
+      "t": 1793923200000,
+      "c": 75848.1
+    },
+    {
+      "t": 1794009600000,
+      "c": 75868.0
+    },
+    {
+      "t": 1794096000000,
+      "c": 74846.4
+    },
+    {
+      "t": 1794182400000,
+      "c": 75361.9
+    },
+    {
+      "t": 1794268800000,
+      "c": 74721.1
+    }
+  ],
+  "technical": {
+    "1d": {
+      "harga": 74721.1,
+      "tren": {
+        "ema20": 77878.98,
+        "ema50": 79136.59,
+        "ema100": 77480.08,
+        "ema200": 74704.55,
+        "posisi": {
+          "ema20": "di_bawah",
+          "ema50": "di_bawah",
+          "ema100": "di_bawah",
+          "ema200": "di_atas"
+        },
+        "cross_50_200": null,
+        "cross_20_50": null,
+        "struktur": "campuran"
+      },
+      "momentum": {
+        "rsi": 36.2,
+        "rsi_zona": "netral",
+        "macd": -1725.2,
+        "macd_signal": -1402.78,
+        "macd_histogram": -322.42,
+        "macd_arah": "menguat",
+        "stoch_rsi_k": 14.2,
+        "stoch_rsi_d": 16.9,
+        "divergensi_rsi": "bullish"
+      },
+      "volatilitas": {
+        "bb_atas": 82868.85,
+        "bb_tengah": 78236.98,
+        "bb_bawah": 73605.11,
+        "bb_bandwidth": 11.84,
+        "bb_squeeze": false,
+        "posisi_dalam_band": "dalam",
+        "atr": 2182.23,
+        "atr_pct": 2.92
+      },
+      "volume": {
+        "terakhir": 49727034.0,
+        "rata_20": 483785304.0,
+        "rasio_vs_rata": 0.1,
+        "kelengkapan": 0.193,
+        "parsial": true,
+        "obv": -4539610299.0,
+        "obv_arah": "turun",
+        "obv_arah_tanpa_candle_berjalan": true,
+        "vwap_harian": 74846.0,
+        "vwap_harian_parsial": true
+      },
+      "level": {
+        "support": [
+          72012.0,
+          67127.5,
+          65490.3
+        ],
+        "resistance": [
+          74949.6,
+          76136.4,
+          79631.55
+        ],
+        "high": 87399.0,
+        "low": 62268.5,
+        "fib_236": 81468.2,
+        "fib_382": 77799.15,
+        "fib_500": 74833.75,
+        "fib_618": 71868.35,
+        "fib_786": 67646.43,
+        "pivot": {
+          "pivot": 74903.63,
+          "r1": 76056.27,
+          "r2": 76750.63,
+          "s1": 74209.27,
+          "s2": 73056.63
+        }
+      }
+    },
+    "key_levels": {
+      "support": [
+        72012.0,
+        67127.5,
+        65490.3
+      ],
+      "resistance": [
+        74949.6,
+        76136.4,
+        79631.55
+      ],
+      "invalidasi_naik": 70920.88,
+      "invalidasi_turun": 76040.72
+    },
+    "oi_price_signal": "long_liquidation",
+    "oi_price_interpretasi": "Harga turun dengan open interest turun: posisi long ditutup atau dilikuidasi.",
+    "oi_change_pct": -0.11,
+    "sinyal_palsu": [
+      {
+        "jenis": "sapuan_likuiditas_bawah",
+        "arah": "bullish",
+        "keterangan": "Harga menembus swing low 75.200 hingga 74.888 lalu ditutup kembali di 75.848 — stop dipanen lalu harga pulih.",
+        "kekuatan": 3,
+        "penjelasan": [
+          "Kode mengambil 40 candle terakhir, lalu mencari titik terendah dari candle-candle SEBELUM lima hari terakhir — itulah yang disebut swing low pada kalimat di atas. Sesudah itu lima candle terbaru diperiksa satu per satu: adakah yang sempat turun menembus level tersebut tapi ditutup kembali di atasnya.",
+          "Di bawah dasar lama menumpuk stop-loss milik yang berposisi beli, dan di sanalah likuiditas paling mudah dipanen. Harga yang menusuk area itu memaksa mereka keluar — lalu, kalau harga langsung pulih dan ditutup di atas level, penurunan tadi tidak menemukan penjual lanjutan. Yang terjadi adalah stop dipanen, bukan tekanan jual sungguhan. Itu sebabnya polanya dibaca condong naik.",
+          "Volume pada candle yang menyapu tidak jauh di atas rata-rata, jadi bobotnya sedang saja. Pola seperti ini bisa juga muncul dari likuiditas yang kebetulan tipis, bukan dari perburuan stop.",
+          "Yang membatalkan pembacaan ini: satu penutupan harian kembali di bawah level yang ditembus. Kalau itu terjadi, penurunannya bukan sapuan melainkan kelanjutan tren turun."
+        ],
+        "arti_singkat": "Stop di bawah dasar lama terpicu lalu harga pulih — likuiditas dipanen, bukan tekanan jual sungguhan.",
+        "timeframe": "1d"
+      }
+    ],
+    "pergerakan_24j": {
+      "arah": "datar",
+      "perubahan_pct": -0.39,
+      "besaran": "tipis",
+      "atr_harian_pct": 2.92,
+      "jenis": null,
+      "jenis_ringkas": null,
+      "jenis_arti": null,
+      "perubahan_oi_pct": -0.11,
+      "volume_rasio_vs_rata": null,
+      "volume_konfirmasi": null,
+      "pendorong": "tidak_ada_pergerakan_berarti",
+      "berita_pendukung": [],
+      "berita_berlawanan": [],
+      "ringkas": "Harga praktis datar dalam 24 jam terakhir (0,39%), bergerak di dalam kisaran hariannya yang normal."
+    }
+  },
+  "market": {
+    "funding_rate": 5.762e-05,
+    "open_interest": 9350.34,
+    "funding_persisten_jam": 64,
+    "funding_rata_7h_pct": 0.0064,
+    "fear_greed": {
+      "value": 32,
+      "label": "Ketakutan",
+      "previous": 29
+    },
+    "hashrate": 962.75,
+    "difficulty": 148364561003867.4,
+    "fee_fastest_sat_vb": 1,
+    "fee_hour_sat_vb": 1,
+    "etf_flow_usd": 12200000.0,
+    "etf_flow_date": "09 Nov 2026",
+    "etf_flow_sumber": "Farside",
+    "etf_flow_verifikasi": {
+      "status": "tanpa_pembanding"
+    },
+    "etf_flow_kedaluwarsa": false,
+    "btc_dominance_pct": 59.62,
+    "likuidasi_long_usd": 3169732.0,
+    "likuidasi_short_usd": 1109432.0,
+    "likuidasi_total_usd": 4279164.0,
+    "likuidasi_jumlah_order": 500,
+    "likuidasi_sisi_dominan": "long",
+    "likuidasi_terbesar": {
+      "nilai_usd": 747768.0,
+      "sisi": "long"
+    },
+    "likuidasi_cakupan_jam": 12.9,
+    "likuidasi_sumber": "OKX BTC-USDT-SWAP"
+  },
+  "macro": {
+    "dxy": 101.68,
+    "ust10y": 4.86,
+    "wti": 85.85,
+    "gold": 4123.4,
+    "nasdaq": 25253.14,
+    "sp500": 7549.94,
+    "vix": 19.92,
+    "usdjpy": 157.96,
+    "dxy_change_pct": -0.61,
+    "ust10y_change_pct": 0.1,
+    "wti_change_pct": -5.48,
+    "gold_change_pct": 1.19,
+    "nasdaq_change_pct": 2.74,
+    "sp500_change_pct": 2.35,
+    "vix_change_pct": -22.31,
+    "usdjpy_change_pct": -0.21,
+    "fed_balance_sheet": 6748145000000.0,
+    "m2": 23413900000000.0
+  },
+  "whale": {
+    "whale_long_pct": 66.02,
+    "whale_short_pct": 33.98,
+    "whale_ratio": 1.943,
+    "whale_tren_long_pp": -0.11,
+    "ritel_long_pct": 72.87,
+    "ritel_short_pct": 27.13,
+    "ritel_ratio": 2.685,
+    "ritel_tren_long_pp": -0.77,
+    "divergensi": -6.85,
+    "divergensi_label": "selaras",
+    "taker_buy_sell_ratio": 0.797,
+    "taker_tren": "seimbang",
+    "periode": "1h",
+    "jam_dipantau": 24,
+    "sumber_whale": "okx",
+    "sumber_ritel": "okx"
+  },
+  "options": {
+    "dvol": 39.3,
+    "dvol_perubahan_7h_pp": 0.83,
+    "dvol_min_7h": 37.05,
+    "dvol_maks_7h": 42.27,
+    "put_call_ratio_oi": 0.73,
+    "oi_call_btc": 198149.6,
+    "oi_put_btc": 144703.3,
+    "iv_atm_call": 44.06,
+    "iv_atm_put": 44.06,
+    "skew_put_call": 0.0,
+    "max_pain_expiry_terdekat": 75000.0,
+    "expiry_terdekat": "2026-11-10T08:00:00Z",
+    "expiry_oi_terbesar": "2026-12-25T08:00:00Z",
+    "oi_pada_expiry_terbesar_btc": 140997.0,
+    "harga_dasar_deribit": 75128.01,
+    "realized_vol_30hari_pct": 35.25,
+    "iv_rv_ratio": 1.11
+  },
+  "onchain": {
+    "metrik_tersedia": [
+      "CapMVRVCur",
+      "AdrActCnt",
+      "SplyCur",
+      "CapMrktCurUSD"
+    ],
+    "mvrv": 1.394,
+    "alamat_aktif": 676220,
+    "pasokan_beredar": 20109964,
+    "market_cap_usd": 1511487638441,
+    "mvrv_perubahan_30hari_pct": -10.28,
+    "alamat_aktif_perubahan_30hari_pct": 24.43,
+    "pasokan_beredar_perubahan_30hari_pct": 0.07,
+    "market_cap_usd_perubahan_30hari_pct": -10.07,
+    "mvrv_zona": "wajar"
+  },
+  "flows": {
+    "harga_coinbase": 74611.78,
+    "premium_coinbase_usd": -109.82,
+    "premium_coinbase_pct": -0.147,
+    "premium_coinbase_label": "tekanan jual dari sisi AS",
+    "stablecoin_cap_usd": 247041653743.0,
+    "stablecoin_perubahan_24j_usd": -151313166.0,
+    "stablecoin_perubahan_24j_pct": -0.061,
+    "stablecoin_rincian": {
+      "tether": 176870198513.0,
+      "usd-coin": 70171455230.0
+    }
+  },
+  "news": [
+    {
+      "id": "ff9ef2bd3d53",
+      "judul": "Bitcoin ETFs shed $1.3B in biggest weekly outflow since late June",
+      "judul_id": "ETF Bitcoin alami arus keluar $1.3B terbesar sejak akhir Juni",
+      "ringkasan_id": "Investor menarik bersih $1.21 miliar dari IBIT BlackRock pekan lalu saat Bitcoin turun di bawah $76,000 dan saham teknologi AS melemah.",
+      "sumber": "Cointelegraph.com News",
+      "url": "https://cointelegraph.com/markets/bitcoin-etfs-13b-biggest-weekly-outflow-late-june?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "waktu_utc": "2026-11-09T08:17:35Z",
+      "kategori": "etf",
+      "relevansi_btc": 90,
+      "sentimen": "bearish",
+      "kekuatan": 4,
+      "horizon": "langsung",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": "supply_demand",
+      "mekanisme": "Penarikan dana dari ETF Bitcoin -> penerbit ETF mengurangi eksposur BTC -> permintaan spot melemah -> tekanan harga turun",
+      "entitas": [
+        "BlackRock",
+        "IBIT"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": -0.36,
+      "catatan_reaksi": "Harga bergerak searah sentimen; kemungkinan sudah tercermin di harga."
+    },
+    {
+      "id": "30f0473e7c8c",
+      "judul": "‘Connecting the dots’: Michael Saylor’s Strategy buys another 1,036 bitcoin for $82 million as holdings top 850,000 BTC",
+      "judul_id": "Strategy milik Michael Saylor beli 1,036 BTC senilai $82 juta, pegangan tembus 850,000 BTC",
+      "ringkasan_id": "Strategy membeli 1,036 Bitcoin senilai $82 juta sehingga total pegangan melampaui 4% dari suplai maksimum Bitcoin dengan keuntungan kertas $500 juta.",
+      "sumber": "The Block",
+      "url": "https://www.theblock.co/news/business/2026-11-09-connecting-the-dots-michael-saylor-strategy-bitcoin-436094",
+      "waktu_utc": "2026-11-09T13:10:42Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 90,
+      "sentimen": "bullish",
+      "kekuatan": 3,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": "supply_demand",
+      "mekanisme": "Strategy membeli 1.036 BTC -> permintaan korporasi menambah pembelian spot -> pasokan beredar berkurang -> tekanan harga naik",
+      "entitas": [
+        "Michael Saylor",
+        "Strategy"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "59ec7cb68b2b",
+      "judul": "Bitcoin in Limbo as Stocks Rebound Ahead of US Inflation Report",
+      "judul_id": "Bitcoin tertahan saat saham rebound menjelang laporan inflasi AS",
+      "ringkasan_id": "Saham AS menguat saat minyak turun, tetapi Bitcoin bertahan di sekitar $75,000 setelah gelombang likuidasi, sementara laporan inflasi Selasa menguji taruhan kenaikan suku bunga Fed Desember.",
+      "sumber": "Decrypt",
+      "url": "https://decrypt.co/382861/bitcoin-limbo-stocks-rebound-us-inflation",
+      "waktu_utc": "2026-11-09T19:06:03Z",
+      "kategori": "makro",
+      "relevansi_btc": 85,
+      "sentimen": "netral",
+      "kekuatan": 3,
+      "horizon": "langsung",
+      "status_kepastian": "terjadwal",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Fed"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "f669ac656467",
+      "judul": "Bitcoin Hits $73,477 Low as Nvidia Probe Sparks $1B Liquidations - Bitbo",
+      "judul_id": "Bitcoin sentuh level rendah $73,477 saat penyelidikan Nvidia picu likuidasi $1B",
+      "ringkasan_id": "Bitcoin turun ke $73,477 setelah penyelidikan terhadap Nvidia memicu likuidasi $1B.",
+      "sumber": "Bitbo",
+      "url": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE5NX2prbk1yUXpjMzJObzBGdk5RdnExSm55ZnJWSVVZSC1OTTZsLXczUk9sMFltSGpCaVlBQlZPanV4WWltUTNpU2V5WERydWVVS0VRX1ZnS0xwelgtYTBObUJQNWQ3bjA?oc=5",
+      "waktu_utc": "2026-11-09T10:15:00Z",
+      "kategori": "regulasi",
+      "relevansi_btc": 95,
+      "sentimen": "bearish",
+      "kekuatan": 4,
+      "horizon": "langsung",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": "likuiditas",
+      "mekanisme": "Investigasi Nvidia -> likuidasi posisi long kripto $1 miliar -> penjualan paksa BTC -> tekanan harga turun",
+      "entitas": [
+        "Nvidia"
+      ],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": 0.29,
+      "catatan_reaksi": "Pasar praktis mengabaikan berita ini."
+    },
+    {
+      "id": "67fda925c431",
+      "judul": "Bitcoin faces U.S. CPI test as analysts warn inflation relief may not be enough",
+      "judul_id": "Bitcoin hadapi uji CPI AS, analis peringatkan penurunan inflasi mungkin belum cukup",
+      "ringkasan_id": "Bitcoin akan menghadapi rilis CPI AS, sementara analis memperingatkan penurunan inflasi mungkin belum cukup.",
+      "sumber": "CoinDesk: Bitcoin, Ethereum, Crypto News and Price Data",
+      "url": "https://www.coindesk.com/markets/2026/11/10/bitcoin-faces-u-s-cpi-test-as-analysts-warn-inflation-relief-may-not-be-enough",
+      "waktu_utc": "2026-11-10T03:22:26Z",
+      "kategori": "makro",
+      "relevansi_btc": 80,
+      "sentimen": "bearish",
+      "kekuatan": 3,
+      "horizon": "langsung",
+      "status_kepastian": "terjadwal",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "opini",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "16429b7057a0",
+      "judul": "Bitcoin ETFs See $1.3 Billion Weekly Outflows, Largest Since June",
+      "judul_id": "Bitcoin ETF Alami Outflow Mingguan $1,3 Miliar, Terbesar Sejak Juni",
+      "ringkasan_id": "U.S. spot Bitcoin ETF mencatat net outflow $1,28 miliar pekan lalu, terbesar sejak akhir Juni, sehingga net outflow year-to-date sekitar $919 juta.",
+      "sumber": "Bitcoinist.com",
+      "url": "https://bitcoinist.com/bitcoin-etfs-see-1-3-billion-weekly-outflows-largest-since-june/",
+      "waktu_utc": "2026-11-09T16:55:35Z",
+      "kategori": "etf",
+      "relevansi_btc": 90,
+      "sentimen": "bearish",
+      "kekuatan": 4,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": "supply_demand",
+      "mekanisme": "Outflow mingguan dari ETF spot Bitcoin -> penerbit ETF mengurangi permintaan BTC -> tekanan beli melemah -> harga turun",
+      "entitas": [
+        "Bitcoin ETFs"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": -0.38,
+      "catatan_reaksi": "Harga bergerak searah sentimen; kemungkinan sudah tercermin di harga."
+    },
+    {
+      "id": "e836a2d8caa9",
+      "judul": "BlackRock: Security Fears Are Driving Bitcoin Whales Into IBIT",
+      "judul_id": "BlackRock: Ketakutan Keamanan Dorong Whales Bitcoin ke IBIT",
+      "ringkasan_id": "Robbie Mitchnick dari BlackRock menyebut permintaan menukar bitcoin langsung ke saham IBIT mencapai level tertinggi, didorong kekhawatiran keamanan.",
+      "sumber": "Bitcoin Magazine",
+      "url": "https://bitcoinmagazine.com/news/blackrock-bitcoin-whales-self-custody-ibit",
+      "waktu_utc": "2026-11-09T16:30:00Z",
+      "kategori": "etf",
+      "relevansi_btc": 85,
+      "sentimen": "bullish",
+      "kekuatan": 3,
+      "horizon": "struktural",
+      "status_kepastian": "belum_dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "BlackRock",
+        "Robbie Mitchnick",
+        "IBIT",
+        "Barron's"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "opini",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "887a43bd497a",
+      "judul": "Bitcoin price faces $297M liquidation wave – Why $70K is at risk",
+      "judul_id": "Gelombang Likuidasi $297 Juta Ancam Harga Bitcoin – Mengapa $70K Berisiko",
+      "ringkasan_id": "Analisis menyebut momentum bearish dan gelombang likuidasi $297 juta mengancam level $70K, meski turun di bawah $57,8K dinilai tidak mungkin.",
+      "sumber": "AMBCrypto",
+      "url": "https://ambcrypto.com/bitcoin-price-faces-297m-liquidation-wave-why-70k-is-at-risk/",
+      "waktu_utc": "2026-11-09T15:00:55Z",
+      "kategori": "onchain",
+      "relevansi_btc": 85,
+      "sentimen": "bearish",
+      "kekuatan": 3,
+      "horizon": "langsung",
+      "status_kepastian": "belum_dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "prediktif",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "4fec4526336c",
+      "judul": "MARA Sold 13,597 Bitcoin After Q3, and It Isn't Done Selling",
+      "judul_id": "MARA Jual 13.597 Bitcoin Setelah K3 dan Belum Selesai Menjual",
+      "ringkasan_id": "MARA Holdings menjual 13.597 BTC senilai sekitar $1,1 miliar setelah kuartal III dan menyebut akan menjual lebih banyak; penjualan itu setara 40% dari 34.012 BTC yang dipegang pada 30 September.",
+      "sumber": "BeInCrypto",
+      "url": "https://beincrypto.com/mara-sells-13597-bitcoin-after-q3/",
+      "waktu_utc": "2026-11-10T03:33:13Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 85,
+      "sentimen": "bearish",
+      "kekuatan": 4,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": "supply_demand",
+      "mekanisme": "MARA menjual 13.597 BTC -> pasokan BTC di pasar spot bertambah -> tekanan jual meningkat -> harga turun",
+      "entitas": [
+        "MARA Holdings"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": 0.21,
+      "catatan_reaksi": "Pasar praktis mengabaikan berita ini."
+    },
+    {
+      "id": "a3ced34f8eac",
+      "judul": "Bitcoin’s 6% Price Drop After $6.3B Binance Hack Signals Maturity: Fitch Ratings",
+      "judul_id": "Penurunan 6% Bitcoin Pasca Peretasan Binance $6,3 Miliar Jadi Tanda Matang: Fitch",
+      "ringkasan_id": "Fitch Ratings menilai penurunan harga bitcoin hanya 6% setelah peretasan Binance senilai $6,3 miliar menunjukkan ketahanan pasar yang lebih matang.",
+      "sumber": "Bitcoin News",
+      "url": "https://news.bitcoin.com/featured/bitcoin-6-percent-price-drop-after-binance-hack-signals-maturity-fitch/",
+      "waktu_utc": "2026-11-09T20:50:57Z",
+      "kategori": "peretasan",
+      "relevansi_btc": 80,
+      "sentimen": "bullish",
+      "kekuatan": 3,
+      "horizon": "struktural",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Fitch Ratings",
+        "Binance"
+      ],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "opini",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "d46270c57dc7",
+      "judul": "Trump Media pledges over 11,000 Bitcoin to yield program as profit hits $410 million",
+      "judul_id": "Trump Media janjikan lebih dari 11.000 Bitcoin ke program yield saat laba capai $410 juta",
+      "ringkasan_id": "Trump Media mengandalkan Bitcoin untuk laba, tetapi strategi itu menyoroti risiko volatilitas dan menutupi pertumbuhan bisnis inti.",
+      "sumber": "Crypto Briefing",
+      "url": "https://cryptobriefing.com/trump-media-q3-net-income-bitcoin-gains/",
+      "waktu_utc": "2026-11-10T01:19:47Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 75,
+      "sentimen": "bullish",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Trump Media"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "53f0d520b51c",
+      "judul": "The missing step in the warning that Japan could trigger Bitcoin’s next selloff",
+      "judul_id": "Langkah yang hilang dalam peringatan bahwa Jepang bisa memicu aksi jual Bitcoin berikutnya",
+      "ringkasan_id": "Ceramah Ueda di IMF memisahkan laba ditahan dari uang yang pulang, sementara rilis sekuritas mendatang menguji saluran alokasi yang lebih sempit.",
+      "sumber": "CryptoSlate",
+      "url": "https://cryptoslate.com/the-missing-step-in-the-warning-that-japan-could-trigger-bitcoins-next-selloff/",
+      "waktu_utc": "2026-11-09T18:20:52Z",
+      "kategori": "makro",
+      "relevansi_btc": 75,
+      "sentimen": "bearish",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "belum_dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Ueda",
+        "IMF",
+        "Jepang"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "opini",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "1608ab17bacb",
+      "judul": "Bitcoin Repeats Rare Historical Signal: What It Means for the 4-Year Cycle",
+      "judul_id": "Bitcoin Ulangi Sinyal Historis Langka: Apa Artinya bagi Siklus 4 Tahun",
+      "ringkasan_id": "Bitcoin menutup pekan di bawah MA 50 pekan, tetapi Galaxy's Alex Thorn menilai hal itu mengonfirmasi siklus 4 tahun dan menyelamatkan pasar bullish.",
+      "sumber": "U.Today - IT, AI and Fintech Daily News for You Today",
+      "url": "https://u.today/bitcoin-repeats-rare-historical-signal-what-it-means-for-the-4-year-cycle",
+      "waktu_utc": "2026-11-09T09:31:10Z",
+      "kategori": "makro",
+      "relevansi_btc": 75,
+      "sentimen": "bullish",
+      "kekuatan": 2,
+      "horizon": "struktural",
+      "status_kepastian": "belum_dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Galaxy",
+        "Alex Thorn"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "opini",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "cb979da2198b",
+      "judul": "EDX Markets Adds Bitcoin-Backed CBTC Trading for Canton Institutions",
+      "judul_id": "EDX Markets Tambahkan Perdagangan CBTC Berbasis Bitcoin untuk Institusi Canton",
+      "ringkasan_id": "EDX Markets bermitra dengan BitSafe untuk memperkenalkan perdagangan spot CBTC, aset berbasis Bitcoin di Canton Network, dalam pengumuman 5 November.",
+      "sumber": "NewsBTC",
+      "url": "https://www.newsbtc.com/news/edx-markets-adds-bitcoin-backed-cbtc-trading-for-canton-institutions/",
+      "waktu_utc": "2026-11-10T03:00:00Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 65,
+      "sentimen": "bullish",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "EDX Markets",
+        "BitSafe",
+        "CBTC",
+        "Canton Network"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "03167171a64f",
+      "judul": "3 unexpected reasons the October jobs report was so strong",
+      "judul_id": "3 Alasan Tak Terduga Laporan Pekerjaan Oktober Sangat Kuat",
+      "ringkasan_id": "Laporan pekerjaan Oktober melampaui perkiraan ekonom, dan artikel ini membahas tiga alasan tak terduga di balik kekuatan data tersebut.",
+      "sumber": "Economy",
+      "url": "https://www.cnbc.com/2026/11/09/october-jobs-report-hiring-by-sector.html",
+      "waktu_utc": "2026-11-09T22:23:56Z",
+      "kategori": "makro",
+      "relevansi_btc": 45,
+      "sentimen": "netral",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 1,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "c263ecb9f014",
+      "judul": "The stock-market rally keeps spreading beyond Big Tech. October inflation data could put it to the test.",
+      "judul_id": "Reli pasar saham meluas di luar Big Tech, data inflasi Oktober bisa jadi ujian",
+      "ringkasan_id": "Laporan CPI inflasi Selasa dan serangkaian pembicara Federal Reserve dapat menguji ketahanan rotasi dari Big Tech ke saham lain.",
+      "sumber": "MarketWatch.com - Top Stories",
+      "url": "https://www.marketwatch.com/story/the-stock-market-rally-keeps-spreading-beyond-big-tech-october-inflation-data-could-put-it-to-the-test-c1b87dcd?mod=mw_rss_topstories",
+      "waktu_utc": "2026-11-09T21:24:00Z",
+      "kategori": "makro",
+      "relevansi_btc": 50,
+      "sentimen": "netral",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "terjadwal",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Federal Reserve"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "prediktif",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "5fb2d56a1c36",
+      "judul": "BTC price eyes $73K amid Nvidia volatility: Three things to know in Bitcoin this week",
+      "judul_id": "Harga BTC incar $73K di tengah volatilitas Nvidia: tiga hal Bitcoin pekan ini",
+      "ringkasan_id": "Harga Bitcoin turun ke level terendah sejak pertengahan Agustus karena laporan Nvidia menambah tekanan jual di futures pasar saham.",
+      "sumber": "Cointelegraph.com News",
+      "url": "https://cointelegraph.com/markets/btc-price-nvidia-volatility-three-things-bitcoin-this-week?utm_source=rss_feed&utm_medium=rss&utm_campaign=rss_partner_inbound",
+      "waktu_utc": "2026-11-09T10:03:40Z",
+      "kategori": "makro",
+      "relevansi_btc": 90,
+      "sentimen": "bearish",
+      "kekuatan": 3,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": "risk_appetite",
+      "mekanisme": "Laporan Nvidia menambah tekanan jual di futures saham -> sentimen aset berisiko memburuk -> investor keluar dari BTC -> tekanan harga turun",
+      "entitas": [
+        "Nvidia"
+      ],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 2,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "ee9d7943c252",
+      "judul": "Bitcoin loses 50-week moving average as 24-hour crypto long liquidations top $1 billion",
+      "judul_id": "Bitcoin kehilangan moving average 50 pekan saat likuidasi long kripto 24 jam tembus $1 miliar",
+      "ringkasan_id": "Bitcoin ditutup di bawah moving average 50 pekan setelah lebih dari $1 miliar posisi long kripto dilikuidasi dalam 24 jam.",
+      "sumber": "The Block",
+      "url": "https://www.theblock.co/news/markets/2026-11-09-bitcoin-loses-50-week-moving-average-as-24-hour-crypto-long-liquidations-top-1-billion-436102",
+      "waktu_utc": "2026-11-09T13:04:21Z",
+      "kategori": "onchain",
+      "relevansi_btc": 85,
+      "sentimen": "bearish",
+      "kekuatan": 4,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": "likuiditas",
+      "mekanisme": "Likuidasi posisi long lebih dari $1 miliar -> pemegang leverage dipaksa menjual BTC -> tekanan jual paksa meningkat -> harga turun",
+      "entitas": [],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": 0.23,
+      "catatan_reaksi": "Pasar praktis mengabaikan berita ini."
+    },
+    {
+      "id": "a88e13395192",
+      "judul": "Bitcoin Rebounds Above $75,000 After Volatility Triggers More Than $1 Billion in Crypto Liquidations - Hokanews",
+      "judul_id": "Bitcoin pulih di atas $75.000 setelah volatilitas picu likuidasi kripto lebih dari $1 miliar",
+      "ringkasan_id": "Bitcoin kembali ke atas $75.000 setelah volatilitas memicu likuidasi lebih dari $1 miliar pada posisi kripto.",
+      "sumber": "Hokanews",
+      "url": "https://news.google.com/rss/articles/CBMifEFVX3lxTE0zRVVIcEw3TXRaS2EwQXJFZ2I0T0d0cndMdWw4MS1scENfVlRObzRfZF84eERkT2lveWN6ZXhqYmVGYlN4WTdTYUtQd3BxOUx3TUotU192UHZQSHdJNFE2OTBEU2RIMzMwSEJmQTNUUUhFd2doS05kQVJXQkc?oc=5",
+      "waktu_utc": "2026-11-09T09:06:00Z",
+      "kategori": "onchain",
+      "relevansi_btc": 95,
+      "sentimen": "bullish",
+      "kekuatan": 3,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": "likuiditas",
+      "mekanisme": "Likuidasi lebih dari $1 miliar -> posisi leverage berlebih terhapus -> tekanan jual paksa mereda -> harga BTC rebound",
+      "entitas": [],
+      "sudah_priced_in": "ya",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "ebb02a888272",
+      "judul": "Strategy Buys $82M in Bitcoin, Buys Back $188M of STRC",
+      "judul_id": "Strategy beli $82 juta Bitcoin dan buyback $188 juta STRC",
+      "ringkasan_id": "Perusahaan treasury Bitcoin ini menjual $284 juta saham MSTR untuk membiayai pembelian Bitcoin dan buyback STRC, menjelang pengumuman MSCI tentang perusahaan yang terancam dihapus dari indeks.",
+      "sumber": "Decrypt",
+      "url": "https://decrypt.co/382820/strategy-buys-82m-in-bitcoin-buys-back-188m-of-strc",
+      "waktu_utc": "2026-11-09T13:24:29Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 80,
+      "sentimen": "netral",
+      "kekuatan": 2,
+      "horizon": "pendek",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Strategy",
+        "MSCI",
+        "MSTR",
+        "STRC"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "02d7b93c7c98",
+      "judul": "BTC Drops Then Rebounds Near $74K as Nvidia Scandal Sparks $1B Liquidations",
+      "judul_id": "BTC Turun Lalu Rebound Dekat $74K karena Skandal Nvidia Picu Likuidasi $1 Miliar",
+      "ringkasan_id": "BTC turun tajam lalu rebound cepat pada akhir pekan 8-9 November 2026, menghapus lebih dari $1 miliar posisi leverage setelah pasar mencerna skandal Nvidia.",
+      "sumber": "Bitcoinist.com",
+      "url": "https://bitcoinist.com/btc-drops-then-rebounds-near-74k-as-nvidia-scandal-sparks-1b-liquidations/",
+      "waktu_utc": "2026-11-09T15:19:35Z",
+      "kategori": "makro",
+      "relevansi_btc": 90,
+      "sentimen": "netral",
+      "kekuatan": 3,
+      "horizon": "langsung",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": "likuiditas",
+      "mekanisme": "Skandal Nvidia memicu likuidasi $1 miliar -> posisi leverage berlebih terhapus -> tekanan jual paksa mereda -> harga BTC rebound",
+      "entitas": [
+        "Bitcoin",
+        "Nvidia",
+        "Jensen Huang"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "44d8fc417b45",
+      "judul": "Coinbase gets full U.S. trust charter from federal banking regulator",
+      "judul_id": "Coinbase Dapat Charter Trust Penuh AS dari Regulator Perbankan Federal",
+      "ringkasan_id": "Coinbase memperoleh charter trust penuh AS dari regulator perbankan federal.",
+      "sumber": "CoinDesk: Bitcoin, Ethereum, Crypto News and Price Data",
+      "url": "https://www.coindesk.com/policy/2026/11/09/coinbase-gets-full-u-s-trust-charter-from-federal-banking-regulator",
+      "waktu_utc": "2026-11-09T10:00:00Z",
+      "kategori": "regulasi",
+      "relevansi_btc": 70,
+      "sentimen": "bullish",
+      "kekuatan": 4,
+      "horizon": "struktural",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": "regulasi",
+      "mekanisme": "Coinbase mendapat charter trust dari regulator perbankan AS -> legitimasi regulasi meningkat -> kepercayaan dan akses institusi ke BTC naik -> tekanan harga naik",
+      "entitas": [
+        "Coinbase"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 2,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": -0.18,
+      "catatan_reaksi": "Pasar praktis mengabaikan berita ini."
+    },
+    {
+      "id": "c9feb7769d03",
+      "judul": "Michael Saylor teases fresh Bitcoin move amid Strategy’s $1B paper loss",
+      "judul_id": "Michael Saylor Isyaratkan Langkah Bitcoin Baru di Tengah Kerugian Buku Strategy $1 Miliar",
+      "ringkasan_id": "Michael Saylor mengisyaratkan langkah Bitcoin baru dari Strategy di tengah penurunan pasar dan kerugian buku $1 miliar; rencana akumulasi belum dikonfirmasi.",
+      "sumber": "AMBCrypto",
+      "url": "https://ambcrypto.com/michael-saylor-teases-fresh-bitcoin-move-amid-strategys-1b-paper-loss/",
+      "waktu_utc": "2026-11-09T23:00:41Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 80,
+      "sentimen": "bullish",
+      "kekuatan": 3,
+      "horizon": "pendek",
+      "status_kepastian": "belum_dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Michael Saylor",
+        "Strategy"
+      ],
+      "sudah_priced_in": "tidak",
+      "tipe_klaim": "prediktif",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "0177f24f06d2",
+      "judul": "Bitcoin Lightning’s security update shuts one door. A critical Linux flaw remains",
+      "judul_id": "Pembaruan Keamanan Bitcoin Lightning Tutup Satu Celah, Cacat Linux Kritis Masih Ada",
+      "ringkasan_id": "Rilis LND 30 Oktober memblokir jalur eksploit MPTCP yang didemonstrasikan, tetapi host terdampak masih butuh kernel yang ditambal dan reboot.",
+      "sumber": "CryptoSlate",
+      "url": "https://cryptoslate.com/bitcoin-lightnings-security-update-shuts-one-door-a-critical-linux-flaw-remains/",
+      "waktu_utc": "2026-11-09T16:40:20Z",
+      "kategori": "teknologi",
+      "relevansi_btc": 70,
+      "sentimen": "netral",
+      "kekuatan": 2,
+      "horizon": "langsung",
+      "status_kepastian": "sudah_terjadi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Bitcoin Lightning",
+        "LND",
+        "Linux"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    },
+    {
+      "id": "1f2d3c89e4c8",
+      "judul": "Amundi Boosts Strategy (MSTR) Stake 44% to $291 Million as Shares Slide",
+      "judul_id": "Amundi Naikkan Kepemilikan Strategy (MSTR) 44% Jadi $291 Juta Saat Saham Turun",
+      "ringkasan_id": "Amundi menaikkan kepemilikan Strategy (MSTR) menjadi 1,9 juta saham pada kuartal ketiga, senilai $291 juta, meski saham MSTR telah turun sekitar 18% sejak akhir kuartal.",
+      "sumber": "Bitcoin Magazine",
+      "url": "https://bitcoinmagazine.com/news/amundi-boosts-strategy-mstr-stake-44",
+      "waktu_utc": "2026-11-09T20:39:56Z",
+      "kategori": "adopsi",
+      "relevansi_btc": 70,
+      "sentimen": "bullish",
+      "kekuatan": 3,
+      "horizon": "struktural",
+      "status_kepastian": "dikonfirmasi",
+      "jalur_transmisi": null,
+      "mekanisme": null,
+      "entitas": [
+        "Amundi",
+        "Strategy",
+        "MSTR"
+      ],
+      "sudah_priced_in": "sebagian",
+      "tipe_klaim": "faktual",
+      "kredibilitas_sumber": 3,
+      "jumlah_konfirmasi": 1,
+      "reaksi_harga_1j": null,
+      "catatan_reaksi": null
+    }
+  ],
+  "statements": [
+    {
+      "id": "stf556b4a5b0",
+      "tokoh": "Blumenthal",
+      "kutipan": null,
+      "ringkasan": "Blumenthal menetapkan tenggat waktu 4 Januari untuk Binance, Tether, dan perusahaan kripto Trump.",
+      "topik": "regulasi",
+      "sikap_kripto": "menentang",
+      "dampak_btc": "bearish",
+      "kekuatan": 4,
+      "status": "dilaporkan_media",
+      "jalur_transmisi": "regulasi",
+      "mekanisme": "Tenggat waktu dari senator untuk perusahaan kripto besar dapat meningkatkan tekanan regulasi dan ketidakpastian, yang menekan sentimen pasar kripto.",
+      "relevansi_btc": 90,
+      "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxORkk4ZHZiNGRvbTlhXzBvYUFvY2ZRd3VaY2ZSYnBNVlVqZ1ZFMllPUjBjWGxkTWszdHFUc0hfcno1cWNrbzlLMG9FekZKRHhCWnJtZXlNNk5pUmlLRklQZnByWnc1clJ3bVVHVTNnSmNaM1pEekp2WllnZ0FtUy1XMnBaYlRvMkJPMzdrd2xZRHBfMG9RWVdydVgxdk1GOFRPZ0dNZ1F2Z2VyNHBfNVJv?oc=5",
+      "sumber": "The Defiant",
+      "jenis_sumber": "media",
+      "terkonfirmasi_media": null,
+      "waktu_utc": "2026-11-09T12:16:14Z"
+    },
+    {
+      "id": "sted7761d0ca",
+      "tokoh": "Donald Trump",
+      "kutipan": null,
+      "ringkasan": "Trump mengklaim telah mendiskusikan suku bunga dengan Ketua Fed, namun kalender resmi menunjukkan hal berbeda.",
+      "topik": "moneter",
+      "sikap_kripto": "netral",
+      "dampak_btc": "netral",
+      "kekuatan": 3,
+      "status": "dilaporkan_media",
+      "jalur_transmisi": "likuiditas",
+      "mekanisme": "Klaim Trump tentang diskusi suku bunga dengan Fed dapat mempengaruhi ekspektasi pasar terhadap kebijakan moneter dan likuiditas, yang berdampak pada aset berisiko seperti Bitcoin.",
+      "relevansi_btc": 60,
+      "url": "https://news.google.com/rss/articles/CBMingFBVV95cUxOSnJIQlBuakJhczJmTUhlMkFjRGVJYUloZ3htNlFQN3NuQVNnZk9IVkhQUTJUWWxmeF8zR1I2ajRPTDNqdGt3TXZ0NlVjUm9iWVhsZDR4Y3RNTEQ5VVpUakItYU1tSzY0U1VzWm82dWlwN3JuN3VGMExHYTI4ZUdmUGZHSkhzejB4d21YMm03RzNKaVQ3a3lSTHJOWXJGQQ?oc=5",
+      "sumber": "Yahoo",
+      "jenis_sumber": "media",
+      "terkonfirmasi_media": null,
+      "waktu_utc": "2026-11-09T15:58:11Z"
+    },
+    {
+      "id": "stcf6991214f",
+      "tokoh": "Scaramucci",
+      "kutipan": null,
+      "ringkasan": "Scaramucci melihat 'kesempatan kedua' karena Bitcoin menghapus keuntungan sejak kemenangan pemilu Trump November 2024.",
+      "topik": "kripto",
+      "sikap_kripto": "mendukung",
+      "dampak_btc": "bullish",
+      "kekuatan": 2,
+      "status": "dilaporkan_media",
+      "jalur_transmisi": "supply_demand",
+      "mekanisme": "Pernyataan positif dari tokoh kripto yang dikenal dapat meningkatkan sentimen dan minat beli investor terhadap Bitcoin.",
+      "relevansi_btc": 70,
+      "url": "https://news.google.com/rss/articles/CBMipAFBVV95cUxNSk1QaTZzZnJuazB3SDZUOTh5Ym9NYkJCVzQtZUlHZHJsWkJjbHJYTFpOdUJTXzFSWEpSZEJuV1RYeDBFWGxiZG9BekRHRWM0aEFvcUpPOHRoRjNRU01laVJBamNsLVpNeXR6WkFFang3SzB2cUZhYWVsRFMtV0Q0ZWU1U1h0c2tiUWNHR1FVY3JUaVRNbW5McnI5eTl0Y05WY1ZJbQ?oc=5",
+      "sumber": "Yahoo Finance",
+      "jenis_sumber": "media",
+      "terkonfirmasi_media": null,
+      "waktu_utc": "2026-11-09T04:30:00Z"
+    }
+  ],
+  "aggregate": {
+    "sentiment_score": -11.6,
+    "sentiment_label": "netral",
+    "rasio_faktual": 0.68,
+    "jumlah_dinilai": 25,
+    "dominant_themes": [
+      "makro",
+      "adopsi",
+      "etf"
+    ],
+    "narrative_shift": ""
+  },
+  "calendar": [
+    {
+      "waktu_utc": "2026-11-10T09:00:00Z",
+      "waktu_wib": "10 Nov · 16:00 WIB",
+      "hari": "Selasa",
+      "nama": "FOMC Member Waller Speaks",
+      "kategori": "ekonomi",
+      "dampak": "menengah",
+      "perkiraan": false,
+      "jam_lagi": 4.2,
+      "relevansi_kripto": 3,
+      "jalur": "Pernyataan Waller -> sinyal hawkish/dovish Fed -> ekspektasi suku bunga dan likuiditas dolar -> selera risiko aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-11-10T13:30:00Z",
+      "waktu_wib": "10 Nov · 20:30 WIB",
+      "hari": "Selasa",
+      "nama": "Core CPI m/m",
+      "kategori": "ekonomi",
+      "dampak": "tinggi",
+      "perkiraan": false,
+      "jam_lagi": 8.7,
+      "relevansi_kripto": 5,
+      "jalur": "Core CPI m/m -> ekspektasi inflasi dan jalur suku bunga Fed -> dolar AS dan likuiditas -> aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-11-10T13:30:00Z",
+      "waktu_wib": "10 Nov · 20:30 WIB",
+      "hari": "Selasa",
+      "nama": "CPI m/m",
+      "kategori": "ekonomi",
+      "dampak": "tinggi",
+      "perkiraan": false,
+      "jam_lagi": 8.7,
+      "relevansi_kripto": 5,
+      "jalur": "CPI m/m -> ekspektasi inflasi dan pemangkasan suku bunga Fed -> dolar AS dan likuiditas -> aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-11-11T09:45:00Z",
+      "waktu_wib": "11 Nov · 16:45 WIB",
+      "hari": "Rabu",
+      "nama": "ECB President Lagarde Speaks (EUR)",
+      "kategori": "ekonomi",
+      "dampak": "menengah",
+      "perkiraan": false,
+      "jam_lagi": 29.0,
+      "relevansi_kripto": 2,
+      "jalur": "Pernyataan Lagarde -> ekspektasi suku bunga ECB dan EUR/USD -> dolar AS dan likuiditas global -> selera risiko aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-11-11T12:30:00Z",
+      "waktu_wib": "11 Nov · 19:30 WIB",
+      "hari": "Rabu",
+      "nama": "Rilis CPI AS",
+      "kategori": "cpi",
+      "dampak": "tinggi",
+      "perkiraan": true,
+      "jam_lagi": 31.7,
+      "relevansi_kripto": 5,
+      "jalur": "Rilis CPI AS -> ekspektasi inflasi dan suku bunga Fed -> dolar AS dan likuiditas -> aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-11-12T13:30:00Z",
+      "waktu_wib": "12 Nov · 20:30 WIB",
+      "hari": "Kamis",
+      "nama": "Unemployment Claims",
+      "kategori": "ekonomi",
+      "dampak": "menengah",
+      "perkiraan": false,
+      "jam_lagi": 56.7,
+      "relevansi_kripto": 3,
+      "jalur": "Unemployment Claims -> sinyal kondisi tenaga kerja AS -> ekspektasi suku bunga Fed -> dolar AS dan likuiditas -> aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-11-12T19:30:00Z",
+      "waktu_wib": "13 Nov · 02:30 WIB",
+      "hari": "Jumat",
+      "nama": "ECB President Lagarde Speaks (EUR)",
+      "kategori": "ekonomi",
+      "dampak": "menengah",
+      "perkiraan": false,
+      "jam_lagi": 62.7,
+      "relevansi_kripto": 2,
+      "jalur": "Pernyataan Lagarde -> ekspektasi suku bunga ECB dan EUR/USD -> dolar AS dan likuiditas global -> selera risiko aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-11-13T13:30:00Z",
+      "waktu_wib": "13 Nov · 20:30 WIB",
+      "hari": "Jumat",
+      "nama": "Core PPI m/m",
+      "kategori": "ekonomi",
+      "dampak": "tinggi",
+      "perkiraan": false,
+      "jam_lagi": 80.7,
+      "relevansi_kripto": 4,
+      "jalur": "Core PPI m/m -> ekspektasi tekanan inflasi lanjutan -> jalur suku bunga Fed -> dolar AS dan likuiditas -> aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-11-13T13:30:00Z",
+      "waktu_wib": "13 Nov · 20:30 WIB",
+      "hari": "Jumat",
+      "nama": "PPI m/m",
+      "kategori": "ekonomi",
+      "dampak": "tinggi",
+      "perkiraan": false,
+      "jam_lagi": 80.7,
+      "relevansi_kripto": 4,
+      "jalur": "PPI m/m -> ekspektasi inflasi producer dan tekanan biaya -> jalur suku bunga Fed -> dolar AS dan likuiditas -> aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-11-27T08:00:00Z",
+      "waktu_wib": "27 Nov · 15:00 WIB",
+      "hari": "Jumat",
+      "nama": "Expiry opsi bulanan Deribit",
+      "kategori": "opsi",
+      "dampak": "menengah",
+      "perkiraan": false,
+      "jam_lagi": 411.2,
+      "relevansi_kripto": 4,
+      "jalur": "Expiry opsi bulanan Deribit -> arus rebalancing dealer dan tarikan ke max pain -> volatilitas BTC meningkat -> harga dapat bergerak dua arah",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-11-27T12:30:00Z",
+      "waktu_wib": "27 Nov · 19:30 WIB",
+      "hari": "Jumat",
+      "nama": "Rilis PCE inti AS",
+      "kategori": "pce",
+      "dampak": "menengah",
+      "perkiraan": true,
+      "jam_lagi": 415.7,
+      "relevansi_kripto": 4,
+      "jalur": "Rilis PCE inti AS -> ukuran inflasi favorit Fed -> ekspektasi suku bunga dan likuiditas dolar -> aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-12-04T12:30:00Z",
+      "waktu_wib": "4 Des · 19:30 WIB",
+      "hari": "Jumat",
+      "nama": "Rilis Non-Farm Payrolls AS",
+      "kategori": "nfp",
+      "dampak": "tinggi",
+      "perkiraan": true,
+      "jam_lagi": 583.7,
+      "relevansi_kripto": 5,
+      "jalur": "Rilis Non-Farm Payrolls AS -> sinyal pasar tenaga kerja -> ekspektasi suku bunga Fed -> dolar AS dan likuiditas -> aset berisiko -> BTC",
+      "arah": "dua_arah"
+    },
+    {
+      "waktu_utc": "2026-12-09T12:30:00Z",
+      "waktu_wib": "9 Des · 19:30 WIB",
+      "hari": "Rabu",
+      "nama": "Rilis CPI AS",
+      "kategori": "cpi",
+      "dampak": "tinggi",
+      "perkiraan": true,
+      "jam_lagi": 703.7,
+      "relevansi_kripto": 5,
+      "jalur": "Rilis CPI AS -> ekspektasi inflasi dan jalur suku bunga Fed -> dolar AS dan likuiditas -> aset berisiko -> BTC",
+      "arah": "dua_arah"
+    }
+  ],
+  "conflicts": [],
+  "diff_vs_previous": {
+    "tersedia": true,
+    "dibanding": "9 November 2026, 09:53 WIB",
+    "harga": {
+      "sekarang": 74721.6,
+      "sebelumnya": 75406.1,
+      "selisih": -684.5,
+      "selisih_pct": -0.91
+    },
+    "sentimen": {
+      "sekarang": -11.6,
+      "sebelumnya": -71.7,
+      "selisih": 60.1,
+      "selisih_pct": -83.82
+    },
+    "funding_rate": {
+      "sekarang": 5.8e-05,
+      "sebelumnya": 3.2e-05,
+      "selisih": 2.5e-05,
+      "selisih_pct": 78.17
+    },
+    "fear_greed": {
+      "sekarang": 32,
+      "sebelumnya": 29,
+      "selisih": 3,
+      "selisih_pct": 10.34
+    },
+    "rsi_1d": {
+      "sekarang": 36.2,
+      "sebelumnya": 38.0,
+      "selisih": -1.8,
+      "selisih_pct": -4.74
+    },
+    "tema_baru": [
+      "adopsi",
+      "etf",
+      "makro"
+    ],
+    "tema_hilang": [
+      "arus keluar ETF dan minat institusional",
+      "deleverage dan likuidasi beruntun yang mulai mereda",
+      "tekanan regulasi pada ekosistem bursa"
+    ],
+    "berita_baru": 25,
+    "ringkasan": [
+      "Harga turun 0,91% sejak brief sebelumnya.",
+      "Skor sentimen berita menguat dari -72 ke -12.",
+      "Fear & Greed naik 3 poin ke 32.",
+      "Tema baru muncul: adopsi, etf, makro.",
+      "Tema yang mereda: arus keluar ETF dan minat institusional, deleverage dan likuidasi beruntun yang mulai mereda, tekanan regulasi pada ekosistem bursa.",
+      "25 berita baru masuk daftar pantauan."
+    ]
+  },
+  "ai": {
+    "narrative": "",
+    "bagian": {},
+    "narrative_singkat": "",
+    "penyebab_pergerakan": [],
+    "bagian_ditahan": [],
+    "tanda_editorial": [],
+    "teknikal": {
+      "ringkasan": "Struktur teknikal harian menunjukkan fase tekanan turun yang mulai kehilangan tenaga, dengan harga bertahan tipis di atas EMA200 dan dekat area Fibonacci 0,5. Momentum jual melemah, muncul divergensi bullish pada RSI dan pola sapuan likuiditas bawah, namun jejak distribusi pada OBV masih membebani. Pergerakan 24 jam terakhir relatif datar sehingga pasar tampak dalam fase menunggu konfirmasi arah berikutnya.",
+      "struktur": "Harga harian saat ini berada di bawah EMA20, EMA50, dan EMA100, menandakan tren menengah masih cenderung turun, tetapi masih sedikit di atas EMA200 yang berperan sebagai penopang tren jangka lebih panjang. Struktur tren diklasifikasikan 'campuran', sejalan dengan posisi harga yang terjepit antara tekanan turun jangka menengah dan dukungan jangka panjang di EMA200. Harga juga bergerak sangat dekat dengan level Fibonacci 0,5 dan pivot harian, menunjukkan area konsolidasi penting di sekitar kisaran ini. Support utama terdekat berada di 72.012 sementara resistance rapat di 74.949–76.136, sehingga setiap penembusan area ini berpotensi mengubah bias jangka pendek.",
+      "momentum_volume": "RSI di sekitar 36 berada di zona netral condong lemah, tetapi divergensi bullish pada RSI menunjukkan pelemahan tekanan jual meski harga sempat membuat level rendah baru. MACD masih negatif (tren momentum turun), namun histogram yang menguat menandakan momentum turun mulai melandai; Stoch RSI yang sangat rendah mengindikasikan kondisi jenuh jual jangka pendek. Volume candle harian saat ini masih parsial (sekitar 19% hari berjalan), sehingga rasio volume terhadap rata-rata belum bisa dipakai untuk menilai kekuatan pergerakan hari ini. OBV masih mengarah turun (menggunakan data hingga candle selesai terakhir), mengonfirmasi bahwa fase sebelumnya didominasi distribusi/tekanan jual dan belum menunjukkan pembalikan volume yang jelas.",
+      "konfluensi": [
+        "Harga di bawah EMA20/50/100 namun tepat di atas EMA200, konsisten dengan tren turun menengah yang mulai bertemu dukungan tren jangka lebih panjang",
+        "RSI yang rendah, Stoch RSI di area jenuh jual, dan MACD yang mulai menguat sama-sama mengindikasikan momentum jual melemah",
+        "Divergensi bullish pada RSI selaras dengan pola sapuan likuiditas bawah yang juga dibaca condong naik (potensi exhaustion penjual)",
+        "ATR sekitar 2,9% menunjukkan volatilitas masih aktif namun tidak ekstrem, cocok dengan narasi konsolidasi setelah fase tekan-turun"
+      ],
+      "kontradiksi": [
+        "OBV yang tetap turun menandakan tekanan distribusi sebelumnya masih dominan, berlawanan dengan sinyal potensi penguatan dari divergensi bullish RSI dan sapuan likuiditas bawah",
+        "Harga masih jelas di bawah EMA20/50/100 (bias turun menengah) sementara momentum indikator mulai melemah ke bawah dan memberi sinyal potensi relief/pantulan",
+        "Level resistance dekat (sekitar 74.949–76.136 dan pivot 74.903) menekan dari atas, bertentangan dengan indikasi teknikal yang mulai condong ke pemulihan jangka pendek"
+      ],
+      "kualitas_tren": "melemah",
+      "pembatalan": "Pembacaan bahwa tekanan turun mulai melemah dan penurunan terakhir lebih mirip sapuan likuiditas akan dianggap batal jika terjadi satu atau lebih penutupan harian yang jelas di bawah support 72.012 disertai lanjutan penurunan OBV, karena itu mengindikasikan penjual baru masuk dan pergerakan berubah menjadi kelanjutan tren turun yang sehat, bukan sekadar pembersihan stop."
+    },
+    "whale": {
+      "ringkasan": "Whale dan ritel saat ini sama-sama dominan di sisi long, dengan ritel sedikit lebih agresif sementara tren long keduanya sama-sama sedikit melemah. Divergensi yang kecil dan 'selaras' menunjukkan belum ada pola distribusi atau akumulasi yang jelas dari pemain besar terhadap ritel. Tekanan taker cenderung ke penjual namun masih tergolong seimbang, dan penurunan open interest yang sangat kecil menandakan likuidasi long ada tapi skalanya terbatas. Sapuan likuiditas ke bawah di timeframe harian memberi indikasi kuat bahwa penurunan terakhir berpotensi lebih banyak memanen stop daripada memulai tren baru yang jelas.",
+      "sinyal_palsu": [
+        {
+          "pola": "sapuan likuiditas bawah (break swing low lalu harga cepat pulih)",
+          "arti": "Penembusan ke bawah swing low yang tidak bertahan dan langsung ditarik naik kembali cenderung berarti likuiditas (stop/likuidasi long) dipanen, bukan konfirmasi kelanjutan penurunan yang bersih.",
+          "keyakinan": "tinggi"
+        },
+        {
+          "pola": "penurunan harga harian ringan dengan rasio taker buy/sell < 1 namun open interest nyaris tidak turun",
+          "arti": "Tekanan jual dari taker tidak diikuti penyusutan open interest yang signifikan, sehingga sebagian pergerakan turun bisa jadi hanya menggoyang posisi eksisting, bukan pembentukan tren kuat baru.",
+          "keyakinan": "sedang"
+        }
+      ],
+      "posisi_whale_vs_ritel": "Posisi whale dan ritel saat ini selaras sama-sama net long, sehingga belum tampak skenario distribusi atau akumulasi agresif dari pemain besar terhadap ritel.",
+      "tingkat_kewaspadaan": "sedang",
+      "catatan": "Sapuan likuiditas bawah di timeframe 1D dengan kekuatan sinyal cukup tinggi menunjukkan penurunan ke area low terbaru berpotensi lebih didorong kebutuhan memanen likuiditas daripada niat melanjutkan tekanan turun yang bersih.\nNamun karena whale dan ritel sama-sama berada di sisi long dan tren long keduanya sedikit melemah, penting untuk mewaspadai jika ke depan muncul pergeseran: misalnya ritel te"
+    },
+    "outlook": {
+      "ringkasan": "Bitcoin saat ini berkonsolidasi tepat di atas EMA200 harian dan area Fibonacci 0,5, sementara momentum jual mulai melemah namun jejak distribusi volume masih membebani. Beberapa hari ke depan, arah akan banyak ditentukan oleh respons pasar terhadap rangkaian data inflasi AS, dinamika dolar dan yield, serta apakah arus keluar ETF dan penjualan institusi seperti miner berlanjut atau mulai mereda. Selama pasar berada di kisaran support 72.012–74.700 dan volatilitas makro tetap terkontrol, fase tunggu-konfirmasi ini cenderung berlanjut dengan sensitivitas tinggi terhadap kejutan berita makro dan regulasi.",
+      "narasi_geopolitik": "Lingkungan makro saat ini relatif condong ke selera risiko: indeks saham AS menguat kuat, VIX turun tajam, dolar (DXY) melemah ke sekitar 101,7, sementara emas juga menguat sebagai sinyal pencarian lindung nilai terhadap inflasi. Namun yield Treasury 10 tahun yang masih tinggi di sekitar 4,86% menjaga biaya modal tetap mahal, sehingga setiap kejutan inflasi dari rilis CPI dan PPI AS dalam beberapa hari ke depan bisa dengan cepat mengubah ekspektasi pemangkasan suku bunga Fed. Jika data inflasi memberi ruang bagi Fed untuk terdengar lebih dovish, premi risiko atas aset berisiko termasuk Bitcoin bisa turun melalui jalur pelemahan dolar dan penurunan yield; sebaliknya, data yang dianggap terlalu panas berpotensi mengembalikan tekanan pada BTC lewat penguatan dolar dan pengetatan likuiditas global.\n\nDi sisi arus institusional, ETF spot Bitcoin AS baru saja mencatat outflow mingguan terbesar sejak Juni, sekitar $1,3 miliar, yang mengindikasikan fase pengurangan eksposur oleh sebagian investor tradisional meski ada sinyal minat kuat dari whale yang menukar kepemilikan on-chain ke saham ETF IBIT karena alasan keamanan. Bersamaan dengan itu, aksi korporasi dan miner terbelah: ada pembelian tambahan lebih dari seribu BTC oleh entitas korporat besar, sementara MARA menjual puluhan ribu BTC dan menyatakan akan terus menjual, sehingga keseimbangan antara akumulasi dan distribusi institusional menjadi salah satu penentu apakah tekanan pasokan tetap tinggi atau mulai terserap. Dinamika ini",
+      "skenario_naik": {
+        "pemicu": [
+          "Data CPI, PPI, dan klaim pengangguran AS beberapa hari ke depan dibaca cukup jinak sehingga ekspektasi pemangkasan suku bunga Fed menguat dan dolar (DXY) tidak berbalik menguat tajam dari area 101,7 saat ini",
+          "Yield Treasury 10Y gagal menembus lebih tinggi secara signifikan dari kisaran 4,86% sehingga tekanan diskonto terhadap aset berisiko tidak bertambah",
+          "Outflow ETF spot Bitcoin AS mengecil atau berbalik menjadi aliran masuk bersih, sementara narasi whale yang beralih ke IBIT menguat dan penjualan lanjutan dari miner seperti MARA tidak bertambah agresif",
+          "Indeks saham utama AS (Nasdaq, S&P 500) mempertahankan rebound saat ini dan VIX tetap terjaga di level rendah, menjaga mode risk-on yang mendukung aset berisiko termasuk BTC",
+          "Secara teknikal, divergensi bullish RSI dan pola sapuan likuiditas bawah terkonfirmasi oleh stabilnya OBV dan bertahannya funding rate di level wajar tanpa lonjakan euforia long"
+        ],
+        "kondisi": "Selama harga bertahan di atas EMA200 harian sekitar 74.704 dan support struktural 72.012, serta tidak terjadi penutupan harian yang jelas di bawah Fibonacci 0,618 di sekitar 71.868 disertai lonjakan distribusi volume, skenario pemulihan bertahap dari zona dukungan ini tetap terbuka."
+      },
+      "skenario_turun": {
+        "pemicu": [
+          "Rilis CPI dan PPI AS keluar lebih tinggi dari yang diantisipasi pasar sehingga probabilitas kenaikan atau penundaan pemangkasan suku bunga Desember naik, mendorong penguatan dolar dan kenaikan lebih lanjut yield 10Y di atas area 4,86%",
+          "Outflow ETF spot Bitcoin AS berlanjut dalam skala besar sehingga penerbit ETF terus mengurangi kepemilikan BTC, sementara penjualan tambahan dari miner seperti MARA menambah suplai di pasar spot",
+          "Peningkatan kekhawatiran regulasi menyusul tenggat senator AS untuk Binance, Tether, dan perusahaan kripto Trump, atau eskalasi lebih jauh dari investigasi seperti kasus Nvidia, memicu pengurangan risiko di aset kripto",
+          "Pasar global beralih ke mode risk-off, tercermin dari koreksi signifikan indeks saham AS dan kenaikan kembali VIX dari area rendah saat ini, sehingga posisi leverage di kripto dibongkar untuk menutup kerugian di aset lain",
+          "Secara teknikal, OBV melanjutkan tren turun tajam, funding rate tetap atau naik positif meskipun harga melemah (crowding long), dan support 72.012 ditembus dengan peningkatan volume serta open interest likuidasi long yang lebih besar"
+        ],
+        "kondisi": "Selama harga gagal kembali dan bertahan di atas zona resistance rapat 74.949–76.136 dan kemudian mencetak satu atau lebih penutupan harian yang jelas di bawah support 72.012 maupun level invalidasi naik 70.920, dengan konfirmasi penurunan OBV, tekanan turun berkelanjutan dari zona distribusi saat in"
+      },
+      "faktor_geopolitik": [
+        "Outflow besar ETF spot Bitcoin AS dan dinamika minat whale ke IBIT",
+        "Penjualan BTC berskala besar oleh MARA dan strategi korporasi lain terhadap treasury Bitcoin",
+        "Penyelidikan terhadap Nvidia yang memicu likuidasi besar di kripto",
+        "Tekanan regulasi AS terhadap Binance, Tether, dan entitas kripto terkait Trump",
+        "Risiko perubahan aliran modal Jepang dan potensi unwind carry trade yang mempengaruhi likuiditas global"
+      ],
+      "horizon": "3-7 hari ke depan"
+    },
+    "model_used": "deepseek/deepseek-v3.2, x-ai/grok-4.3, openai/gpt-5.1, anthropic/claude-sonnet-5",
+    "generated_at": "2026-11-10T04:49:12Z",
+    "critic": {
+      "passed": true,
+      "corrections": [],
+      "tanda": [],
+      "dijalankan": true
+    }
+  },
+  "agen_kebijakan": {
+    "jendela": {
+      "fase": "tutup_harian",
+      "waktu_ny": "2026-11-09 23:45 EST",
+      "bursa_as_buka": false,
+      "jam_sampai_buka": 9.7,
+      "panjang_jeda_jam": 17.5,
+      "jeda_mulai": "Senin 16.00 EST",
+      "jeda_berjalan_jam": 7.8,
+      "dalam_jendela_rawan": false,
+      "buka_berikutnya_utc": "2026-11-10T14:30:00+00:00",
+      "tutup_berikutnya_utc": null,
+      "buka_berikutnya_wib": "Selasa · 10 Nov · 21:30 WIB"
+    },
+    "kerapuhan": {
+      "skor": 1,
+      "maks": 5,
+      "tingkat": "rendah",
+      "faktor": [
+        {
+          "nama": "posisi menumpuk satu sisi",
+          "keterangan": "funding bertahan 64 jam di sisi long — bahan bakar likuidasi beruntun kalau arah berbalik"
+        }
+      ]
+    },
+    "risiko_jendela": {
+      "tingkat": "rendah",
+      "fase": "tutup_harian",
+      "dalam_jendela_rawan": false,
+      "kerapuhan": "rendah"
+    },
+    "pendaratan": {
+      "kuat": 7,
+      "kuat_di_jendela_rawan": 5,
+      "ada_yang_tertahan": true
+    }
+  },
+  "tautan_luar": [
+    {
+      "label": "Lihat Arena Pertempuran BTC",
+      "url": "https://tigorworks.github.io/crypto-battlefield/",
+      "ikon": "swords",
+      "deskripsi": ""
+    }
+  ],
+  "bot_telegram": "tmmcrypto_bot",
+  "disclaimer": "Konten ini bersifat informasional dan bukan saran investasi."
+}
