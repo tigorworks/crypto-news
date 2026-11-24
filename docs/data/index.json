@@ -1,6 +1,13 @@
 {
-  "updated_at": "2026-11-23T03:50:34Z",
+  "updated_at": "2026-11-24T07:06:42Z",
   "items": [
+    {
+      "file": "archive/2026-11-24-1407.json",
+      "waktu_wib": "24 Nov 2026, 14:07",
+      "waktu_utc": "2026-11-24T07:06:42Z",
+      "harga": 60526.8,
+      "sentimen": 7.1
+    },
     {
       "file": "archive/2026-11-23-1051.json",
       "waktu_wib": "23 Nov 2026, 10:51",
@@ -595,13 +602,6 @@
       "waktu_utc": "2026-08-26T16:49:11Z",
       "harga": 77978.55,
       "sentimen": 8.2
-    },
-    {
-      "file": "archive/2026-08-26-0646.json",
-      "waktu_wib": "26 Agu 2026, 06:46",
-      "waktu_utc": "2026-08-25T23:46:04Z",
-      "harga": 78647.0,
-      "sentimen": 68.5
     }
   ]
 }
