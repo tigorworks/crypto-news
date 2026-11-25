@@ -1,6 +1,13 @@
 {
-  "updated_at": "2026-11-24T07:06:42Z",
+  "updated_at": "2026-11-25T05:35:46Z",
   "items": [
+    {
+      "file": "archive/2026-11-25-1236.json",
+      "waktu_wib": "25 Nov 2026, 12:36",
+      "waktu_utc": "2026-11-25T05:35:46Z",
+      "harga": 59217.5,
+      "sentimen": -52.8
+    },
     {
       "file": "archive/2026-11-24-1407.json",
       "waktu_wib": "24 Nov 2026, 14:07",
@@ -581,27 +588,6 @@
       "waktu_utc": "2026-08-28T00:03:22Z",
       "harga": 80275.3,
       "sentimen": 38.2
-    },
-    {
-      "file": "archive/2026-08-27-1138.json",
-      "waktu_wib": "27 Agu 2026, 11:38",
-      "waktu_utc": "2026-08-27T04:38:17Z",
-      "harga": 78742.7,
-      "sentimen": 24.0
-    },
-    {
-      "file": "archive/2026-08-27-1019.json",
-      "waktu_wib": "27 Agu 2026, 10:19",
-      "waktu_utc": "2026-08-27T03:19:24Z",
-      "harga": 78718.8,
-      "sentimen": -38.7
-    },
-    {
-      "file": "archive/2026-08-26-2349.json",
-      "waktu_wib": "26 Agu 2026, 23:49",
-      "waktu_utc": "2026-08-26T16:49:11Z",
-      "harga": 77978.55,
-      "sentimen": 8.2
     }
   ]
 }
